@@ -1,0 +1,526 @@
+---
+description: What SimpleLoggerAdvisor and SafeGuardAdvisor really do, and how to write three production advisors (PII redaction, a daily token budget and a semantic cache) and place each one where its order does the right thing.
+---
+
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import GuardrailLab from '@/components/islands/GuardrailLab';
+
+The previous lesson showed how the chain runs. This one fills it: two built-in advisors you will use on day one, and three you
+write yourself. For each, the code is short. The decision that matters is where it sits in the order.
+
+## 1. Spring mental model
+
+Advisors do three kinds of work, and each kind has a natural shape:
+
+| The advisor | Like | Shape |
+| --- | --- | --- |
+| Changes the request or response | A `HandlerInterceptor` | `BaseAdvisor` with `before` and `after` |
+| Wraps the call | A metering `Filter` | `CallAdvisor` around `chain.nextCall(...)` |
+| Answers without the model | A `Filter` that returns early | Returns a response without calling `nextCall` |
+
+PII redaction is the first kind, a token budget the second, and `SafeGuardAdvisor` and a semantic cache the third.
+
+Two advisors ship in `spring-ai-client-chat`:
+
+- **`SimpleLoggerAdvisor`** logs the request and the response at `DEBUG` under its own class name, so set
+  `logging.level.org.springframework.ai.chat.client.advisor` to `DEBUG`. The request is logged with
+  `ChatClientRequest.toString()`, which includes every message and the context map; the response is logged as pretty-printed JSON.
+  For streams it logs the aggregated answer once. You can replace either format with `requestToString` and `responseToString` on
+  its builder.
+- **`SafeGuardAdvisor`** blocks a call when the prompt contains a sensitive word. It lower-cases the text of every message in the
+  prompt, system message and memory included, and checks each word with `String.contains`. On a match it returns its failure
+  response (by default "I'm unable to respond to that due to sensitive content. Could we rephrase or discuss something else?")
+  and the model is never called.
+
+Both default to order `0`, which is rarely where you want them. Here is the order the lesson code uses, outermost first:
+
+| Order | Advisor | Why it sits there |
+| --- | --- | --- |
+| `HIGHEST_PRECEDENCE + 25` | `SafeGuardAdvisor` | A blocked call stops before anything is stored, logged or spent. |
+| `+ 50` | `TokenBudgetAdvisor` | Outside memory and the tool loop: a refused call stores nothing, and the usage it counts covers every tool round. |
+| `+ 100` | `PiiRedactionAdvisor` | Before memory and the logger, so neither ever holds the raw text. |
+| `+ 200` | `MessageChatMemoryAdvisor` | Its default. |
+| `+ 250` | `AnswerLanguageAdvisor` | From the previous lesson: once per call, before the tool loop. |
+| `+ 280` | `SemanticCacheAdvisor` | On a separate FAQ client, just before tool calling, so a hit skips the tools and the model. |
+| `+ 300` | `ToolCallingAdvisor` | Added by `ChatClient`. |
+| `0` | `SimpleLoggerAdvisor` | Inside the tool loop, so you see every model call. |
+
+## 2. Interactive sandbox
+
+<GuardrailLab client:visible />
+
+Things to try:
+
+- Send **What is a classname?** The word `ssn` is inside `classname`, so the guard blocks a harmless question.
+- With the guard at `0`, send **I forgot my password**, then **Can you help with my invoice?** a few times. The guard runs after
+  memory, sees the earlier message in the prompt, and blocks every turn until the window drops it. Move the guard to
+  `HIGHEST_PRECEDENCE + 25` and the conversation recovers at once, because blocked calls are no longer stored.
+- Turn on redaction **after memory** and send the card number. The model gets `[card]`, but memory, and every later prompt,
+  keep the real number. Move it **before memory**.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+The advisors need nothing new. The semantic cache needs a `VectorStore` bean, which Module 4 sets up; until then, leave out the
+FAQ client below.
+
+PII redaction is a request transformation, so it is a `BaseAdvisor`. Its order is the important line:
+
+<CodeFile title="src/main/java/com/example/support/chat/PiiRedactionAdvisor.java">
+```java {22,28}
+package com.example.support.chat;
+
+import java.util.Map;
+import java.util.regex.Pattern;
+
+import org.springframework.ai.chat.client.ChatClientRequest;
+import org.springframework.ai.chat.client.ChatClientResponse;
+import org.springframework.ai.chat.client.advisor.api.AdvisorChain;
+import org.springframework.ai.chat.client.advisor.api.BaseAdvisor;
+import org.springframework.core.Ordered;
+
+/** Masks e-mail addresses and card numbers in the user message before memory, logs or the model see it. */
+public final class PiiRedactionAdvisor implements BaseAdvisor {
+
+    private static final Map<Pattern, String> RULES = Map.of(
+            Pattern.compile("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"), "[email]",
+            Pattern.compile("\\b(?:\\d[ -]?){12,18}\\d\\b"), "[card]");
+
+    @Override
+    public int getOrder() {
+        // Before memory (+200), so the conversation is stored already redacted.
+        return Ordered.HIGHEST_PRECEDENCE + 100;
+    }
+
+    @Override
+    public ChatClientRequest before(ChatClientRequest request, AdvisorChain chain) {
+        return request.mutate()
+                .prompt(request.prompt().augmentUserMessage(user -> user.mutate().text(redact(user.getText())).build()))
+                .build();
+    }
+
+    @Override
+    public ChatClientResponse after(ChatClientResponse response, AdvisorChain chain) {
+        return response;
+    }
+
+    static String redact(String text) {
+        String result = text;
+        for (var rule : RULES.entrySet()) {
+            result = rule.getKey().matcher(result).replaceAll(rule.getValue());
+        }
+        return result;
+    }
+}
+```
+</CodeFile>
+
+A budget wraps the call. It checks the user's spend before the call and adds the call's total tokens after it. Because it sits
+outside the tool loop, `getTotalTokens()` already includes every round:
+
+<CodeFile title="src/main/java/com/example/support/chat/TokenBudgetAdvisor.java">
+```java {47,50,51}
+package com.example.support.chat;
+
+import java.time.Clock;
+import java.time.LocalDate;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+import org.springframework.ai.chat.client.ChatClientRequest;
+import org.springframework.ai.chat.client.ChatClientResponse;
+import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
+import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
+import org.springframework.core.Ordered;
+import org.springframework.util.Assert;
+
+/** Refuses a user's calls once they have spent their daily token budget. */
+public final class TokenBudgetAdvisor implements CallAdvisor {
+
+    public static final String USER_ID = "support.user-id";
+
+    private final long dailyTokens;
+    private final Clock clock;
+    private final ConcurrentMap<String, DailySpend> spend = new ConcurrentHashMap<>();
+
+    public TokenBudgetAdvisor(long dailyTokens, Clock clock) {
+        this.dailyTokens = dailyTokens;
+        this.clock = clock;
+    }
+
+    @Override
+    public String getName() {
+        return "TokenBudgetAdvisor";
+    }
+
+    @Override
+    public int getOrder() {
+        // Outside memory and the tool loop: a refused call stores nothing, and the usage covers every tool round trip.
+        return Ordered.HIGHEST_PRECEDENCE + 50;
+    }
+
+    @Override
+    public ChatClientResponse adviseCall(ChatClientRequest request, CallAdvisorChain chain) {
+        Object userId = request.context().get(USER_ID);
+        Assert.state(userId != null, () -> USER_ID + " advisor parameter is required");
+        LocalDate today = LocalDate.now(clock);
+        DailySpend current = spend.get(userId.toString());
+        if (current != null && current.day().equals(today) && current.tokens() >= dailyTokens) {
+            throw new TokenBudgetExceededException(userId.toString(), dailyTokens);
+        }
+        ChatClientResponse response = chain.nextCall(request);
+        long used = response.chatResponse().getMetadata().getUsage().getTotalTokens();
+        spend.merge(userId.toString(), new DailySpend(today, used), DailySpend::plus);
+        return response;
+    }
+
+    private record DailySpend(LocalDate day, long tokens) {
+
+        DailySpend plus(DailySpend next) {
+            return day.equals(next.day) ? new DailySpend(day, tokens + next.tokens) : next;
+        }
+    }
+}
+```
+</CodeFile>
+
+Turn the exception into a `429 Too Many Requests` for the client:
+
+<CodeFile title="src/main/java/com/example/support/chat/SupportChatErrorHandler.java">
+```java {13}
+package com.example.support.chat;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+@RestControllerAdvice
+class SupportChatErrorHandler {
+
+    @ExceptionHandler
+    ProblemDetail budgetExceeded(TokenBudgetExceededException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS,
+                "You have reached today's assistant limit. It resets at midnight UTC.");
+    }
+}
+```
+</CodeFile>
+
+A semantic cache answers without the model. It searches a vector store for an earlier question that means the same thing and
+returns the stored answer as the response. It only caches a first question: a follow-up such as "and the other one?" depends on
+the history, so another conversation's answer can't fit it.
+
+<CodeFile title="src/main/java/com/example/support/chat/SemanticCacheAdvisor.java">
+```java {44,51,55,63}
+package com.example.support.chat;
+
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.ai.chat.client.ChatClientRequest;
+import org.springframework.ai.chat.client.ChatClientResponse;
+import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
+import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.core.Ordered;
+
+/** Answers a first question with the stored answer to a similar one, without calling the model. */
+public final class SemanticCacheAdvisor implements CallAdvisor {
+
+    private static final String ANSWER = "answer";
+
+    private final VectorStore vectorStore;
+    private final double similarityThreshold;
+
+    public SemanticCacheAdvisor(VectorStore vectorStore, double similarityThreshold) {
+        this.vectorStore = vectorStore;
+        this.similarityThreshold = similarityThreshold;
+    }
+
+    @Override
+    public String getName() {
+        return "SemanticCacheAdvisor";
+    }
+
+    @Override
+    public int getOrder() {
+        // Just before the tool loop (+300), so a hit skips the tools and the model.
+        return Ordered.HIGHEST_PRECEDENCE + 280;
+    }
+
+    @Override
+    public ChatClientResponse adviseCall(ChatClientRequest request, CallAdvisorChain chain) {
+        if (request.prompt().getUserMessages().size() != 1) {
+            return chain.nextCall(request); // a follow-up depends on the history, so another answer doesn't fit it
+        }
+        String question = request.prompt().getUserMessage().getText();
+        List<Document> hits = vectorStore.similaritySearch(SearchRequest.builder()
+                .query(question)
+                .topK(1)
+                .similarityThreshold(similarityThreshold)
+                .build());
+        if (!hits.isEmpty()) {
+            var cached = new AssistantMessage((String) hits.getFirst().getMetadata().get(ANSWER));
+            return ChatClientResponse.builder()
+                    .chatResponse(new ChatResponse(List.of(new Generation(cached))))
+                    .context(request.context())
+                    .build();
+        }
+        ChatClientResponse response = chain.nextCall(request);
+        String answer = response.chatResponse().getResult().getOutput().getText();
+        if (answer != null && !answer.isBlank()) {
+            vectorStore.add(List.of(new Document(question, Map.of(ANSWER, answer))));
+        }
+        return response;
+    }
+}
+```
+</CodeFile>
+
+The configuration puts it all together. The support client gets the guard, budget, redaction, memory, language and logging; the
+FAQ client gets the cache, without memory:
+
+<CodeFile title="src/main/java/com/example/support/chat/SupportChatConfig.java">
+```java {26,40}
+package com.example.support.chat;
+
+import java.time.Clock;
+import java.util.List;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.SafeGuardAdvisor;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+
+@Configuration(proxyBeanMethods = false)
+class SupportChatConfig {
+
+    @Bean
+    ChatClient supportChatClient(ChatClient.Builder builder, ChatMemory chatMemory) {
+        return builder
+                .defaultSystem("You are the support assistant for Acme Cloud.")
+                .defaultAdvisors(
+                        SafeGuardAdvisor.builder()
+                                .sensitiveWords(List.of("internal only", "api_key"))
+                                .order(Ordered.HIGHEST_PRECEDENCE + 25)
+                                .build(),
+                        new TokenBudgetAdvisor(200_000, Clock.systemUTC()),   // + 50
+                        new PiiRedactionAdvisor(),                            // + 100
+                        MessageChatMemoryAdvisor.builder(chatMemory).build(), // + 200
+                        new AnswerLanguageAdvisor(),                          // + 250
+                        new SimpleLoggerAdvisor())                            // 0
+                .build();
+    }
+
+    @Bean
+    ChatClient faqChatClient(ChatClient.Builder builder, VectorStore vectorStore) {
+        return builder
+                .defaultSystem("Answer questions about Acme Cloud plans and billing.")
+                .defaultAdvisors(new PiiRedactionAdvisor(), new SemanticCacheAdvisor(vectorStore, 0.92))
+                .build();
+    }
+}
+```
+</CodeFile>
+
+The tests use the real `ChatClient` and memory, with a lambda as the model, so they check the order as well as the code:
+
+<CodeFile title="src/test/java/com/example/support/chat/PiiRedactionAdvisorTest.java">
+```java {40}
+package com.example.support.chat;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.Prompt;
+
+class PiiRedactionAdvisorTest {
+
+    private final List<Prompt> prompts = new ArrayList<>();
+    private final ChatMemory chatMemory = MessageWindowChatMemory.builder().build();
+
+    private final ChatClient chatClient = ChatClient.builder(prompt -> {
+                prompts.add(prompt);
+                return new ChatResponse(List.of(new Generation(new AssistantMessage("Done."))));
+            })
+            .defaultAdvisors(new PiiRedactionAdvisor(), MessageChatMemoryAdvisor.builder(chatMemory).build())
+            .build();
+
+    @Test
+    void theModelAndTheMemoryOnlySeeTheRedactedMessage() {
+        chatClient.prompt()
+                .user("Refund card 4111 1111 1111 1111 and mail ada@example.com")
+                .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, "c-1"))
+                .call()
+                .content();
+
+        String redacted = "Refund card [card] and mail [email]";
+        assertThat(prompts.getLast().getUserMessage().getText()).isEqualTo(redacted);
+        assertThat(chatMemory.get("c-1").getFirst().getText()).isEqualTo(redacted);
+    }
+
+    @Test
+    void leavesOrderNumbersAndDatesAlone() {
+        assertThat(PiiRedactionAdvisor.redact("Order 1042 from 2026-11-18")).isEqualTo("Order 1042 from 2026-11-18");
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/test/java/com/example/support/chat/SemanticCacheAdvisorTest.java">
+```java {56,83}
+package com.example.support.chat;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
+
+import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+
+@ExtendWith(MockitoExtension.class)
+class SemanticCacheAdvisorTest {
+
+    @Mock
+    private VectorStore vectorStore;
+
+    @Captor
+    private ArgumentCaptor<List<Document>> stored;
+
+    private int modelCalls;
+
+    private ChatClient chatClient() {
+        return ChatClient.builder(prompt -> {
+                    modelCalls++;
+                    return new ChatResponse(List.of(new Generation(new AssistantMessage("Open Billing, then Change plan."))));
+                })
+                .defaultAdvisors(new SemanticCacheAdvisor(vectorStore, 0.92))
+                .build();
+    }
+
+    @Test
+    void answersASimilarQuestionWithoutCallingTheModel() {
+        given(vectorStore.similaritySearch(any(SearchRequest.class))).willReturn(List.of(
+                new Document("How do I change my plan?", Map.of("answer", "Open Billing, then Change plan."))));
+
+        String answer = chatClient().prompt().user("how can I switch plans").call().content();
+
+        assertThat(answer).isEqualTo("Open Billing, then Change plan.");
+        assertThat(modelCalls).isZero();
+        then(vectorStore).should(never()).add(anyList());
+    }
+
+    @Test
+    void storesTheAnswerAfterAMiss() {
+        given(vectorStore.similaritySearch(any(SearchRequest.class))).willReturn(List.of());
+
+        chatClient().prompt().user("How do I change my plan?").call().content();
+
+        assertThat(modelCalls).isOne();
+        then(vectorStore).should().add(stored.capture());
+        assertThat(stored.getValue()).singleElement().satisfies(document -> {
+            assertThat(document.getText()).isEqualTo("How do I change my plan?");
+            assertThat(document.getMetadata()).containsEntry("answer", "Open Billing, then Change plan.");
+        });
+    }
+
+    @Test
+    void skipsTheCacheForAFollowUp() {
+        chatClient().prompt()
+                .messages(new UserMessage("I'm on the Team plan."), new AssistantMessage("Thanks."))
+                .user("How do I change it?")
+                .call()
+                .content();
+
+        assertThat(modelCalls).isOne();
+        then(vectorStore).shouldHaveNoInteractions();
+    }
+}
+```
+</CodeFile>
+
+## 4. Production gotchas & security
+
+<Gotcha kind="security" title="SafeGuardAdvisor is a word list, not a security control">
+It matches substrings, so `ssn` blocks "classname", and it is trivially bypassed: `p a s s w o r d`, another language or a
+synonym all pass. Use it to stop obvious mistakes. Authorization, data access and prompt-injection defences belong in your code
+and your tools, not in a list of words.
+</Gotcha>
+
+<Gotcha kind="reliability" title="A guard after memory can block a whole conversation">
+At its default order `0`, `SafeGuardAdvisor` runs after memory and checks the stored history too. One blocked message is saved
+with the failure reply, and every later turn is blocked until the window drops it. It also checks the system message, so a
+sensitive word there blocks every request. Order it before memory, at `HIGHEST_PRECEDENCE + 25` or similar.
+</Gotcha>
+
+<Gotcha kind="security" title="SimpleLoggerAdvisor logs everything">
+At `DEBUG` it logs every message, including the full conversation history and retrieved documents, plus the context map. Keep
+it after redaction, keep that logger off in production unless your logs are cleared for personal data, or pass a
+`requestToString` function that logs only what you need.
+</Gotcha>
+
+<Gotcha kind="security" title="A shared cache can leak one user's answer to another">
+The semantic cache returns an answer written for someone else. Cache only answers that are the same for everyone, like FAQs,
+on a client without user-specific tools or documents. If answers differ per tenant, store the tenant in the document metadata
+and add a `filterExpression` to the search.
+</Gotcha>
+
+<Gotcha kind="reliability" title="The similarity threshold decides what counts as the same question">
+Too low, and "How do I cancel my plan?" returns the answer to "How do I change my plan?". Start high (0.92 here), log hits with
+the stored question, and lower it only when you have checked real pairs. Give cached entries an expiry, or clear them, when
+the source documents change.
+</Gotcha>
+
+<Gotcha kind="reliability" title="Call-only advisors don't run for stream()">
+`TokenBudgetAdvisor` and `SemanticCacheAdvisor` implement only `CallAdvisor`, and `stream()` skips them without a warning, so
+a streaming endpoint would bypass the budget. Implement `StreamAdvisor` as well, or don't offer streaming on that client. The
+budget also lives in one JVM: with several instances, keep the counters in Redis or your database.
+</Gotcha>
+
+## Recap
+
+- `SimpleLoggerAdvisor` logs full requests and responses at `DEBUG`; `SafeGuardAdvisor` blocks on a case-insensitive substring
+  match anywhere in the prompt. Both default to order `0`.
+- Change requests with `BaseAdvisor`, wrap calls with `CallAdvisor`, and answer early by returning a `ChatClientResponse`
+  without calling `nextCall`.
+- Order is the design: guards and budgets outermost, redaction before memory and logging, caches just before the tool loop.
+- Test advisors with the real `ChatClient`, real memory and a lambda model, so the tests check the order too.

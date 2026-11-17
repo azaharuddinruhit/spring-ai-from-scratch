@@ -1,0 +1,267 @@
+---
+description: How a ChatClient call travels through CallAdvisor, StreamAdvisor and BaseAdvisor, what getOrder() decides, why advisors below ToolCallingAdvisor run on every model call, and how to change a request without breaking the chain.
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import AdvisorChainLab from '@/components/islands/AdvisorChainLab';
+
+Every `ChatClient` call you have made so far went through advisors, even when you registered none: Module 2's format text came
+from `ChatModelCallAdvisor`, and `validateSchema()` added `StructuredOutputValidationAdvisor`. This lesson opens the chain itself:
+the order advisors run in, what they can change, and the one advisor that makes part of the chain run more than once.
+
+## 1. Spring mental model
+
+Advisors are servlet filters for model calls. Each one gets the request, can change it, passes it on, and gets the response on the
+way back.
+
+| Spring you know | Spring AI 2.0 | In short |
+| --- | --- | --- |
+| `Filter` | `CallAdvisor` | Wraps the rest of the chain. Not calling `nextCall` stops the call. |
+| `HandlerInterceptor` | `BaseAdvisor` | `before` and `after`, for both `call()` and `stream()`. |
+| `@Order` | `getOrder()` | Lower runs first on the way in, last on the way out. |
+| Request attributes | `request.context()` | A map for this call, filled by `.advisors(a -> a.param(...))`. |
+| `request.mutate()` in WebFlux | `request.mutate()` | Requests and prompts are immutable, so you pass on a changed copy. |
+
+The interfaces are small. `CallAdvisor.adviseCall(ChatClientRequest, CallAdvisorChain)` returns a `ChatClientResponse`.
+`StreamAdvisor.adviseStream(ChatClientRequest, StreamAdvisorChain)` returns a `Flux` of them. Both extend `Advisor`, which adds
+`getName()` and `getOrder()`. `ChatClientRequest` is a record of the `Prompt` and the context map; `ChatClientResponse` holds the
+`ChatResponse` and the context.
+
+These are the default orders in 2.0.2, read from the classes and from the chain a running `ChatClient` printed:
+
+| Advisor | Order | Who adds it |
+| --- | --- | --- |
+| `MessageChatMemoryAdvisor`, `VectorStoreChatMemoryAdvisor` | `HIGHEST_PRECEDENCE + 200` | You |
+| `ToolCallingAdvisor` | `HIGHEST_PRECEDENCE + 300` | `ChatClient`, on every client |
+| `SimpleLoggerAdvisor`, `SafeGuardAdvisor`, `QuestionAnswerAdvisor`, `RetrievalAugmentationAdvisor` | `0` | You |
+| `StructuredOutputValidationAdvisor` | `LOWEST_PRECEDENCE - 2000` | `validateSchema()` |
+| `ChatModelCallAdvisor` | `LOWEST_PRECEDENCE` | `ChatClient`, always last |
+
+`ToolCallingAdvisor` deserves its own diagram. When the model asks for a tool, it runs the tool and calls the rest of the chain
+again, so everything ordered after it runs once per model call. Advisors ordered before it run once per `ChatClient` call and see
+the finished answer, with the token usage of every round added up.
+
+<Mermaid
+  caption="One call with a tool. Memory runs once; the logger runs once per model call, inside the tool loop."
+  code={`
+flowchart TD
+  C["ChatClient.call()"] --> M["MessageChatMemoryAdvisor<br/>HIGHEST_PRECEDENCE + 200"]
+  M --> T["ToolCallingAdvisor<br/>HIGHEST_PRECEDENCE + 300"]
+  subgraph L["Once per model call"]
+    G["SimpleLoggerAdvisor<br/>0"] --> X["ChatModelCallAdvisor<br/>LOWEST_PRECEDENCE"]
+  end
+  T --> G
+  X --> P["ChatModel"]
+  P -.->|"tool call: run it, call again"| T
+`}
+/>
+
+Three more rules, all checked against the running code:
+
+- **Equal orders.** `SimpleLoggerAdvisor` and `SafeGuardAdvisor` both default to `0`, and so does a custom advisor that returns 0.
+  In 2.0.2 advisors with the same order run in reverse registration order. That is an implementation detail, not a contract.
+- **Short-circuiting.** An advisor that returns a response without calling `nextCall` ends the call there. Nothing below it runs,
+  including the model. `SafeGuardAdvisor` works this way.
+- **Streaming.** `BaseAdvisor` runs `before` on `getScheduler()`, which defaults to `Schedulers.boundedElastic()`, and runs `after`
+  only on the chunk that carries the finish reason. An advisor that implements only `CallAdvisor` is skipped by `stream()`.
+
+## 2. Interactive sandbox
+
+<AdvisorChainLab client:visible />
+
+Things to try:
+
+- Step through the default configuration with the tool call. `SimpleLoggerAdvisor` and `RetrievalAugmentationAdvisor` both run
+  twice, once for each model call, and memory runs once.
+- Move `RetrievalAugmentationAdvisor` to `HIGHEST_PRECEDENCE + 100`. It now runs before memory, so the documents are saved in the
+  conversation and sent again with every later question.
+- Move memory to `0`. It now sits inside the tool loop and stores the tool call and the tool result as well.
+- Leave the logger and RAG at `0` and watch which one runs first: the logger, because it is registered last.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+There are no new dependencies: the advisor API is part of `spring-ai-client-chat`, which every model starter brings in.
+
+Most custom advisors only need to change the request or the response, so extend `BaseAdvisor`. It works for both `call()` and
+`stream()`. This one adds a language instruction to the system message when the caller passes a `Locale`:
+
+<CodeFile title="src/main/java/com/example/support/chat/AnswerLanguageAdvisor.java">
+```java {19,24,29}
+package com.example.support.chat;
+
+import java.util.Locale;
+
+import org.springframework.ai.chat.client.ChatClientRequest;
+import org.springframework.ai.chat.client.ChatClientResponse;
+import org.springframework.ai.chat.client.advisor.api.AdvisorChain;
+import org.springframework.ai.chat.client.advisor.api.BaseAdvisor;
+import org.springframework.core.Ordered;
+
+/** Tells the model which language to answer in, taken from a per-request advisor parameter. */
+public final class AnswerLanguageAdvisor implements BaseAdvisor {
+
+    public static final String LANGUAGE = "support.answer-language";
+
+    @Override
+    public int getOrder() {
+        // After memory (+200) and before the tool loop (+300), so it runs once per call.
+        return Ordered.HIGHEST_PRECEDENCE + 250;
+    }
+
+    @Override
+    public ChatClientRequest before(ChatClientRequest request, AdvisorChain chain) {
+        if (!(request.context().get(LANGUAGE) instanceof Locale locale)) {
+            return request;
+        }
+        String instruction = "Answer in " + locale.getDisplayLanguage(Locale.ENGLISH) + ".";
+        return request.mutate()
+                .prompt(request.prompt().augmentSystemMessage(system -> system.mutate()
+                        .text(system.getText().isEmpty() ? instruction : system.getText() + "\n" + instruction)
+                        .build()))
+                .build();
+    }
+
+    @Override
+    public ChatClientResponse after(ChatClientResponse response, AdvisorChain chain) {
+        return response;
+    }
+}
+```
+</CodeFile>
+
+Register advisors once on the client. The comments record each order, so the chain can be read from the configuration:
+
+<CodeFile title="src/main/java/com/example/support/chat/SupportChatConfig.java">
+```java {17}
+package com.example.support.chat;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration(proxyBeanMethods = false)
+class SupportChatConfig {
+
+    @Bean
+    ChatClient supportChatClient(ChatClient.Builder builder, ChatMemory chatMemory) {
+        return builder
+                .defaultSystem("You are the support assistant for Acme Cloud.")
+                .defaultAdvisors(
+                        MessageChatMemoryAdvisor.builder(chatMemory).build(), // HIGHEST_PRECEDENCE + 200
+                        new AnswerLanguageAdvisor(),                          // HIGHEST_PRECEDENCE + 250
+                        new SimpleLoggerAdvisor())                            // 0, below the tool loop
+                .build();
+    }
+}
+```
+</CodeFile>
+
+Pass the value for one call with `.advisors(advisor -> advisor.param(AnswerLanguageAdvisor.LANGUAGE, Locale.GERMAN))`. The
+advisor reads it from `request.context()`.
+
+An advisor is plain Java, so you can test it with a lambda as the `ChatModel` and look at the prompt that reached it:
+
+<CodeFile title="src/test/java/com/example/support/chat/AnswerLanguageAdvisorTest.java">
+```java {20,37}
+package com.example.support.chat;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.Prompt;
+
+class AnswerLanguageAdvisorTest {
+
+    private final List<Prompt> prompts = new ArrayList<>();
+
+    private final ChatClient chatClient = ChatClient.builder(prompt -> {
+                prompts.add(prompt);
+                return new ChatResponse(List.of(new Generation(new AssistantMessage("ok"))));
+            })
+            .defaultSystem("You are the support assistant for Acme Cloud.")
+            .defaultAdvisors(new AnswerLanguageAdvisor())
+            .build();
+
+    @Test
+    void addsTheLanguageToTheSystemMessage() {
+        chatClient.prompt()
+                .user("Where is my invoice?")
+                .advisors(advisor -> advisor.param(AnswerLanguageAdvisor.LANGUAGE, Locale.GERMAN))
+                .call()
+                .content();
+
+        assertThat(prompts.getLast().getSystemMessage().getText())
+                .isEqualTo("You are the support assistant for Acme Cloud.\nAnswer in German.");
+    }
+
+    @Test
+    void leavesThePromptAloneWithoutALanguage() {
+        chatClient.prompt().user("Where is my invoice?").call().content();
+
+        assertThat(prompts.getLast().getSystemMessage().getText())
+                .isEqualTo("You are the support assistant for Acme Cloud.");
+    }
+}
+```
+</CodeFile>
+
+## 4. Production gotchas & security
+
+<Gotcha kind="reliability" title="Two advisors with the same order">
+`SimpleLoggerAdvisor`, `SafeGuardAdvisor` and the RAG advisors all default to `0`. With equal orders, 2.0.2 runs the advisor you
+registered last first, so a logger registered after RAG logs the prompt without its documents. Give every advisor its own order,
+and pass it to the builder (`.order(...)`) rather than relying on registration order.
+</Gotcha>
+
+<Gotcha kind="cost" title="Advisors after ToolCallingAdvisor run on every model call">
+A question that takes three rounds of tool calls makes four model calls, and every advisor ordered after
+`HIGHEST_PRECEDENCE + 300` runs four times. For a logger that means four log entries; for `RetrievalAugmentationAdvisor` at its default order it means four
+embeddings and four vector searches. Put an advisor that only needs the final answer before the tool loop.
+</Gotcha>
+
+<Gotcha kind="reliability" title="before() runs on another thread when streaming">
+For `stream()`, `BaseAdvisor` moves `before` onto `Schedulers.boundedElastic()`. Thread-bound values such as the
+`SecurityContext` or the logging MDC aren't there. Read the user and anything else you need in the controller and pass it as an
+advisor parameter, as the lesson code does.
+</Gotcha>
+
+<Gotcha kind="reliability" title="after() doesn't see a whole streamed answer">
+In a stream, `BaseAdvisor.after` runs once, on the chunk that carries the finish reason, and that chunk holds only the last
+piece of text. An advisor that inspects the answer must implement `StreamAdvisor` itself and aggregate the chunks.
+A `CallAdvisor` alone doesn't run for `stream()` at all.
+</Gotcha>
+
+<Gotcha kind="security" title="The context map travels with the request">
+Everything you pass with `.param(...)` sits in `request.context()`, which every advisor can read and `SimpleLoggerAdvisor`
+logs with the request. Pass identifiers, not secrets or tokens, and remember that a later advisor can't trust a value an earlier
+one could have changed.
+</Gotcha>
+
+<Gotcha kind="migration" title="AdvisedRequest and aroundCall are gone">
+Advisors written for the 1.0 milestones used `CallAroundAdvisor`, `AdvisedRequest` and `aroundCall(...)`. In 2.0 the types are
+`CallAdvisor`, `ChatClientRequest` and `adviseCall(...)`, and the context is a plain `Map` on the request record. Port them by
+building a changed request with `request.mutate()` and calling `chain.nextCall(...)`.
+</Gotcha>
+
+## Recap
+
+- An advisor wraps the rest of the chain: `CallAdvisor` for `call()`, `StreamAdvisor` for `stream()`, `BaseAdvisor` for both
+  through `before` and `after`.
+- Lower `getOrder()` runs first on the way in. Built-ins sit at `+200` (memory), `+300` (tool calling), `0` (logging, guard, RAG)
+  and `LOWEST_PRECEDENCE` (the model call). Give your advisors distinct orders.
+- Advisors after `ToolCallingAdvisor` run once per model call; advisors before it run once and see the total usage.
+- Requests are immutable: change them with `mutate()` and the prompt's `augmentUserMessage` and `augmentSystemMessage`, and pass
+  per-call values through `.advisors(a -> a.param(...))`.

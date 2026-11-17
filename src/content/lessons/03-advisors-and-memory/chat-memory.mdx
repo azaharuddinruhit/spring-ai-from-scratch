@@ -1,0 +1,458 @@
+---
+description: Give the stateless model a conversation with ChatMemory, MessageWindowChatMemory and MessageChatMemoryAdvisor, store it in JDBC, Redis, Cassandra, MongoDB or Neo4j, and keep every user's conversation apart with CONVERSATION_ID.
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import ChatMemoryLab from '@/components/islands/ChatMemoryLab';
+
+A chat model remembers nothing between calls. Every request must carry the conversation so far, and choosing what to carry,
+where to keep it and whose it is, is your job. Spring AI splits that job into three parts, and the advisor from the previous two
+lessons ties them together.
+
+## 1. Spring mental model
+
+Chat memory works like an HTTP session, and the pieces map one to one:
+
+| Spring you know | Spring AI 2.0 | What it does |
+| --- | --- | --- |
+| `HttpSession` | A conversation, keyed by `ChatMemory.CONVERSATION_ID` | One user's history with the assistant. |
+| Spring Session's `SessionRepository` | `ChatMemoryRepository` | Stores messages: `saveAll`, `findByConversationId`, `deleteByConversationId`. |
+| A session size or timeout policy | `ChatMemory`, usually `MessageWindowChatMemory` | Decides which messages to keep. |
+| `SessionRepositoryFilter` | `MessageChatMemoryAdvisor` | Loads the history before the call and saves the new messages after it. |
+
+You get memory without configuring anything. Every model starter brings in `ChatMemoryAutoConfiguration`, which defines a
+`MessageWindowChatMemory` over an `InMemoryChatMemoryRepository` when you haven't defined your own beans. To make the
+conversation survive a restart, add a repository starter; it replaces the in-memory repository.
+
+| Backend | Starter |
+| --- | --- |
+| JDBC: PostgreSQL, MySQL and MariaDB, Oracle, SQL Server, H2, HSQLDB, SQLite | `spring-ai-starter-model-chat-memory-repository-jdbc` |
+| Redis | `spring-ai-starter-model-chat-memory-repository-redis` |
+| Apache Cassandra | `spring-ai-starter-model-chat-memory-repository-cassandra` |
+| MongoDB | `spring-ai-starter-model-chat-memory-repository-mongodb` |
+| Neo4j | `spring-ai-starter-model-chat-memory-repository-neo4j` |
+
+`MessageWindowChatMemory` keeps the newest 20 messages per conversation by default, and there is no property to change that,
+so you define the bean yourself. When it trims, it never drops a system message, and a new system message replaces the old one.
+
+<Mermaid
+  caption="One turn through MessageChatMemoryAdvisor. The prompt is the stored window plus the new message; the window is trimmed when the messages are saved."
+  code={`
+sequenceDiagram
+  autonumber
+  participant S as Service
+  participant A as MessageChatMemoryAdvisor
+  participant W as MessageWindowChatMemory
+  participant M as Rest of the chain
+  S->>A: request, CONVERSATION_ID in context
+  A->>W: get(id)
+  A->>W: add(id, user message)
+  Note over W: saveAll to the repository,<br/>trimmed to maxMessages
+  A->>M: system, stored window, new message
+  M-->>A: answer
+  A->>W: add(id, answer)
+  A-->>S: answer
+`}
+/>
+
+Spring AI has two memory advisors, and they answer different questions:
+
+| | `MessageChatMemoryAdvisor` | `VectorStoreChatMemoryAdvisor` |
+| --- | --- | --- |
+| Artifact | `spring-ai-client-chat`, with every model starter | `spring-ai-vector-store-advisor` |
+| Stores | Messages in a `ChatMemory` | Each message as a document in a `VectorStore`, tagged with the conversation id |
+| Sends to the model | The recent messages, in order, as real messages | The messages most similar to the question (top 20 by default), as text in the system prompt |
+| Good for | Ordinary chat: what was just said | Long histories where something from weeks ago matters |
+| Default order | `HIGHEST_PRECEDENCE + 200` | `HIGHEST_PRECEDENCE + 200` |
+
+Both read the conversation id from the request context, and in 2.0 it is mandatory: a call without it fails with
+`IllegalArgumentException: conversationId cannot be null`.
+
+## 2. Interactive sandbox
+
+<ChatMemoryLab client:visible />
+
+Things to try:
+
+- As Alice, say **My order number is 1042.** Switch to Bob and ask **What is my order number?** With **UUID from user and chat**,
+  Bob's conversation is empty. Choose **The chat id from the URL** and repeat: Bob gets Alice's order number.
+- Choose `userId + ":" + chatId`. It is unique per user too, but Alice's id is 42 characters long, which doesn't fit the
+  36-character column, so the call fails before the model is called.
+- With `maxMessages` at 4, keep talking and watch the oldest rows go. The model then no longer knows the order number.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+Add the JDBC repository starter and your database driver to the build:
+
+<CodeFile
+  title="build.gradle"
+  lang="groovy"
+  lines="2-3"
+  code={`dependencies {
+    implementation 'org.springframework.ai:spring-ai-starter-model-chat-memory-repository-jdbc'
+    runtimeOnly 'org.postgresql:postgresql'
+}`}
+/>
+
+The repository creates its table only for embedded databases unless you say otherwise:
+
+<CodeFile
+  title="src/main/resources/application.yaml"
+  lang="yaml"
+  lines="11"
+  code={`spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/support
+    username: support
+    password: \${SUPPORT_DB_PASSWORD}
+  ai:
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: always`}
+/>
+
+Define the `ChatMemory` bean to choose the window. The repository bean comes from the starter:
+
+<CodeFile title="src/main/java/com/example/support/chat/ChatMemoryConfig.java">
+```java {16}
+package com.example.support.chat;
+
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.memory.ChatMemoryRepository;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration(proxyBeanMethods = false)
+class ChatMemoryConfig {
+
+    @Bean
+    ChatMemory chatMemory(ChatMemoryRepository chatMemoryRepository) {
+        return MessageWindowChatMemory.builder()
+                .chatMemoryRepository(chatMemoryRepository)
+                .maxMessages(40)
+                .build();
+    }
+}
+```
+</CodeFile>
+
+The service builds the conversation id from the signed-in user and the chat id from the URL. A name-based UUID is the same every
+time for the same pair, is different for every user, and fits the column:
+
+<CodeFile title="src/main/java/com/example/support/chat/SupportChatService.java">
+```java {26,34,39}
+package com.example.support.chat;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
+import java.util.UUID;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.stereotype.Service;
+
+@Service
+public class SupportChatService {
+
+    private final ChatClient supportChatClient;
+    private final ChatMemory chatMemory;
+
+    public SupportChatService(ChatClient supportChatClient, ChatMemory chatMemory) {
+        this.supportChatClient = supportChatClient;
+        this.chatMemory = chatMemory;
+    }
+
+    public String ask(String userId, UUID chatId, String question, Locale language) {
+        return supportChatClient.prompt()
+                .user(question)
+                .advisors(advisor -> advisor
+                        .param(ChatMemory.CONVERSATION_ID, conversationId(userId, chatId))
+                        .param(TokenBudgetAdvisor.USER_ID, userId)
+                        .param(AnswerLanguageAdvisor.LANGUAGE, language))
+                .call()
+                .content();
+    }
+
+    public void forget(String userId, UUID chatId) {
+        chatMemory.clear(conversationId(userId, chatId));
+    }
+
+    /** A UUID that only this user's chat maps to, and that fits the 36-character JDBC column. */
+    static String conversationId(String userId, UUID chatId) {
+        return UUID.nameUUIDFromBytes((userId + ":" + chatId).getBytes(StandardCharsets.UTF_8)).toString();
+    }
+}
+```
+</CodeFile>
+
+The controller takes the user from the `Principal`, never from the request body:
+
+<CodeFile title="src/main/java/com/example/support/chat/SupportChatController.java">
+```java {32,38,41}
+package com.example.support.chat;
+
+import java.security.Principal;
+import java.util.Locale;
+import java.util.UUID;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/chats/{chatId}")
+class SupportChatController {
+
+    private final SupportChatService chatService;
+
+    SupportChatController(SupportChatService chatService) {
+        this.chatService = chatService;
+    }
+
+    @PostMapping("/messages")
+    AnswerResponse ask(@PathVariable UUID chatId, @Valid @RequestBody AskRequest request, Principal principal, Locale locale) {
+        return new AnswerResponse(chatService.ask(principal.getName(), chatId, request.question(), locale));
+    }
+
+    @DeleteMapping
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void forget(@PathVariable UUID chatId, Principal principal) {
+        chatService.forget(principal.getName(), chatId);
+    }
+
+    record AskRequest(@NotBlank @Size(max = 4000) String question) {
+    }
+
+    record AnswerResponse(String answer) {
+    }
+}
+```
+</CodeFile>
+
+The isolation is the behaviour that matters, so test it with real memory:
+
+<CodeFile title="src/test/java/com/example/support/chat/SupportChatServiceTest.java">
+```java {37,60}
+package com.example.support.chat;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.Prompt;
+
+class SupportChatServiceTest {
+
+    private final List<Prompt> prompts = new ArrayList<>();
+    private final ChatMemory chatMemory = MessageWindowChatMemory.builder().build();
+    private final UUID chatId = UUID.fromString("0f8e2a4c-6b1d-4c3e-9a7f-5d2b8c1e4a60");
+
+    private final SupportChatService service = new SupportChatService(
+            ChatClient.builder(prompt -> {
+                        prompts.add(prompt);
+                        return new ChatResponse(List.of(new Generation(new AssistantMessage("Noted."))));
+                    })
+                    .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                    .build(),
+            chatMemory);
+
+    @Test
+    void usersWithTheSameChatIdDoNotShareAConversation() {
+        service.ask("alice", chatId, "My order number is 1042.", Locale.ENGLISH);
+        service.ask("bob", chatId, "What is my order number?", Locale.ENGLISH);
+
+        assertThat(prompts.getLast().getInstructions())
+                .extracting(Message::getText)
+                .containsExactly("What is my order number?");
+    }
+
+    @Test
+    void aUserSeesTheirOwnHistory() {
+        service.ask("alice", chatId, "My order number is 1042.", Locale.ENGLISH);
+        service.ask("alice", chatId, "What is my order number?", Locale.ENGLISH);
+
+        assertThat(prompts.getLast().getInstructions())
+                .extracting(Message::getText)
+                .containsExactly("My order number is 1042.", "Noted.", "What is my order number?");
+    }
+
+    @Test
+    void conversationIdsFitTheJdbcColumn() {
+        String id = SupportChatService.conversationId("alice.long-name@customer.example.com", chatId);
+
+        assertThat(id).hasSize(36).isEqualTo(SupportChatService.conversationId("alice.long-name@customer.example.com", chatId));
+    }
+
+    @Test
+    void forgetClearsOnlyThatUsersChat() {
+        service.ask("alice", chatId, "Hello", Locale.ENGLISH);
+        service.ask("bob", chatId, "Hello", Locale.ENGLISH);
+
+        service.forget("alice", chatId);
+
+        assertThat(chatMemory.get(SupportChatService.conversationId("alice", chatId))).isEmpty();
+        assertThat(chatMemory.get(SupportChatService.conversationId("bob", chatId))).hasSize(2);
+    }
+}
+```
+</CodeFile>
+
+And the web layer with `@WebMvcTest`, including the `429` from the budget advisor:
+
+<CodeFile title="src/test/java/com/example/support/chat/SupportChatControllerTest.java">
+```java {19,69}
+package com.example.support.chat;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+
+import java.util.Locale;
+import java.util.UUID;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.assertj.MockMvcTester;
+
+@WebMvcTest(SupportChatController.class)
+class SupportChatControllerTest {
+
+    private static final UUID CHAT_ID = UUID.fromString("0f8e2a4c-6b1d-4c3e-9a7f-5d2b8c1e4a60");
+
+    @Autowired
+    private MockMvcTester mvc;
+
+    @MockitoBean
+    private SupportChatService chatService;
+
+    @Test
+    void answersInTheCallersLanguage() {
+        given(chatService.ask("alice", CHAT_ID, "Wo ist Bestellung 1042?", Locale.GERMAN)).willReturn("Unterwegs.");
+
+        assertThat(mvc.post().uri("/api/chats/{chatId}/messages", CHAT_ID)
+                .principal(() -> "alice")
+                .header(HttpHeaders.ACCEPT_LANGUAGE, "de")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"question": "Wo ist Bestellung 1042?"}
+                        """))
+                .hasStatusOk()
+                .bodyJson().extractingPath("$.answer").isEqualTo("Unterwegs.");
+    }
+
+    @Test
+    void rejectsABlankQuestion() {
+        assertThat(mvc.post().uri("/api/chats/{chatId}/messages", CHAT_ID)
+                .principal(() -> "alice")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"question": " "}
+                        """))
+                .hasStatus(HttpStatus.BAD_REQUEST);
+        then(chatService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void reportsAnExhaustedBudgetAs429() {
+        given(chatService.ask("alice", CHAT_ID, "Hi", Locale.ENGLISH))
+                .willThrow(new TokenBudgetExceededException("alice", 200_000));
+
+        assertThat(mvc.post().uri("/api/chats/{chatId}/messages", CHAT_ID)
+                .principal(() -> "alice")
+                .header(HttpHeaders.ACCEPT_LANGUAGE, "en")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"question": "Hi"}
+                        """))
+                .hasStatus(HttpStatus.TOO_MANY_REQUESTS)
+                .bodyJson().extractingPath("$.detail").isEqualTo("You have reached today's assistant limit. It resets at midnight UTC.");
+    }
+
+    @Test
+    void forgetsAChat() {
+        assertThat(mvc.delete().uri("/api/chats/{chatId}", CHAT_ID).principal(() -> "alice"))
+                .hasStatus(HttpStatus.NO_CONTENT);
+        then(chatService).should().forget("alice", CHAT_ID);
+    }
+}
+```
+</CodeFile>
+
+## 4. Production gotchas & security
+
+<Gotcha kind="security" title="A conversation id from the client is a data leak">
+If the id comes straight from the URL or the request body, anyone who learns or guesses it reads that conversation, and two users
+who pick the same id share one. Derive the id on the server from the authenticated user, as `conversationId(userId, chatId)` does,
+or look up the conversation and check its owner.
+</Gotcha>
+
+<Gotcha kind="reliability" title="The JDBC column holds 36 characters">
+`SPRING_AI_CHAT_MEMORY.conversation_id` is `VARCHAR(36)`, the length of a UUID. A longer id fails with
+`DataIntegrityViolationException` when the user message is saved, before the model is called. Use UUIDs, or create the table
+yourself with a wider column.
+</Gotcha>
+
+<Gotcha kind="reliability" title="The schema is created only for embedded databases">
+`spring.ai.chat.memory.repository.jdbc.initialize-schema` defaults to `embedded`, so on PostgreSQL the table doesn't exist and
+the first call fails. Set it to `always`, or, better in production, copy
+`org/springframework/ai/chat/memory/repository/jdbc/schema-postgresql.sql` from the jar into a Flyway or Liquibase migration and
+set it to `never`.
+</Gotcha>
+
+<Gotcha kind="cost" title="The window counts messages, not tokens">
+Twenty messages can be twenty short lines or twenty pasted log files, and all of them are sent, and billed, with every turn. Keep
+the window small, cap the input size as the controller does with `@Size`, and keep memory before the tool loop, so that tool results
+aren't stored and sent again.
+</Gotcha>
+
+<Gotcha kind="security" title="Conversations are kept until you delete them">
+No repository expires messages for you. Conversations hold whatever users typed, so give users a way to delete a chat
+(`chatMemory.clear(id)`), remove a user's conversations when the account goes, and run a retention job against the table. Store
+messages after redaction, as in the previous lesson.
+</Gotcha>
+
+<Gotcha kind="migration" title="There is no default conversation any more">
+In 1.x a call without a conversation id fell back to `ChatMemory.DEFAULT_CONVERSATION_ID`, so every user shared one conversation
+named "default". In 2.0 the constant is gone and the advisor throws `IllegalArgumentException` instead. Pass
+`ChatMemory.CONVERSATION_ID` on every call that uses a memory advisor.
+</Gotcha>
+
+## Recap
+
+- `ChatMemoryRepository` stores messages, `ChatMemory` decides which to keep, and `MessageChatMemoryAdvisor` loads and saves them
+  around each call.
+- The default is a 20-message window in memory. Add a repository starter for JDBC, Redis, Cassandra, MongoDB or Neo4j, and define
+  the `ChatMemory` bean to change the window.
+- `CONVERSATION_ID` is mandatory. Derive it on the server from the authenticated user, and keep it within 36 characters for JDBC.
+- `VectorStoreChatMemoryAdvisor` recalls similar past messages from a vector store instead of the recent ones.

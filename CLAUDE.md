@@ -62,6 +62,18 @@ Structured output (verified by running the 2.0.2 classes): `entity(Type, spec ->
 `StructuredOutputValidationAdvisor` sits at `LOWEST_PRECEDENCE - 2000`, retries 3 times by default and returns the last reply when they
 run out; schema properties are sorted by name unless `@JsonPropertyOrder`, and a bare `@JsonProperty("x")` makes the field optional.
 `RecordSchemaLab` reproduces the generator exactly; re-check it against `BeanOutputConverter.getJsonSchema()` when Spring AI is upgraded.
+Advisors and memory (verified by running the 2.0.2 classes): equal orders run in reverse registration order; advisors ordered after
+`ToolCallingAdvisor` run once per model call, and advisors before it see the summed usage; `SimpleLoggerAdvisor` and `SafeGuardAdvisor`
+default to order 0, the RAG advisors to 0; `SafeGuardAdvisor` lower-cases `Prompt.getContents()` (system and memory included) and uses
+`contains`; `SimpleLoggerAdvisor` logs at DEBUG and its request line includes the context map; `BaseAdvisor` runs `before` on
+`boundedElastic` for streams and `after` only on the chunk with a finish reason; `stream()` skips `CallAdvisor`-only advisors.
+`MessageChatMemoryAdvisor` sends system + stored window + the new message, then saves the last user or tool message and the reply;
+`MessageWindowChatMemory` defaults to 20 messages (no property; define the bean), keeps system messages and trims on save; every model
+starter auto-configures it over `InMemoryChatMemoryRepository`; a missing conversation id throws
+`IllegalArgumentException: conversationId cannot be null`; JDBC `conversation_id` is `VARCHAR(36)` and
+`spring.ai.chat.memory.repository.jdbc.initialize-schema` defaults to `embedded`; `VectorStoreChatMemoryAdvisor` lives in
+`spring-ai-vector-store-advisor` (top-K 20, order `+ 200`); there is no `PromptChatMemoryAdvisor` in 2.0.2.
+`AdvisorChainLab`, `GuardrailLab` and `ChatMemoryLab` simulate exactly these rules; update them together with the lessons.
 
 MDX pitfall: `{` and `<` in prose are parsed as JSX. Put generics and braces inside backticks.
 
