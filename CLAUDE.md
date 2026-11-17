@@ -56,6 +56,12 @@ options are immutable (`mutate()`, no `copy()`); `ChatClient.options()` / `defau
 auto-registered at `HIGHEST_PRECEDENCE + 300`, after memory advisors (`+ 200`) and before RAG and logging (order 0); tool limits are `spring.ai.tools.limits.*` / `maxCallsPerTool` (there is no `maxToolCalls`);
 advisors use `ChatClientRequest` / `ChatClientResponse` (not `AdvisedRequest`); the `.options` segment is gone from property keys;
 `ChatMemory.CONVERSATION_ID` is mandatory for memory advisors; MCP annotations live in `org.springframework.ai.mcp.annotation`.
+Structured output (verified by running the 2.0.2 classes): `entity(Type, spec -> spec.useProviderStructuredOutput().validateSchema())`;
+`ChatModelCallAdvisor` appends `getFormat()` to the last user message, or sets `outputSchema` when the options implement
+`StructuredOutputChatOptions` (OpenAI, Anthropic, Google GenAI, Mistral AI, Ollama) and silently falls back otherwise;
+`StructuredOutputValidationAdvisor` sits at `LOWEST_PRECEDENCE - 2000`, retries 3 times by default and returns the last reply when they
+run out; schema properties are sorted by name unless `@JsonPropertyOrder`, and a bare `@JsonProperty("x")` makes the field optional.
+`RecordSchemaLab` reproduces the generator exactly; re-check it against `BeanOutputConverter.getJsonSchema()` when Spring AI is upgraded.
 
 MDX pitfall: `{` and `<` in prose are parsed as JSX. Put generics and braces inside backticks.
 

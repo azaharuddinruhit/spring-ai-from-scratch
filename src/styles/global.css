@@ -99,9 +99,10 @@ pre:is(.shiki, .astro-code) span {
   font-weight: var(--shiki-dark-font-weight);
 }
 
-/* Code font: JetBrains Mono without ligatures, so != and -> show exactly as typed. */
+/* Code font: JetBrains Mono without ligatures, so != and -> show exactly as typed, inline code included. */
 pre:is(.shiki, .astro-code),
-.code-mono {
+.code-mono,
+code {
   font-family: var(--font-mono);
   font-variant-ligatures: none;
 }

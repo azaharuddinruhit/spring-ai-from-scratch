@@ -55,7 +55,7 @@ links into the official Spring AI reference documentation for depth.
 
 ## Evidence on Hand
 
-- The Module 1 lessons and their four sandboxes in `src/content/lessons/01-foundations/`.
+- The Module 1 and Module 2 lessons and their sandboxes in `src/content/lessons/`.
 - The source repository on GitHub.
 - There are no testimonials, learner counts, endorsements or benchmarks. Do not invent any.
 

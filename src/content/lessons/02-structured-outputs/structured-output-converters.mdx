@@ -1,0 +1,266 @@
+---
+description: How .entity() turns model text into Java records, lists and maps. What BeanOutputConverter sends to the model, the JSON Schema it generates from your record, and where conversion is more lenient than the schema suggests.
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import RecordSchemaLab from '@/components/islands/RecordSchemaLab';
+
+In Module 1, `.entity(Joke.class)` turned a reply into a record in one line. This lesson opens that line up: what Spring AI adds to
+your prompt, how it reads the reply, and which promises in the generated schema nothing actually checks.
+
+## 1. Spring mental model
+
+A structured output converter does the job of an `HttpMessageConverter`, with one addition: before the call it also tells the model
+what to send.
+
+| `RestClient` | `ChatClient` | What it does |
+| --- | --- | --- |
+| `HttpMessageConverter<T>` | `StructuredOutputConverter<T>` | Reads a body into a type, and its `getFormat()` describes the expected output. |
+| `.body(Order.class)` | `.entity(Order.class)` | Maps the reply to a record or class through `BeanOutputConverter`. |
+| `.body(typeRef)` | `.entity(typeRef)` | Generic types such as `List<Order>` go through a `ParameterizedTypeReference`. The schema becomes an array. |
+| `Accept: application/json` | Format text appended to your last user message | Asks for a representation. A server must honour it; a model can ignore it. |
+| An OpenAPI schema from springdoc | A JSON Schema generated from the record | Built from the same Jackson annotations you already use. |
+
+Spring AI ships three converters:
+
+- **`BeanOutputConverter<T>`** handles records, classes and generic types. It generates a JSON Schema (draft 2020-12) from the type
+  and reads the reply with a Jackson 3 `JsonMapper`. `.entity(Type.class)` uses it for you.
+- **`ListOutputConverter`** returns a `List<String>`. It asks for comma-separated values and splits them, with no JSON involved.
+- **`MapOutputConverter`** returns a `Map<String, Object>` from any JSON object. It sends no schema, so the keys are whatever the model
+  chooses.
+
+<Mermaid
+  caption="One .entity() call. The format text is added by the last advisor, just before the model call, and conversion happens after the advisor chain returns."
+  code={`
+sequenceDiagram
+  autonumber
+  participant S as TriageService
+  participant C as ChatClient
+  participant B as BeanOutputConverter
+  participant X as ChatModelCallAdvisor
+  participant M as ChatModel
+  S->>C: entity(TicketTriage.class)
+  C->>B: getFormat()
+  B-->>C: instructions and schema
+  C->>X: your advisors, then the last one
+  Note over X: Appends the format text<br/>to the last user message
+  X->>M: call(Prompt)
+  M-->>C: reply text
+  C->>B: convert(text)
+  Note over B: Removes think tags and<br/>fences, then Jackson reads
+  B-->>S: TicketTriage
+`}
+/>
+
+Two details in that flow matter later. The format text is added by `ChatModelCallAdvisor`, the last advisor in the chain, so logging
+and memory advisors see your prompt without it. And the converter cleans the reply before parsing: it trims whitespace and removes
+`<think>` blocks and markdown code fences, so a reply wrapped in a json code fence still converts.
+
+## 2. Interactive sandbox
+
+<RecordSchemaLab client:visible />
+
+The sandbox applies the same rules as `BeanOutputConverter` in 2.0.2, and its output for the examples matches the real generator exactly:
+
+- Properties are sorted by name unless the record has `@JsonPropertyOrder`. The model usually writes JSON in schema order, so put the
+  fields it should settle first, such as a summary, at the top.
+- Every object gets `"additionalProperties": false`.
+- A record or enum used in more than one place moves to `$defs` and is referenced with `$ref`.
+- `@JsonPropertyDescription` and `@JsonClassDescription` become `description`. They are the cheapest place to explain what a field
+  means, because they travel with the field.
+- A property is required unless one of these applies, checked in this order: it has `@JsonProperty` without `required = true`; it
+  has `@Schema(requiredMode = NOT_REQUIRED)`; its type is `@Nullable`.
+
+Try it with the support ticket example. Remove `@Nullable` from `suggestedReply`, then change the customer's annotation to
+`@JsonProperty(value = "account_id", required = true)` and watch the `required` list. Switch to `getFormat()` to read the exact text
+that is appended to your prompt.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+There are no new dependencies. The schema generator and the JSON Schema validator used in the next lesson come with
+`spring-ai-client-chat`, and JSpecify's `@Nullable` comes with Spring Framework 7.
+
+The record is the contract. Descriptions, order and the one optional field are all decided here.
+
+<CodeFile title="src/main/java/com/example/support/triage/TicketTriage.java">
+```java {12,18,22}
+package com.example.support.triage;
+
+import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonClassDescription;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import org.jspecify.annotations.Nullable;
+
+@JsonClassDescription("Triage result for one support ticket")
+@JsonPropertyOrder({"summary", "priority", "customer", "tags", "suggestedReply"})
+public record TicketTriage(
+        @JsonPropertyDescription("One sentence, under 20 words") String summary,
+        @JsonPropertyDescription("How fast support must respond") Priority priority,
+        Customer customer,
+        @JsonPropertyDescription("Lowercase product areas, such as billing or login") List<String> tags,
+        @JsonPropertyDescription("A draft reply, only when the answer is obvious") @Nullable String suggestedReply) {
+
+    public enum Priority { LOW, MEDIUM, HIGH, URGENT }
+
+    public record Customer(String name, @JsonProperty(value = "account_id", required = true) String accountId) {}
+}
+```
+</CodeFile>
+
+One service shows all three converters. Each terminal `entity(...)` call sends one request.
+
+<CodeFile title="src/main/java/com/example/support/triage/TriageService.java">
+```java {25,35,44,53}
+package com.example.support.triage;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.converter.ListOutputConverter;
+import org.springframework.ai.converter.MapOutputConverter;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.stereotype.Service;
+
+@Service
+public class TriageService {
+
+    private final ChatClient chatClient;
+
+    public TriageService(ChatClient.Builder builder) {
+        this.chatClient = builder
+                .defaultSystem("You triage support tickets for an online store.")
+                .build();
+    }
+
+    public TicketTriage triage(String ticket) {
+        TicketTriage triage = chatClient.prompt().user(ticket).call().entity(TicketTriage.class);
+        return Objects.requireNonNull(triage, "model returned no triage");
+    }
+
+    /** One request, one typed list: the schema becomes an array of TicketTriage objects. */
+    public List<TicketTriage> triageAll(List<String> tickets) {
+        List<TicketTriage> results = chatClient.prompt()
+                .user(u -> u.text("Triage each ticket, in order:\n{tickets}")
+                        .param("tickets", String.join("\n---\n", tickets)))
+                .call()
+                .entity(new ParameterizedTypeReference<List<TicketTriage>>() {});
+        return Objects.requireNonNullElse(results, List.of());
+    }
+
+    /** Comma-separated text, split into strings. No JSON and no schema. */
+    public List<String> suggestTags(String ticket) {
+        List<String> tags = chatClient.prompt()
+                .user(u -> u.text("Suggest up to five tags for this ticket:\n{ticket}").param("ticket", ticket))
+                .call()
+                .entity(new ListOutputConverter());
+        return Objects.requireNonNullElse(tags, List.of());
+    }
+
+    /** Any JSON object. Untyped, so check every key you read. */
+    public Map<String, Object> extractFields(String ticket) {
+        Map<String, Object> fields = chatClient.prompt()
+                .user(u -> u.text("Extract order numbers, dates and amounts from:\n{ticket}").param("ticket", ticket))
+                .call()
+                .entity(new MapOutputConverter());
+        return Objects.requireNonNullElse(fields, Map.of());
+    }
+}
+```
+</CodeFile>
+
+The schema is plain Java, so you can test it without a model, a key or a Spring context. A change to the record that silently makes
+a field optional fails this test.
+
+<CodeFile title="src/test/java/com/example/support/triage/TicketTriageSchemaTest.java">
+```java {16,17}
+package com.example.support.triage;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.ai.converter.BeanOutputConverter;
+
+class TicketTriageSchemaTest {
+
+    private final BeanOutputConverter<TicketTriage> converter = new BeanOutputConverter<>(TicketTriage.class);
+
+    @Test
+    void onlyTheDraftReplyIsOptional() {
+        assertThat(converter.getJsonSchemaMap().get("required"))
+                .isEqualTo(List.of("summary", "priority", "customer", "tags"));
+    }
+
+    @Test
+    void readsAReplyWrappedInMarkdown() {
+        TicketTriage triage = converter.convert("""
+                ```json
+                {"summary": "Card charged twice for order 1042",
+                 "priority": "HIGH",
+                 "customer": {"name": "Ada Lovelace", "account_id": "A-17"},
+                 "tags": ["billing"]}
+                ```""");
+
+        assertThat(triage.priority()).isEqualTo(TicketTriage.Priority.HIGH);
+        assertThat(triage.customer().accountId()).isEqualTo("A-17");
+        assertThat(triage.suggestedReply()).isNull();
+    }
+}
+```
+</CodeFile>
+
+## 4. Production gotchas & security
+
+<Gotcha kind="reliability" title="The converter doesn't enforce the schema">
+`required` and `additionalProperties: false` are instructions to the model, not checks. When the reply leaves out a required field,
+Jackson builds the record with `null` there. When it adds a field the schema doesn't have, Jackson ignores it. Only text that isn't JSON
+at all fails, with Jackson's unchecked `JacksonException`. Check the fields you depend on, or turn on schema validation (next lesson).
+</Gotcha>
+
+<Gotcha kind="reliability" title='@JsonProperty("name") makes a field optional'>
+When a property has `@JsonProperty`, its `required` flag decides, and that flag defaults to `false`. Renaming a field with
+`@JsonProperty("account_id")` therefore removes it from `required`. Write `@JsonProperty(value = "account_id", required = true)`, and keep
+a schema test like the one above.
+</Gotcha>
+
+<Gotcha kind="reliability" title="Your logs don't show the format text">
+`ChatModelCallAdvisor` appends the instructions after every other advisor has run. `SimpleLoggerAdvisor` logs the prompt without them,
+and chat memory stores the user message without them, which keeps the conversation history free of schemas. To see what the model
+actually received, call `getFormat()` on the converter, or log at the model level (Module 6).
+</Gotcha>
+
+<Gotcha kind="cost" title="The schema is prompt text on every call">
+The full schema, with every description, is sent on each request and billed as input tokens. A large nested record used for a small
+answer costs on every call. Keep output records focused on one task, and keep descriptions short and specific.
+</Gotcha>
+
+<Gotcha kind="security" title="A typed answer is still untrusted input">
+An enum limits `priority` to four values, but a `String` holds whatever the model wrote, including text that came from the ticket
+itself. Escape `suggestedReply` before rendering it as HTML, never build SQL or shell commands from it, and add Bean Validation
+constraints (`@Size`, `@Pattern`) to the record when the values flow further into your system.
+</Gotcha>
+
+<Gotcha kind="migration" title="Jackson 3 in Spring AI 2.0">
+`BeanOutputConverter` now takes a Jackson 3 `tools.jackson.databind.json.JsonMapper` instead of a Jackson 2 `ObjectMapper`, and parse
+failures are Jackson 3's unchecked `tools.jackson.core.JacksonException`. The annotations keep their old package,
+`com.fasterxml.jackson.annotation`, so records written for 1.x compile unchanged.
+</Gotcha>
+
+## Recap
+
+- `.entity(Type.class)` uses `BeanOutputConverter`: it appends instructions and a JSON Schema to your last user message, then cleans
+  the reply and reads it with Jackson.
+- Use `ParameterizedTypeReference` for generic types, `ListOutputConverter` for a plain list of strings and `MapOutputConverter`
+  for untyped JSON.
+- Fields are required by default. `@Nullable`, `@JsonProperty` without `required = true` and `@Schema(requiredMode = NOT_REQUIRED)`
+  make them optional.
+- The schema is a request, not a check: missing fields arrive as `null`. Test the schema in plain JUnit and validate the values you rely on.
+- Streams have no `entity()`. To get a typed result from a stream, collect the text first and call the converter's `convert(...)`.
