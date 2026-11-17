@@ -1,0 +1,48 @@
+---
+import type { NavModule } from '@/lib/course';
+
+interface Props {
+  nav: NavModule[];
+  currentId: string;
+}
+
+const { nav, currentId } = Astro.props;
+---
+
+<nav aria-label="Course" class="space-y-6 text-sm">
+  {
+    nav.map((module) => (
+      <div>
+        <p class="mb-2 flex items-baseline gap-2 font-semibold text-slate-900 dark:text-white">
+          <span class="w-4 shrink-0 text-brand-700 tabular-nums dark:text-brand-400">{module.number}</span>
+          {module.title}
+        </p>
+        <ul class="space-y-0.5 border-l border-slate-200 dark:border-slate-800">
+          {module.navLessons.map((lesson) =>
+            lesson.href ? (
+              <li>
+                <a
+                  href={lesson.href}
+                  aria-current={lesson.id === currentId ? 'page' : undefined}
+                  class:list={[
+                    '-ml-px block border-l py-1 pr-2 pl-3 transition-colors',
+                    lesson.id === currentId
+                      ? 'border-brand-600 font-medium text-brand-700 dark:border-brand-400 dark:text-brand-300'
+                      : 'border-transparent text-slate-600 hover:border-slate-400 hover:text-slate-900 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:text-white',
+                  ]}
+                >
+                  {lesson.title}
+                </a>
+              </li>
+            ) : (
+              <li class="-ml-px flex items-center justify-between gap-2 border-l border-transparent py-1 pr-2 pl-3 text-slate-400 dark:text-slate-500">
+                <span>{lesson.title}</span>
+                <span class="shrink-0 text-xs italic">soon</span>
+              </li>
+            ),
+          )}
+        </ul>
+      </div>
+    ))
+  }
+</nav>

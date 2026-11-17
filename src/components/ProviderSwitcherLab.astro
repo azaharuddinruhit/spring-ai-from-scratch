@@ -1,0 +1,22 @@
+---
+/** Highlights every provider's files at build time, so the island ships no syntax highlighter. */
+import ProviderSwitcher from './islands/ProviderSwitcher';
+import { ASSISTANT_SERVICE, PROVIDERS, applicationYaml, buildGradle } from '@/data/snippets';
+import { highlight } from '@/lib/highlight';
+
+const file = async (code: string, lang: string) => ({ lines: code.split('\n'), html: await highlight(code, lang) });
+
+const variants = await Promise.all(
+  PROVIDERS.map(async (p) => ({
+    id: p.id,
+    name: p.name,
+    note: p.note,
+    env: p.env,
+    gradle: await file(buildGradle([p.starter]), 'groovy'),
+    yaml: await file(applicationYaml(p), 'yaml'),
+  })),
+);
+const service = await file(ASSISTANT_SERVICE, 'java');
+---
+
+<ProviderSwitcher client:visible variants={variants} service={service} />

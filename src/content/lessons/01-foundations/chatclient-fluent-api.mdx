@@ -1,0 +1,253 @@
+---
+description: Synchronous call(), reactive stream() over SSE, reading ChatResponse metadata, mapping replies to records, and setting default system prompts and advisors once for every request.
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import ChatClientLifecycle from '@/components/islands/ChatClientLifecycle';
+
+`ChatClient` is the main API in Spring AI 2.x, and `ChatModel` is the lower-level building block underneath it.
+If you've used `RestClient`, the shape will feel familiar.
+
+## 1. Spring mental model
+
+| `RestClient` | `ChatClient` | What it does |
+| --- | --- | --- |
+| `RestClient.Builder` (auto-configured) | `ChatClient.Builder` (auto-configured, prototype-scoped) | Each injection point gets a fresh builder for you to customize. |
+| `.defaultHeader(…)` | `.defaultSystem(…)`, `.defaultAdvisors(…)`, `.defaultOptions(…)` | Settings shared by every request this client sends. |
+| `.get().uri(…)` | `.prompt().system(…).user(…)` | Describes a single request. |
+| `.retrieve()` | `.call()` / `.stream()` | Chooses blocking or reactive delivery. **Nothing is sent yet.** |
+| `.body(String.class)` | `.content()` | The terminal operation that sends the request. |
+| `.body(Order.class)` | `.entity(Order.class)` | Maps the response to a Java type. |
+| `.toEntity(…)` | `.chatResponse()` / `.responseEntity(…)` | Returns the body together with metadata. |
+| `ClientHttpRequestInterceptor` | `Advisor` | Ordered interception of every exchange. |
+
+<Mermaid
+  caption="A single .call().content() request. ToolCallingAdvisor is outermost because it can repeat everything below it when the model asks for a tool."
+  code={`
+sequenceDiagram
+  autonumber
+  participant S as JokeService
+  participant C as ChatClient
+  participant T as ToolCallingAdvisor
+  participant L as SimpleLoggerAdvisor
+  participant M as ChatModel
+  participant P as Provider API
+  S->>C: prompt().user("…").call().content()
+  C->>T: ChatClientRequest
+  T->>L: chain.nextCall(request)
+  L->>M: ChatModelCallAdvisor → call(Prompt)
+  M->>P: HTTPS POST (JSON)
+  P-->>M: 200 OK
+  M-->>L: ChatResponse
+  L-->>T: ChatClientResponse
+  Note over T: No tool calls, so it returns
+  T-->>C: ChatClientResponse
+  C-->>S: String
+`}
+/>
+
+The four terminal operations differ only in what they return:
+
+- **`.call().content()`** returns a `@Nullable String`, which is the assistant's text.
+- **`.call().chatResponse()`** returns the full `ChatResponse`: generations, finish reason, model ID and token `Usage`.
+- **`.call().entity(Type.class)`** adds JSON-schema format instructions to the prompt and converts the reply into your record. Module 2 covers this in depth.
+- **`.stream().content()`** returns a `Flux<String>` of text deltas. `.stream().chatResponse()` returns a `Flux<ChatResponse>` if you also need metadata for each chunk.
+
+## 2. Interactive sandbox
+
+<ChatClientLifecycle client:visible />
+
+Notice where the auto-registered `ToolCallingAdvisor` sits. Its default order is `Ordered.HIGHEST_PRECEDENCE + 300`, so it wraps
+every advisor ordered after it (`SimpleLoggerAdvisor` defaults to order `0`). When the model requests a tool, it runs everything below
+itself again, including your logger. Memory advisors are the exception: they default to `HIGHEST_PRECEDENCE + 200`, so they sit
+outside the tool loop and run once per call. Modules 3 and 5 build on this.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+Keep the system prompt in a resource rather than a Java string so you can review and version it like any other file.
+
+<CodeFile title="src/main/resources/prompts/comedian-system.st">
+```text
+You are a programmer comedian. Keep jokes under 40 words and family friendly.
+```
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/jokes/JokeConfig.java">
+```java {17-18}
+package com.example.jokes;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.Resource;
+
+@Configuration(proxyBeanMethods = false)
+class JokeConfig {
+
+    @Bean
+    ChatClient jokeClient(ChatClient.Builder builder,
+                          @Value("classpath:/prompts/comedian-system.st") Resource systemPrompt) {
+        return builder
+                .defaultSystem(systemPrompt)
+                .defaultAdvisors(new SimpleLoggerAdvisor())   // logs at DEBUG; see the gotcha below
+                .build();
+    }
+}
+```
+</CodeFile>
+
+Records describe both the structured output and the API response. With pattern matching, the metadata mapping stays compact.
+
+<CodeFile title="src/main/java/com/example/jokes/JokeService.java">
+```java {35-36}
+package com.example.jokes;
+
+import java.util.Objects;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.metadata.Usage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+
+@Service
+public class JokeService {
+
+    public record Joke(String setup, String punchline) {}
+
+    public record JokeWithUsage(String text, String model, int totalTokens) {}
+
+    private final ChatClient chatClient;
+
+    public JokeService(ChatClient jokeClient) {
+        this.chatClient = jokeClient;
+    }
+
+    public String tell(String topic) {
+        return Objects.requireNonNullElse(prompt(topic).call().content(), "");
+    }
+
+    public Joke structured(String topic) {
+        Joke joke = prompt(topic).call().entity(Joke.class);
+        return Objects.requireNonNull(joke, "model returned no parsable joke");
+    }
+
+    /** One request that returns both the text and the metadata. Calling content() and chatResponse() would cost two requests. */
+    public JokeWithUsage withUsage(String topic) {
+        ChatResponse response = Objects.requireNonNull(prompt(topic).call().chatResponse());
+        int totalTokens = response.getMetadata().getUsage() instanceof Usage usage && usage.getTotalTokens() != null
+                ? usage.getTotalTokens()
+                : 0;
+        return new JokeWithUsage(
+                response.getResult().getOutput().getText(),
+                response.getMetadata().getModel(),
+                totalTokens);
+    }
+
+    public Flux<String> stream(String topic) {
+        return prompt(topic).stream().content();
+    }
+
+    private ChatClient.ChatClientRequestSpec prompt(String topic) {
+        return chatClient.prompt()
+                .user(u -> u.text("Tell me a joke about {topic}").param("topic", topic));
+    }
+}
+```
+</CodeFile>
+
+Spring MVC returns a `Flux` as server-sent events when the endpoint produces `text/event-stream`. You don't need WebFlux.
+
+<CodeFile title="src/main/java/com/example/jokes/JokeController.java">
+```java {35-38}
+package com.example.jokes;
+
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
+
+@RestController
+@RequestMapping("/jokes")
+class JokeController {
+
+    private final JokeService jokes;
+
+    JokeController(JokeService jokes) {
+        this.jokes = jokes;
+    }
+
+    @GetMapping
+    String tell(@RequestParam(defaultValue = "Java") String topic) {
+        return jokes.tell(topic);
+    }
+
+    @GetMapping("/structured")
+    JokeService.Joke structured(@RequestParam(defaultValue = "Java") String topic) {
+        return jokes.structured(topic);
+    }
+
+    @GetMapping("/usage")
+    JokeService.JokeWithUsage withUsage(@RequestParam(defaultValue = "Java") String topic) {
+        return jokes.withUsage(topic);
+    }
+
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    Flux<String> stream(@RequestParam(defaultValue = "Java") String topic) {
+        return jokes.stream(topic);
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/main/resources/application.yml (additions)">
+```yaml {4}
+spring:
+  mvc:
+    async:
+      request-timeout: 2m      # long streams outlive the server's default async timeout
+logging:
+  level:
+    org.springframework.ai.chat.client.advisor: DEBUG   # makes SimpleLoggerAdvisor output visible
+```
+</CodeFile>
+
+## 4. Production gotchas & security
+
+<Gotcha kind="cost" title="Every terminal call is a new request">
+`.call()` only describes the request. Each terminal method (`content()`, `chatResponse()`, `entity()`) sends it again.
+Calling `spec.content()` and then `spec.chatResponse()` pays for two completions and can return two different answers. When you need both
+the value and the metadata, use `chatResponse()` or `responseEntity(Type.class)`.
+</Gotcha>
+
+<Gotcha kind="reliability" title="SSE streams cut off at the async timeout">
+MVC streaming runs as an async request. If a long generation takes longer than `spring.mvc.async.request-timeout` (or the servlet
+container's default), the client gets a truncated stream. Reverse proxies cause similar problems: nginx buffers responses unless you disable
+`proxy_buffering` or send `X-Accel-Buffering: no`, so tokens arrive all at once.
+</Gotcha>
+
+<Gotcha kind="security" title="SimpleLoggerAdvisor writes prompts and answers to your logs">
+At DEBUG level it logs the full request and response, including any PII, retrieved documents and tool output. Enable it per environment,
+never in production by default. Alternatively, use the three-argument constructor with your own `requestToString` and `responseToString`
+functions that redact sensitive fields.
+</Gotcha>
+
+<Gotcha kind="reliability" title="ChatClient.create(chatModel) skips observability">
+Clients built with `ChatClient.create(…)` or `ChatClient.builder(chatModel)` bypass the auto-configured builder. That means no Micrometer
+observations and no `ChatClientBuilderCustomizer` beans. Inject `ChatClient.Builder`, or use `ChatClientBuilderConfigurer` when you work with several models
+(see the next lesson).
+</Gotcha>
+
+## Recap
+
+- Use the injected `ChatClient.Builder` to set the system prompt, advisors and options once, and keep `ChatClient` as a bean.
+- `.call()` and `.stream()` choose how the response is delivered. The terminal method sends the request, and each call sends a new one.
+- `chatResponse()` gives you usage and finish reasons. `entity()` gives you typed records. `stream()` gives you a `Flux` that MVC can serve as SSE.
+- The auto-registered `ToolCallingAdvisor` (`HIGHEST_PRECEDENCE + 300`) wraps advisors ordered after it, such as logging and RAG.
+  Memory advisors (`+ 200`) wrap it instead.

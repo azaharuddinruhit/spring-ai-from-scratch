@@ -1,0 +1,215 @@
+---
+description: Switch between OpenAI, Anthropic, Google GenAI, Amazon Bedrock, DeepSeek, Ollama and Docker Model Runner by changing a Boot starter and a few properties. Your Java service code stays the same.
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import ProviderSwitcherLab from '@/components/ProviderSwitcherLab.astro';
+import { gradleDependencies } from '@/data/snippets';
+
+Your services depend on `ChatClient`, and `ChatClient` depends on the `ChatModel` interface. Which implementation sits behind it is
+decided at build time by the **starter on the classpath**, and at runtime by **properties**. It works the same way as swapping
+PostgreSQL for H2 in a test: you change the driver and the URL, not the repository.
+
+## 1. Spring mental model
+
+<Mermaid
+  caption="Boot 4 creates a ChatModel bean for each starter on the classpath whose spring.ai.model.chat condition matches. ChatClient.Builder wraps that bean."
+  code={`
+flowchart LR
+  subgraph build["build.gradle"]
+    ST["spring-ai-starter-model-anthropic"]
+  end
+  subgraph runtime["Boot 4 auto-configuration"]
+    COND{"spring.ai.model.chat<br/>= anthropic? (default when present)"}
+    PROPS["spring.ai.anthropic.*<br/>api-key · chat.model · chat.max-tokens"]
+    CM["AnthropicChatModel bean<br/>(implements ChatModel)"]
+    CB["ChatClient.Builder<br/>(prototype)"]
+  end
+  subgraph code["Your code (unchanged)"]
+    SVC["AssistantService<br/>ChatClient.prompt()…"]
+  end
+  ST --> COND
+  COND -- yes --> CM
+  PROPS --> CM
+  CM --> CB --> SVC
+`}
+/>
+
+Spring AI 2.0 also reduced the provider variants. OpenAI has one implementation, built on the official SDK (the Azure and separate SDK modules
+were folded in). Anthropic has one, built on `anthropic-java`. Google has one, built on the GenAI SDK, which serves both the Gemini Developer API
+and Vertex AI. Local options are Ollama, and Docker Model Runner through the OpenAI-compatible starter.
+
+## 2. Interactive sandbox
+
+<ProviderSwitcherLab />
+
+Switch from **OpenAI** to **Docker Model Runner**. `build.gradle` doesn't change at all, because both use the OpenAI starter.
+Only `base-url` and the model name change. Then switch to **Amazon Bedrock**. The starter, the property tree and the credentials all change,
+but `AssistantService.java` stays exactly the same.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+### Pattern A: one provider per environment
+
+This is the most common setup: a local model for development and a hosted model in production. Put both starters on the classpath and
+choose one with `spring.ai.model.chat`, set per Spring profile. The `ChatClient` code from the sandbox stays the same.
+
+<CodeFile
+  title="build.gradle (dependencies block)"
+  lang="groovy"
+  code={gradleDependencies(['spring-ai-starter-model-anthropic', 'spring-ai-starter-model-ollama'])}
+/>
+
+<CodeFile title="src/main/resources/application.yml">
+```yaml {7-8}
+spring:
+  threads:
+    virtual:
+      enabled: true
+  ai:
+    model:
+      chat: anthropic              # the only ChatModel that gets created
+      embedding: none              # no embedding model needed in Module 1
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY}
+      chat:
+        model: claude-haiku-4-5
+```
+</CodeFile>
+
+<CodeFile title="src/main/resources/application-local.yml">
+```yaml {4}
+spring:
+  ai:
+    model:
+      chat: ollama                 # run with --spring.profiles.active=local
+    ollama:
+      base-url: http://localhost:11434
+      init:
+        pull-model-strategy: when_missing
+      chat:
+        model: qwen3:8b
+```
+</CodeFile>
+
+### Pattern B: several models in one application
+
+Routing cheap questions to a small local model and hard ones to a frontier model needs two `ChatModel` beans. Drop the
+`spring.ai.model.chat` selector so both are created. Then build each `ChatClient` through `ChatClientBuilderConfigurer`, which applies the same
+customizers and observability that the auto-configured builder would. Building from a bare `ChatClient.builder(model)` skips them.
+
+<CodeFile title="src/main/java/com/example/assistant/MultiModelConfig.java">
+```java {32-33}
+package com.example.assistant;
+
+import io.micrometer.observation.ObservationRegistry;
+import org.springframework.ai.anthropic.AnthropicChatModel;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.model.chat.client.autoconfigure.ChatClientBuilderConfigurer;
+import org.springframework.ai.ollama.OllamaChatModel;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+
+@Configuration(proxyBeanMethods = false)
+class MultiModelConfig {
+
+    @Bean
+    @Primary
+    ChatClient frontierClient(AnthropicChatModel model, ChatClientBuilderConfigurer configurer,
+                              ObjectProvider<ObservationRegistry> observations) {
+        return build(model, configurer, observations);
+    }
+
+    @Bean
+    ChatClient localClient(OllamaChatModel model, ChatClientBuilderConfigurer configurer,
+                           ObjectProvider<ObservationRegistry> observations) {
+        return build(model, configurer, observations);
+    }
+
+    private static ChatClient build(ChatModel model, ChatClientBuilderConfigurer configurer,
+                                    ObjectProvider<ObservationRegistry> observations) {
+        ObservationRegistry registry = observations.getIfUnique(() -> ObservationRegistry.NOOP);
+        return configurer.configure(ChatClient.builder(model, registry, null, null)).build();
+    }
+}
+```
+</CodeFile>
+
+A small router picks a client per request. Callers still see a single service.
+
+<CodeFile title="src/main/java/com/example/assistant/ModelRouter.java">
+```java {24-27}
+package com.example.assistant;
+
+import java.util.Objects;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Service;
+
+@Service
+public class ModelRouter {
+
+    public enum Tier { LOCAL, FRONTIER }
+
+    private final ChatClient frontier;
+    private final ChatClient local;
+
+    public ModelRouter(@Qualifier("frontierClient") ChatClient frontier,
+                       @Qualifier("localClient") ChatClient local) {
+        this.frontier = frontier;
+        this.local = local;
+    }
+
+    public String ask(String question, Tier tier) {
+        ChatClient client = switch (tier) {
+            case LOCAL -> local;
+            case FRONTIER -> frontier;
+        };
+        return Objects.requireNonNullElse(client.prompt(question).call().content(), "");
+    }
+}
+```
+</CodeFile>
+
+## 4. Production gotchas & security
+
+<Gotcha kind="reliability" title="Two starters without a selector cause an ambiguous ChatModel">
+With two model starters on the classpath, both `ChatModel` beans are created by default. Anything that injects `ChatModel` or the
+auto-configured `ChatClient.Builder` then fails at startup with a `NoUniqueBeanDefinitionException`. Either choose one provider with
+`spring.ai.model.chat` (Pattern A), or stop injecting the builder and wire clients explicitly with `@Primary` (Pattern B).
+</Gotcha>
+
+<Gotcha kind="reliability" title="Portable code, but behavior differs by provider">
+The Java code is portable. Model behavior is not. Default `max-tokens`, whether `temperature` is supported (OpenAI's GPT-5 family rejects it),
+JSON-schema strictness, multimodal support and tool-calling quality all differ between providers. Run the same evaluation suite against each
+provider you switch to (Module 6) rather than assuming parity.
+</Gotcha>
+
+<Gotcha kind="security" title="'Local' doesn't automatically mean private">
+Ollama and Docker Model Runner keep prompts on your machine only if the endpoint really is local. A `base-url` pointing at a shared GPU box
+over plain HTTP sends prompts and customer data unencrypted. Use TLS and network policies for shared inference hosts, and never expose
+Ollama's port to the internet. It has no authentication.
+</Gotcha>
+
+<Gotcha kind="cost" title="pull-model-strategy: always in production">
+`always` re-pulls multi-gigabyte model layers on every startup, which slows rollouts and autoscaling. Use `when_missing` in development, and
+bake models into the image or a volume for production.
+</Gotcha>
+
+<Gotcha kind="migration" title="Removed modules in 2.0">
+`spring-ai-azure-openai` and `spring-ai-openai-sdk` were removed and merged into `spring-ai-openai`, which now supports Microsoft Foundry
+deployments. The dedicated MiniMax and OCI GenAI modules are gone as well. Drop the `Azure` or `Sdk` prefixes from class names when you migrate.
+</Gotcha>
+
+## Recap
+
+- The starter chooses the implementation, properties configure it, and your code depends only on `ChatClient`.
+- Use `spring.ai.model.chat` with profiles to run one provider per environment.
+- To run several models side by side, build each `ChatClient` through `ChatClientBuilderConfigurer` so observability is kept.
+- Portability covers the code, not model behavior. Evaluate each provider before you switch.

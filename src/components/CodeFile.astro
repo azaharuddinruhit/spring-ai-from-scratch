@@ -1,0 +1,58 @@
+---
+/**
+ * The code viewer: the file name and a copy button above a code box with line numbers and highlighted key lines.
+ * Wrap a Markdown fence (mark lines with ```java {12-14}), or pass `code` + `lang` (+ optional `lines`)
+ * for snippets generated from src/data.
+ */
+import { highlight } from '@/lib/highlight';
+
+interface Props {
+  title: string;
+  code?: string;
+  lang?: string;
+  /** Lines to highlight when `code` is passed, e.g. "3" or "12-14,20". */
+  lines?: string;
+}
+
+const { title, code, lang, lines } = Astro.props;
+const html = code ? await highlight(code.trimEnd(), lang ?? 'text', lines) : null;
+---
+
+<figure class="not-prose my-5" data-code-file>
+  <figcaption class="mb-1.5 flex items-center justify-between gap-2">
+    <span class="code-mono min-w-0 truncate text-[0.8rem] font-medium text-slate-700 dark:text-slate-300">{title}</span>
+    <button type="button" class="copy-btn" data-copy aria-label={`Copy ${title}`} title="Copy code">
+      <svg class="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="9" y="9" width="12" height="12" rx="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+      <svg class="icon-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M20 6 9 17l-5-5"></path>
+      </svg>
+    </button>
+    <span class="sr-only" aria-live="polite" data-copy-status></span>
+  </figcaption>
+  {html ? <Fragment set:html={html} /> : <slot />}
+</figure>
+
+<script>
+  // One delegated listener for every code viewer on the page.
+  document.addEventListener('click', async (event) => {
+    const button = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-copy]');
+    const code = button?.closest('[data-code-file]')?.querySelector('pre code');
+    if (!button || !code) return;
+    const status = button.parentElement?.querySelector('[data-copy-status]');
+    try {
+      await navigator.clipboard.writeText(code.textContent ?? '');
+      button.classList.add('is-done');
+      if (status) status.textContent = 'Copied';
+    } catch {
+      getSelection()?.selectAllChildren(code);
+      if (status) status.textContent = 'Selected, press Ctrl+C to copy';
+    }
+    setTimeout(() => {
+      button.classList.remove('is-done');
+      if (status) status.textContent = '';
+    }, 1500);
+  });
+</script>

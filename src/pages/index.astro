@@ -1,0 +1,124 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import HeroTrace from '@/components/HeroTrace.astro';
+import { getNavigation, publishedSequence } from '@/lib/course';
+import { STACK } from '@/data/versions';
+
+const nav = await getNavigation();
+const first = publishedSequence(nav)[0];
+
+const anatomy = [
+  { title: 'The Spring mental model', body: 'Each abstraction is mapped to a Spring primitive you already know, with a diagram of the request lifecycle.' },
+  { title: 'A sandbox to try it', body: 'Change settings, send a simulated request and inspect what happens. It runs in your browser, so you need no API key.' },
+  { title: 'Code to copy', body: 'Complete Java 25 classes, application.yml and build.gradle files, with the important lines marked.' },
+  { title: 'What breaks in production', body: 'Failure modes such as runaway tool loops, leaked chat memory and prompt injection, and how to prevent them.' },
+];
+---
+
+<BaseLayout
+  title="Spring AI from Scratch"
+  description="An interactive course for Java and Spring Boot developers building production AI applications with Spring AI 2, Spring Boot 4 and Java 25."
+>
+  <main id="content">
+    <section class="mx-auto max-w-6xl px-4 pt-14 pb-16 sm:px-6 sm:pt-20">
+      <h1 class="max-w-[22ch] text-[2.25rem] leading-[1.08] font-semibold tracking-tight text-slate-900 sm:text-[3.375rem] dark:text-white">
+        Learn production AI the way you already write Spring.
+      </h1>
+      <p class="mt-5 max-w-[60ch] text-lg leading-relaxed text-slate-600 dark:text-slate-400">
+        This course starts with your first <code class="font-mono text-[0.92em] text-slate-800 dark:text-slate-200">ChatClient</code> call
+        and ends with a multi-tenant assistant that remembers, retrieves, calls your tools and is tested like any other Spring service.
+      </p>
+
+      <div class="mt-10 sm:mt-12">
+        <HeroTrace nav={nav} />
+      </div>
+
+      <div class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+        {
+          first && (
+            <a
+              href={first.href}
+              class="rounded-md bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-800 dark:bg-brand-500 dark:text-slate-950 dark:hover:bg-brand-400"
+            >
+              Start with the ChatClient
+            </a>
+          )
+        }
+        <a href="#curriculum" class="text-sm font-medium text-slate-700 underline decoration-slate-300 underline-offset-4 hover:decoration-brand-600 dark:text-slate-300 dark:decoration-slate-600">
+          See all seven modules
+        </a>
+      </div>
+      <p class="mt-6 max-w-[70ch] text-sm text-slate-500 dark:text-slate-400">
+        The lessons use Java {STACK.java}, Spring Boot {STACK.springBoot}, Spring Framework {STACK.springFramework}, Spring AI {STACK.springAi} and
+        Gradle {STACK.gradle} with the Groovy DSL.
+      </p>
+    </section>
+
+    <section class="border-t border-slate-200 dark:border-slate-800">
+      <div class="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <h2 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Every lesson has four parts, in this order</h2>
+        <ol class="mt-8 grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
+          {
+            anatomy.map((step, i) => (
+              <li class="border-t-2 border-slate-900 pt-4 dark:border-slate-200">
+                <span class="text-3xl font-light text-brand-700 tabular-nums dark:text-brand-400">{i + 1}</span>
+                <h3 class="mt-2 font-semibold text-slate-900 dark:text-white">{step.title}</h3>
+                <p class="mt-1.5 text-[0.9375rem] leading-relaxed text-slate-600 dark:text-slate-400">{step.body}</p>
+              </li>
+            ))
+          }
+        </ol>
+      </div>
+    </section>
+
+    <section id="curriculum" class="scroll-mt-16 border-t border-slate-200 dark:border-slate-800">
+      <div class="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <h2 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">The course</h2>
+        <p class="mt-2 max-w-[60ch] text-slate-600 dark:text-slate-400">
+          Seven modules, meant to be taken in order. Lessons not yet written are listed so you can see where the course is going.
+        </p>
+        <ol class="mt-10 divide-y divide-slate-200 border-y border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+          {
+            nav.map((module) => {
+              const published = module.navLessons.some((l) => l.href);
+              return (
+                <li id={`module-${module.number}`} class="grid scroll-mt-20 gap-x-8 gap-y-3 py-8 md:grid-cols-[5rem_minmax(0,22rem)_minmax(0,1fr)]">
+                  <span
+                    class:list={[
+                      'text-4xl leading-none font-light tabular-nums',
+                      published ? 'text-brand-700 dark:text-brand-400' : 'text-slate-400 dark:text-slate-500',
+                    ]}
+                  >
+                    {module.number}
+                  </span>
+                  <div>
+                    <h3 class="text-lg font-semibold text-slate-900 dark:text-white">{module.title}</h3>
+                    <p class="mt-1.5 text-[0.9375rem] leading-relaxed text-slate-600 dark:text-slate-400">{module.summary}</p>
+                  </div>
+                  <ul class="space-y-1.5 text-[0.9375rem]">
+                    {module.navLessons.map((lesson) =>
+                      lesson.href ? (
+                        <li>
+                          <a
+                            href={lesson.href}
+                            class="text-slate-800 underline decoration-brand-500/40 underline-offset-4 hover:text-brand-700 hover:decoration-brand-600 dark:text-slate-200 dark:hover:text-brand-400"
+                          >
+                            {lesson.title}
+                          </a>
+                        </li>
+                      ) : (
+                        <li class="text-slate-400 dark:text-slate-500">
+                          {lesson.title} <span class="text-sm italic">soon</span>
+                        </li>
+                      ),
+                    )}
+                  </ul>
+                </li>
+              );
+            })
+          }
+        </ol>
+      </div>
+    </section>
+  </main>
+</BaseLayout>

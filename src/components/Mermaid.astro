@@ -1,0 +1,94 @@
+---
+interface Props {
+  code: string;
+  caption?: string;
+}
+
+const { code, caption } = Astro.props;
+---
+
+<figure class="not-prose my-6 rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:p-6 dark:border-slate-800 dark:bg-slate-800/30">
+  <div class="mermaid-diagram min-h-24 overflow-x-auto" data-source={code.trim()} data-label={caption ?? 'Diagram'}>
+    <p class="py-8 text-center text-sm text-slate-500 dark:text-slate-400" data-mermaid-pending>Drawing the diagram…</p>
+  </div>
+  {caption && <figcaption class="mt-3 text-center text-sm text-slate-500 dark:text-slate-400">{caption}</figcaption>}
+</figure>
+
+<script>
+  let renderCount = 0;
+
+  async function renderAll() {
+    const { default: mermaid } = await import('mermaid');
+    await document.fonts.ready; // Mermaid sizes nodes from measured text; measuring a fallback font clips labels
+    const dark = document.documentElement.classList.contains('dark');
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      fontFamily: 'IBM Plex Sans, ui-sans-serif, system-ui, sans-serif',
+      theme: 'base',
+      themeVariables: dark
+        ? {
+            background: '#0f172a',
+            primaryColor: '#064e3b',
+            primaryTextColor: '#e2e8f0',
+            primaryBorderColor: '#10b981',
+            lineColor: '#64748b',
+            secondaryColor: '#1e293b',
+            tertiaryColor: '#0f172a',
+            actorBkg: '#064e3b',
+            actorBorder: '#10b981',
+            actorTextColor: '#ecfdf5',
+            signalColor: '#cbd5e1',
+            signalTextColor: '#e2e8f0',
+            labelBoxBkgColor: '#1e293b',
+            labelTextColor: '#e2e8f0',
+            noteBkgColor: '#1e293b',
+            noteTextColor: '#e2e8f0',
+            noteBorderColor: '#475569',
+            activationBkgColor: '#065f46',
+            activationBorderColor: '#34d399',
+          }
+        : {
+            background: '#ffffff',
+            primaryColor: '#d1fae5',
+            primaryTextColor: '#0f172a',
+            primaryBorderColor: '#059669',
+            lineColor: '#64748b',
+            secondaryColor: '#f1f5f9',
+            tertiaryColor: '#ffffff',
+            actorBkg: '#d1fae5',
+            actorBorder: '#059669',
+            actorTextColor: '#064e3b',
+            signalColor: '#334155',
+            signalTextColor: '#0f172a',
+            noteBkgColor: '#f8fafc',
+            noteTextColor: '#0f172a',
+            noteBorderColor: '#cbd5e1',
+            activationBkgColor: '#a7f3d0',
+            activationBorderColor: '#059669',
+          },
+    });
+
+    for (const el of document.querySelectorAll<HTMLElement>('.mermaid-diagram')) {
+      const source = el.dataset.source;
+      if (!source) continue;
+      try {
+        const { svg } = await mermaid.render(`mermaid-${++renderCount}`, source);
+        el.innerHTML = svg;
+        const rendered = el.querySelector('svg');
+        rendered?.setAttribute('role', 'img');
+        rendered?.setAttribute('aria-label', el.dataset.label ?? 'Diagram');
+      } catch (error) {
+        console.error('Mermaid render failed', error);
+        // Fall back to the diagram source, which still reads as a description of the flow.
+        const fallback = document.createElement('pre');
+        fallback.className = 'code-mono text-xs whitespace-pre-wrap text-slate-600 dark:text-slate-400';
+        fallback.textContent = source;
+        el.replaceChildren(fallback);
+      }
+    }
+  }
+
+  renderAll();
+  document.addEventListener('themechange', renderAll);
+</script>

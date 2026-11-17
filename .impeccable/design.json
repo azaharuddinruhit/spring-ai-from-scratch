@@ -1,0 +1,310 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-18T01:45:00Z",
+  "title": "Design System: Spring AI from Scratch",
+  "extensions": {
+    "colorMeta": {
+      "spring-emerald": {
+        "role": "primary",
+        "displayName": "Spring Emerald",
+        "tonalRamp": [
+          "#064e3b",
+          "#065f46",
+          "#047857",
+          "#059669",
+          "#10b981",
+          "#34d399",
+          "#6ee7b7",
+          "#d1fae5"
+        ]
+      },
+      "spring-emerald-deep": {
+        "role": "primary",
+        "displayName": "Deep Emerald"
+      },
+      "spring-emerald-bright": {
+        "role": "primary",
+        "displayName": "Bright Emerald"
+      },
+      "spring-emerald-mid": {
+        "role": "primary",
+        "displayName": "Mid Emerald"
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper"
+      },
+      "night-slate": {
+        "role": "neutral",
+        "displayName": "Night Slate",
+        "tonalRamp": [
+          "#020617",
+          "#0f172a",
+          "#1e293b",
+          "#334155",
+          "#475569",
+          "#64748b",
+          "#cbd5e1",
+          "#f1f5f9"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink"
+      },
+      "ink-strong": {
+        "role": "neutral",
+        "displayName": "Ink Strong"
+      },
+      "midnight": {
+        "role": "neutral",
+        "displayName": "Midnight"
+      },
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Ink Muted"
+      },
+      "ink-quiet": {
+        "role": "neutral",
+        "displayName": "Ink Quiet"
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Rule"
+      },
+      "rule-dark": {
+        "role": "neutral",
+        "displayName": "Rule Dark"
+      },
+      "latte-text": {
+        "role": "tertiary",
+        "displayName": "Latte Text"
+      },
+      "latte-green": {
+        "role": "tertiary",
+        "displayName": "Line Green (light)"
+      },
+      "mocha-text": {
+        "role": "tertiary",
+        "displayName": "Mocha Text"
+      },
+      "mocha-green": {
+        "role": "tertiary",
+        "displayName": "Line Green (dark)"
+      },
+      "code-paper": {
+        "role": "tertiary",
+        "displayName": "Code Paper"
+      },
+      "code-night": {
+        "role": "tertiary",
+        "displayName": "Code Night"
+      },
+      "code-rule": {
+        "role": "tertiary",
+        "displayName": "Code Rule"
+      },
+      "code-rule-dark": {
+        "role": "tertiary",
+        "displayName": "Code Rule (dark)"
+      },
+      "answer-yellow": {
+        "role": "secondary",
+        "displayName": "Answer Yellow",
+        "canonical": "#ac5e00 (dark theme #f9e2af)"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The home headline only."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Lesson titles."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Section headings on home and in lessons."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Lesson prose and ledes."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Navigation, buttons, notes; always sentence case."
+      },
+      "numeral": {
+        "displayName": "Numeral",
+        "purpose": "Module and lesson-part numbers, tabular figures."
+      },
+      "code": {
+        "displayName": "Code",
+        "purpose": "Code files and sandbox code; no ligatures, never italic."
+      }
+    },
+    "shadows": [
+      {
+        "name": "line-band",
+        "value": "inset 3px 0 0 var(--code-highlight-bar)",
+        "purpose": "The inset bar of the 'this line' band, paired with a --code-highlight background."
+      },
+      {
+        "name": "callout",
+        "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        "purpose": "Gotcha callouts only."
+      }
+    ],
+    "motion": [
+      {
+        "name": "step-band",
+        "value": "160ms ease",
+        "purpose": "Background, rail and node colour transitions on hero trace steps."
+      },
+      {
+        "name": "trace-pass",
+        "value": "170ms step, 400ms delay",
+        "purpose": "The single load pass of the request trace: out, round the tool loop, back; skipped under reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single main action on a page, such as starting the course.",
+      "html": "<a class=\"ds-btn-primary\" href=\"#\">Start with the ChatClient</a>",
+      "css": ".ds-btn-primary { display: inline-block; background: #047857; color: #fff; padding: 10px 20px; border-radius: 6px; font: 600 0.875rem/1.4 'IBM Plex Sans', system-ui, sans-serif; text-decoration: none; transition: background-color 150ms; } .ds-btn-primary:hover { background: #065f46; } .ds-btn-primary:focus-visible { outline: 2px solid #047857; outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Link",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Secondary actions: an underlined link whose decoration turns emerald on hover.",
+      "html": "<a class=\"ds-link\" href=\"#\">See all seven modules</a>",
+      "css": ".ds-link { color: #334155; font: 500 0.875rem 'IBM Plex Sans', system-ui, sans-serif; text-decoration: underline; text-decoration-color: #cbd5e1; text-underline-offset: 4px; } .ds-link:hover { text-decoration-color: #059669; } .ds-link:focus-visible { outline: 2px solid #047857; outline-offset: 2px; }"
+    },
+    {
+      "name": "Sandbox Pill",
+      "kind": "chip",
+      "refersTo": "pill",
+      "description": "Toggle inside a sandbox; the label is code, so it is set in mono.",
+      "html": "<div style=\"display:flex;gap:8px\"><button class=\"ds-pill is-active\" aria-pressed=\"true\">chatClient.prompt()</button><button class=\"ds-pill\" aria-pressed=\"false\">chatModel.call(prompt)</button></div>",
+      "css": ".ds-pill { border: 1px solid #cbd5e1; background: transparent; color: #334155; border-radius: 6px; padding: 4px 10px; font: 0.75rem 'JetBrains Mono', ui-monospace, monospace; cursor: pointer; transition: border-color 150ms, color 150ms; } .ds-pill:hover { border-color: #10b981; color: #047857; } .ds-pill.is-active { background: #059669; border-color: #059669; color: #fff; } .ds-pill:focus-visible { outline: 2px solid #047857; outline-offset: 2px; }"
+    },
+    {
+      "name": "Code File",
+      "kind": "custom",
+      "refersTo": "code-surface",
+      "description": "The code viewer: file path and an icon copy button above a near-white code box with line numbers and the green key-line band.",
+      "html": "<figure class=\"ds-code\"><figcaption><span>AssistantService.java</span><button class=\"ds-copy\" aria-label=\"Copy AssistantService.java\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"9\" y=\"9\" width=\"12\" height=\"12\" rx=\"2\"/><path d=\"M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1\"/></svg></button></figcaption><pre><code><span class=\"l\"><span style=\"color:#ac5e00\">@Service</span></span><span class=\"l hl\"><span style=\"color:#8839ef\">class</span> <span style=\"color:#ac5e00\">AssistantService</span> {</span><span class=\"l\"><span style=\"color:#6d7084\">// one ChatClient per use case</span></span><span class=\"l\">}</span></code></pre></figure>",
+      "css": ".ds-code { margin: 0; font-family: 'IBM Plex Sans', system-ui, sans-serif; } .ds-code figcaption { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; } .ds-code figcaption span { font: 500 0.8rem 'JetBrains Mono', monospace; font-variant-ligatures: none; color: #334155; } .ds-copy { display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: none; color: #64748b; cursor: pointer; } .ds-copy:hover { color: #0f172a; border-color: #e2e8f0; } .ds-copy:focus-visible { outline: 2px solid #047857; outline-offset: 2px; } .ds-copy svg { width: 16px; height: 16px; } .ds-code pre { margin: 0; padding: 12px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; color: #4c4f69; font: 0.8rem/1.65 'JetBrains Mono', monospace; font-variant-ligatures: none; overflow-x: auto; scrollbar-color: #8c8fa1 #f8fafc; } .ds-code code { display: grid; counter-reset: line; } .ds-code .l { padding-right: 14px; } .ds-code .l::before { counter-increment: line; content: counter(line); display: inline-block; width: 3rem; padding-right: 1rem; text-align: right; color: #8c8fa1; } .ds-code .l.hl { background: rgb(64 160 43 / 0.12); box-shadow: inset 3px 0 0 #40a02b; } .ds-code .l.hl::before { color: #40a02b; }"
+    },
+    {
+      "name": "Sandbox Frame",
+      "kind": "card",
+      "refersTo": "sandbox-frame",
+      "description": "Frame around every interactive simulation, with an emerald top edge.",
+      "html": "<section class=\"ds-lab\"><header><div class=\"ds-lab-title\"><h3>ChatOptions merge inspector</h3><span>Simulated in your browser, no API key needed</span></div><p>Set options at each layer and compare how they resolve.</p></header><div class=\"ds-lab-body\">…</div></section>",
+      "css": ".ds-lab { border: 1px solid #e2e8f0; border-top: 2px solid #059669; border-radius: 12px; background: #fff; overflow: hidden; font-family: 'IBM Plex Sans', system-ui, sans-serif; } .ds-lab header { padding: 12px 16px; border-bottom: 1px solid #e2e8f0; } .ds-lab-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; } .ds-lab h3 { margin: 0; font-size: 1rem; font-weight: 600; color: #0f172a; } .ds-lab-title span { font-size: 0.75rem; color: #64748b; } .ds-lab header p { margin: 4px 0 0; font-size: 0.875rem; color: #475569; } .ds-lab-body { padding: 16px; }"
+    },
+    {
+      "name": "Gotcha",
+      "kind": "custom",
+      "refersTo": "gotcha",
+      "description": "Production gotcha callout; the hue encodes the kind.",
+      "html": "<section class=\"ds-gotcha\"><div><span class=\"ds-gotcha-badge\">Security</span><h3>Never echo user input into the system prompt</h3></div><p>Treat it as untrusted data.</p></section>",
+      "css": ".ds-gotcha { border: 1px solid #e2e8f0; border-left: 4px solid #f43f5e; border-radius: 8px; padding: 16px; background: #fff; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); font-family: 'IBM Plex Sans', system-ui, sans-serif; } .ds-gotcha div { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; } .ds-gotcha-badge { background: #ffe4e6; color: #9f1239; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; font-weight: 500; } .ds-gotcha h3 { margin: 0; font-size: 1rem; font-weight: 600; color: #0f172a; } .ds-gotcha p { margin: 8px 0 0; color: #334155; }"
+    },
+    {
+      "name": "Sidebar Navigation",
+      "kind": "nav",
+      "refersTo": "sidebar",
+      "description": "Course navigation: tabular module numbers, lessons on a 1px rail, current lesson in emerald.",
+      "html": "<nav class=\"ds-nav\"><p><span>1</span>Foundations & Core Abstractions</p><ul><li><a href=\"#\">Spring AI 2.x Architecture</a></li><li><a href=\"#\" aria-current=\"page\">The ChatClient Fluent API</a></li><li class=\"soon\">Multi-Provider Portability <em>soon</em></li></ul></nav>",
+      "css": ".ds-nav { font: 0.875rem 'IBM Plex Sans', system-ui, sans-serif; } .ds-nav p { display: flex; gap: 8px; margin: 0 0 8px; font-weight: 600; color: #0f172a; } .ds-nav p span { width: 1rem; color: #047857; font-variant-numeric: tabular-nums; } .ds-nav ul { list-style: none; margin: 0; padding: 0; border-left: 1px solid #e2e8f0; } .ds-nav a, .ds-nav .soon { display: flex; justify-content: space-between; margin-left: -1px; padding: 4px 8px 4px 12px; border-left: 1px solid transparent; color: #475569; text-decoration: none; } .ds-nav a:hover { border-color: #94a3b8; color: #0f172a; } .ds-nav a[aria-current=page] { border-color: #059669; color: #047857; font-weight: 500; } .ds-nav .soon { color: #94a3b8; } .ds-nav em { font-size: 0.75rem; }"
+    },
+    {
+      "name": "Version Pill",
+      "kind": "chip",
+      "refersTo": "version-pill",
+      "description": "The site version in the header, stamped on each deploy; \"dev\" on local builds.",
+      "html": "<span class=\"ds-version\">v1.0.37</span>",
+      "css": ".ds-version { display: inline-block; border: 1px solid #e2e8f0; border-radius: 9999px; padding: 2px 8px; font: 500 0.75rem/1.4 'IBM Plex Sans', system-ui, sans-serif; font-variant-numeric: tabular-nums; color: #475569; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Running Call",
+    "overview": "One call runs through the whole site. The home page opens with a request trace: one `ChatClient` call travelling from your service through the advisor chain (memory, the tool loop, RAG) to `ChatModel` and the provider, then back as a typed `Answer`, with each step labelled by the module that teaches it. A single pass runs the request out, round the tool loop once and back, and comes to rest on `ChatClient`, where the course starts. The green band that marks the selected step also marks the key lines in every code file and the changed lines in the provider switcher, so \"this is the part that matters\" looks the same everywhere on the site. Around the code, everything is quiet: white or slate-900 paper, slate prose in IBM Plex Sans, emerald used only for links, the primary action and position in a sequence. The density is that of good reference documentation: generous measure, clear section breaks, nothing decorative. Code surfaces are the only saturated color on the page and they carry it fully (Catppuccin token colors: Latte, darkened where needed, on a near-white box in light mode; Mocha on the slate-800 card color in dark mode), which keeps the emerald chrome from competing with syntax colors. The system rejects the generic course-site template: no gradient washes, no card grids for lists, no ALL-CAPS eyebrows, no monospace used as a costume for small labels, no `→` on links, no `A · B · C` meta strings.",
+    "keyCharacteristics": [
+      "One visual language for \"this line\": a translucent green band with a 3px inset bar.",
+      "Catppuccin code surfaces that follow the site theme; slate and emerald for everything else.",
+      "JetBrains Mono only for real code; IBM Plex Sans for prose, labels and numerals.",
+      "Numbers only for real sequences (modules, the four lesson parts), set light and tabular.",
+      "Flat surfaces separated by hairline rules and tonal steps, not shadows."
+    ],
+    "rules": [
+      {
+        "name": "The One Accent Rule",
+        "body": "Emerald is the only chrome color. Amber, rose, sky and violet appear only as Gotcha kinds (reliability, security, cost, migration), where the hue carries the meaning.",
+        "section": "colors"
+      },
+      {
+        "name": "The Code Owns Saturation Rule",
+        "body": "Syntax color lives inside code surfaces. Chrome around code stays slate so the two never compete.",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono Is Code Rule",
+        "body": "JetBrains Mono appears only where the text is code, a file name, or a value the reader would type. Small UI labels are Plex.",
+        "section": "typography"
+      },
+      {
+        "name": "The Sentence Case Rule",
+        "body": "Every heading, label, button and badge is sentence case. No tracked uppercase.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat By Default Rule",
+        "body": "Don't add shadows to separate content. Use a rule, a tonal step or space.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do mark the important line with the green band and inset bar, wherever code appears.",
+      "Do keep emerald for links, the primary action, module numbers and the current position.",
+      "Do set numbers in Plex with tabular figures, and only for real sequences.",
+      "Do write every label in sentence case and every link as the thing it opens.",
+      "Do let tables and code scroll inside their column on phones."
+    ],
+    "donts": [
+      "Don't use ALL-CAPS tracked eyebrow labels above headings.",
+      "Don't use monospace for small UI labels; mono is for code.",
+      "Don't append → to links or buttons, or join meta with middle dots.",
+      "Don't lay out lists as card grids or add gradient washes.",
+      "Don't use a near-black dark background; dark mode is slate-900.",
+      "Don't add fake window chrome (dots, title bars) to code or sandboxes.",
+      "Don't set code in italics or turn ligatures on."
+    ]
+  }
+}

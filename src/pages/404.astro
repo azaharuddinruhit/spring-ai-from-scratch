@@ -1,0 +1,37 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { getNavigation, publishedSequence, withBase } from '@/lib/course';
+
+const first = publishedSequence(await getNavigation())[0];
+---
+
+<BaseLayout title="Page not found" description="This address isn't part of Spring AI from Scratch.">
+  <main id="content" class="mx-auto max-w-6xl px-4 pt-20 pb-24 sm:px-6 sm:pt-28">
+    <p class="code-mono text-lg text-(--syn-comment)">// 404: no lesson at this address</p>
+    <h1 class="mt-4 max-w-[22ch] text-[2.25rem] leading-[1.1] font-semibold tracking-tight text-slate-900 sm:text-5xl dark:text-white">
+      This page isn't part of the course.
+    </h1>
+    <p class="mt-5 max-w-[60ch] text-lg leading-relaxed text-slate-600 dark:text-slate-400">
+      The link may be mistyped, or it points to a lesson that hasn't been written yet. The course list shows every module and which
+      lessons are ready.
+    </p>
+    <div class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+      <a
+        href={withBase('/#curriculum')}
+        class="rounded-md bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-800 dark:bg-brand-500 dark:text-slate-950 dark:hover:bg-brand-400"
+      >
+        Go to the course list
+      </a>
+      {
+        first && (
+          <a
+            href={first.href}
+            class="text-sm font-medium text-slate-700 underline decoration-slate-300 underline-offset-4 hover:decoration-brand-600 dark:text-slate-300 dark:decoration-slate-600"
+          >
+            Start with the first lesson
+          </a>
+        )
+      }
+    </div>
+  </main>
+</BaseLayout>

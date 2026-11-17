@@ -1,63 +1,71 @@
 # Spring AI from Scratch
 
-A hands-on project for building AI-powered applications with [Spring AI](https://docs.spring.io/spring-ai/reference/) and Spring Boot, starting from an empty project and adding features step by step.
+An interactive course for Java and Spring Boot developers who want to build production AI applications with Spring AI. It runs from
+the first `ChatClient` call to a multi-tenant, tool-calling, RAG-backed assistant.
 
-## Tech stack
+Every lesson has four parts:
 
-- Java 21
-- Spring Boot 3
-- Spring AI
-- Maven (via the included wrapper `./mvnw`)
+1. **Spring mental model.** The abstraction is mapped to Spring primitives you already know, with a Mermaid diagram of the request lifecycle.
+2. **Interactive sandbox.** A deterministic simulation that runs in the browser, with no backend and no API keys.
+3. **Idiomatic code.** Copy-pasteable Java, `application.yml` and `build.gradle` (Groovy DSL) files.
+4. **Production gotchas.** Reliability, security, cost and migration pitfalls, and how to avoid them.
 
-## Prerequisites
+## Stack taught in the lessons
 
-- JDK 21+ ([Eclipse Temurin](https://adoptium.net/) recommended)
-- An API key for the model provider you configure in Spring AI (for example, OpenAI or Anthropic)
-- Docker (optional, for building container images)
+| | Version |
+| --- | --- |
+| Java | 25 |
+| Spring Boot | 4.1.2 |
+| Spring Framework | 7 |
+| Spring AI | 2.0.2 |
+| Gradle | 9.9.1 (Groovy DSL) |
 
-## Getting started
+These versions are pinned in [`src/data/versions.ts`](src/data/versions.ts), and every generated build snippet reads them from there.
 
-1. Clone the repository:
+## Curriculum
 
-   ```bash
-   git clone https://github.com/azaharuddinruhit/spring-ai-from-scratch.git
-   cd spring-ai-from-scratch
-   ```
+| Module | Topic | Status |
+| --- | --- | --- |
+| 1 | Foundations & core abstractions | Published |
+| 2 | Deterministic structured outputs | Planned |
+| 3 | The Advisors API & chat memory | Planned |
+| 4 | RAG & ETL pipelines | Planned |
+| 5 | Tool calling, MCP & agents | Planned |
+| 6 | Testing, evaluation & production hardening | Planned |
+| 7 | Capstone: enterprise support & knowledge assistant | Planned |
 
-2. Provide your model provider's API key as an environment variable. Don't commit it. For example:
+## Running the site locally
 
-   ```bash
-   export OPENAI_API_KEY=your-key-here        # macOS / Linux
-   $env:OPENAI_API_KEY = "your-key-here"      # Windows PowerShell
-   ```
-
-3. Run the application:
-
-   ```bash
-   ./mvnw spring-boot:run
-   ```
-
-## Build and test
-
-```bash
-./mvnw verify
-```
-
-## Container image
-
-Build an OCI image with Spring Boot's buildpacks support (no Dockerfile needed):
+Requires Node.js 22.23 or later.
 
 ```bash
-./mvnw spring-boot:build-image -Dspring-boot.build-image.imageName=spring-ai-from-scratch
-docker run -p 8080:8080 -e OPENAI_API_KEY=$OPENAI_API_KEY spring-ai-from-scratch
+npm install
+npm run dev        # http://localhost:4321/spring-ai-from-scratch/
+npm run build      # astro check + static build into dist/
+npm run preview    # serve the production build
 ```
 
-## CI/CD
+## Project layout
 
-The [`deploy.yml`](.github/workflows/deploy.yml) workflow runs on every push and pull request to `main`:
+```text
+src/
+  data/curriculum.ts        course structure and lesson titles (single source of truth)
+  data/versions.ts          pinned stack versions and the site version shown in the header
+  data/snippets.ts          generated build.gradle / application.yml snippets and provider data
+  content/lessons/<module>/<lesson>.mdx   lesson content
+  components/islands/       React sandboxes (client-side simulations)
+  components/               Astro components: HeroTrace (home), Mermaid, CodeFile, Gotcha, layout pieces
+  layouts/                  base and lesson layouts
+```
 
-- **Pull requests:** builds the project and runs the tests.
-- **Pushes to `main`** (or a manual run): also builds a container image and publishes it to GitHub Container Registry as
-  `ghcr.io/<owner>/spring-ai-from-scratch`, tagged with `latest` and the commit SHA.
+A lesson goes live when its MDX file exists at the path that matches its entry in `curriculum.ts`. Until then it appears as "soon" in the navigation.
 
-The workflow uses the built-in `GITHUB_TOKEN`, so it needs no extra secrets.
+`PRODUCT.md` describes who the course is for and what it may claim; `DESIGN.md` is the visual system that every UI change follows.
+
+## Deployment
+
+[`deploy.yml`](.github/workflows/deploy.yml) type-checks and builds on every pull request and push to `main`. Pushes to `main` (or a
+manual run) also publish `dist/` to GitHub Pages. In the repository settings, set **Pages → Source** to **GitHub Actions** once.
+
+Each deploy is versioned automatically: `VERSION` holds `major.minor` and the workflow adds its run number as the patch (for example
+`1.0.37`), which the header shows. Local and pull request builds show `dev`. Edit `VERSION` only for a minor or major release.

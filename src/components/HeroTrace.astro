@@ -1,0 +1,594 @@
+---
+/**
+ * The home hero: one request travelling through Spring AI at runtime, from your service down the advisor chain to the
+ * provider and back as a typed Answer. Each step is a tab whose panel says what happens there and which module teaches it.
+ * On load, one pass runs the request out, round the tool loop once and back, then rests on ChatClient, where the course starts.
+ * Advisor order is the 2.0.2 default: memory (+200), ToolCallingAdvisor (+300), RAG (0), then the model call.
+ */
+import type { NavModule } from '@/lib/course';
+import { withBase } from '@/lib/course';
+import { highlight } from '@/lib/highlight';
+
+interface Props {
+  nav: NavModule[];
+}
+
+interface Step {
+  id: string;
+  label: string;
+  /** The real type behind the step, shown in the panel. */
+  type: string;
+  module: number;
+  body: string;
+  code: string;
+  lang: string;
+}
+
+const STEPS: Step[] = [
+  {
+    id: 'service',
+    label: 'Your service',
+    type: '@Service',
+    module: 7,
+    body: 'Your code asks one question through the fluent API. In the capstone it is a support assistant that answers from your documents and your CRM.',
+    code: `Answer answer = chatClient.prompt()
+        .user(question)
+        .call()
+        .entity(Answer.class);`,
+    lang: 'java',
+  },
+  {
+    id: 'client',
+    label: 'ChatClient',
+    type: 'ChatClient',
+    module: 1,
+    body: 'Built once from the auto-configured builder, like RestClient. It turns the call into a ChatClientRequest and passes it down the advisor chain in order.',
+    code: `ChatClient chatClient = builder
+        .defaultAdvisors(memoryAdvisor, ragAdvisor)
+        .build();`,
+    lang: 'java',
+  },
+  {
+    id: 'memory',
+    label: 'Chat memory',
+    type: 'MessageChatMemoryAdvisor',
+    module: 3,
+    body: 'First in the chain by default (order HIGHEST_PRECEDENCE + 200). It adds this conversation’s earlier messages and saves the new exchange, keyed by the conversation ID you pass.',
+    code: `chatClient.prompt()
+        .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))`,
+    lang: 'java',
+  },
+  {
+    id: 'tools',
+    label: 'Tool loop',
+    type: 'ToolCallingAdvisor',
+    module: 5,
+    body: 'Registered automatically at HIGHEST_PRECEDENCE + 300. When the model asks for a tool, it runs your @Tool method and sends the result back down the chain, so RAG and the model run again.',
+    code: `@Tool(description = "Look up an order by its id")
+Order findOrder(String orderId) {
+    return orders.findById(orderId);
+}`,
+    lang: 'java',
+  },
+  {
+    id: 'rag',
+    label: 'RAG',
+    type: 'RetrievalAugmentationAdvisor',
+    module: 4,
+    body: 'Order 0 by default. It retrieves the chunks of your documents most relevant to the question and adds them to the prompt as context.',
+    code: `RetrievalAugmentationAdvisor ragAdvisor = RetrievalAugmentationAdvisor.builder()
+        .documentRetriever(retriever)
+        .build();`,
+    lang: 'java',
+  },
+  {
+    id: 'model',
+    label: 'ChatModel',
+    type: 'ChatModel',
+    module: 1,
+    body: 'The vendor-neutral interface at the end of the chain. The starter on your classpath decides the implementation, such as AnthropicChatModel or OpenAiChatModel.',
+    code: 'spring.ai.model.chat: anthropic',
+    lang: 'yaml',
+  },
+  {
+    id: 'provider',
+    label: 'Provider API',
+    type: 'HTTPS',
+    module: 6,
+    body: 'The one step that leaves your JVM. Latency, cost, rate limits and failures all show up here, which is why it is where you measure, test and guard.',
+    code: 'spring.threads.virtual.enabled: true',
+    lang: 'yaml',
+  },
+  {
+    id: 'answer',
+    label: 'Answer',
+    type: 'record Answer',
+    module: 2,
+    body: '.entity(Answer.class) adds a JSON Schema generated from your record to the prompt, then converts the model’s JSON reply into an Answer on the way back.',
+    code: 'record Answer(String text, List<String> sources) {}',
+    lang: 'java',
+  },
+];
+
+/** Where the tool loop starts and ends (indexes into STEPS); the loop re-runs everything between them. */
+const LOOP_FROM = STEPS.findIndex((s) => s.id === 'tools');
+const LOOP_TO = STEPS.findIndex((s) => s.id === 'model');
+const REST_ON = 'client';
+
+const { nav } = Astro.props;
+
+const steps = await Promise.all(
+  STEPS.map(async (step) => {
+    const module = nav.find((m) => m.number === step.module)!;
+    const firstLesson = module.navLessons.find((l) => l.href);
+    return {
+      ...step,
+      moduleTitle: module.title,
+      href: firstLesson?.href ?? withBase(`/#module-${module.number}`),
+      published: Boolean(firstLesson),
+      html: await highlight(step.code, step.lang),
+    };
+  }),
+);
+const route = steps.filter((s) => s.id !== 'answer');
+const answer = steps.find((s) => s.id === 'answer')!;
+---
+
+<div class="trace" data-trace data-loop-from={LOOP_FROM} data-loop-to={LOOP_TO} data-rest={REST_ON}>
+  <p class="trace-caption">
+    One request through the support assistant you build in Module 7. Select a step to see what happens there.
+  </p>
+
+  <div class="trace-map" role="tablist" aria-label="Steps of one request" style={`--cols: ${route.length + 1}; --loop-from: ${LOOP_FROM}; --loop-to: ${LOOP_TO}`}>
+    <div class="trace-loop" aria-hidden="true" data-trace-loop><span>repeats for each tool call</span></div>
+    {
+      [...route, answer].map((step) => (
+        <button
+          type="button"
+          role="tab"
+          id={`trace-tab-${step.id}`}
+          aria-controls={`trace-panel-${step.id}`}
+          aria-selected={step.id === REST_ON ? 'true' : 'false'}
+          tabindex={step.id === REST_ON ? 0 : -1}
+          class:list={['station', step.id === 'answer' && 'station-answer']}
+          data-station={step.id}
+          style={`--col: ${step.id === 'answer' ? 1 : route.indexOf(step) + 2}`}
+        >
+          <span class="node" aria-hidden="true" />
+          <span class="station-label">{step.id === 'answer' ? <>Back as <code>Answer</code></> : step.label}</span>
+          <span class="station-module">Module {step.module}</span>
+        </button>
+      ))
+    }
+  </div>
+
+  {
+    steps.map((step) => (
+      <section
+        role="tabpanel"
+        id={`trace-panel-${step.id}`}
+        aria-labelledby={`trace-tab-${step.id}`}
+        class="trace-panel"
+        hidden={step.id !== REST_ON}
+        tabindex="0"
+      >
+        <div>
+          <h3 class="panel-title">
+            {step.label} {step.type !== step.label && <code class="panel-type">{step.type}</code>}
+          </h3>
+          <p class="panel-body">{step.body}</p>
+          <a href={step.href} class="panel-link">
+            Module {step.module}: {step.moduleTitle}
+            {!step.published && <span class="panel-soon"> (lessons coming soon)</span>}
+          </a>
+        </div>
+        <div class="panel-code" set:html={step.html} />
+      </section>
+    ))
+  }
+</div>
+
+<style>
+  .trace {
+    --rail: #e2e8f0; /* slate-200 */
+    --rail-out: #059669; /* brand-600 */
+    --rail-back: var(--syn-type);
+    --node: #94a3b8; /* slate-400 */
+    border-top: 1px solid var(--code-border);
+    border-bottom: 1px solid var(--code-border);
+    padding: 1.25rem 0 1.5rem;
+  }
+  :global(.dark) .trace {
+    --rail: #334155; /* slate-700 */
+    --rail-out: #34d399; /* brand-400 */
+    --node: #64748b; /* slate-500 */
+  }
+
+  .trace-caption {
+    margin: 0;
+    max-width: 62ch;
+    font-size: 0.9375rem;
+    color: #475569; /* slate-600 */
+  }
+  :global(.dark) .trace-caption {
+    color: #94a3b8; /* slate-400 */
+  }
+
+  /* Phones: the request runs top to bottom, the tool loop is a bracket on the right. */
+  .trace-map {
+    --row: 3.25rem;
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: var(--row);
+    margin-top: 1.25rem;
+  }
+
+  .station {
+    position: relative;
+    display: flex;
+    gap: 0.75rem;
+    padding: 0 0.75rem 0 2.75rem;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    align-items: center;
+    transition:
+      background-color 160ms ease,
+      box-shadow 160ms ease;
+  }
+  .node {
+    position: absolute;
+    top: 50%;
+    left: 0.75rem;
+    z-index: 1;
+    width: 0.75rem;
+    height: 0.75rem;
+    margin-top: -0.375rem;
+    border: 2px solid var(--node);
+    border-radius: 50%;
+    background: var(--code-bg);
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease;
+  }
+  /* The rail out of each station runs to the centre of the next one. */
+  .station::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: calc(1.125rem - 1px);
+    width: 2px;
+    height: 100%;
+    background: var(--rail);
+    transition: background-color 160ms ease;
+  }
+  .station-answer::before {
+    display: none;
+  }
+  .station.is-out::before {
+    background: var(--rail-out);
+  }
+  /* On phones the reply comes down from the provider to the answer at the bottom. */
+  .station[data-station='provider'].is-back::before {
+    background: var(--rail-back);
+  }
+
+  .station-label {
+    font-weight: 600;
+    color: #0f172a; /* slate-900 */
+  }
+  :global(.dark) .station-label {
+    color: #fff;
+  }
+  .station-label code {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    font-size: 0.92em;
+    color: var(--syn-type);
+  }
+  .station-module {
+    margin-left: auto;
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+    color: #64748b; /* slate-500 */
+    white-space: nowrap;
+  }
+  :global(.dark) .station-module {
+    color: #94a3b8;
+  }
+  .station-answer .node {
+    border-color: var(--rail-back);
+  }
+
+  .station:hover,
+  .station:focus-visible,
+  .station.is-current,
+  .station[aria-selected='true'] {
+    background-color: var(--code-highlight);
+    box-shadow: inset 3px 0 0 var(--code-highlight-bar);
+  }
+  .station:focus-visible {
+    outline-offset: 0;
+  }
+  .station.is-current .node,
+  .station[aria-selected='true'] .node {
+    border-color: var(--rail-out);
+    background: var(--rail-out);
+  }
+  .station-answer.is-current .node,
+  .station-answer[aria-selected='true'] .node {
+    border-color: var(--rail-back);
+    background: var(--rail-back);
+  }
+
+  .trace-loop {
+    position: absolute;
+    top: calc(var(--row) * (var(--loop-from) + 0.5));
+    right: 0.25rem;
+    width: 0.9rem;
+    height: calc(var(--row) * (var(--loop-to) - var(--loop-from)));
+    border: 2px dashed var(--rail);
+    border-left: 0;
+    border-radius: 0 0.75rem 0.75rem 0;
+    transition: border-color 160ms ease;
+  }
+  .trace-loop span {
+    display: none;
+  }
+  .trace-loop.is-on {
+    border-color: var(--rail-out);
+  }
+  /* Room on the right of the looped rows for the bracket. */
+  .station {
+    margin-right: 1.5rem;
+  }
+
+  /* Wider screens: the request runs left to right on one rail, and comes back on a second rail below it. */
+  @media (min-width: 48rem) {
+    .trace-map {
+      grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+      grid-auto-rows: auto;
+      margin-top: 3rem;
+    }
+    .station {
+      grid-row: 1;
+      grid-column: var(--col);
+      flex-direction: column;
+      align-items: center;
+      gap: 0.15rem;
+      margin-right: 0;
+      padding: 2.6rem 0.25rem 0.6rem;
+      text-align: center;
+    }
+    .node {
+      top: 0.55rem;
+      left: 50%;
+      margin: 0 0 0 -0.375rem;
+    }
+    .station::before {
+      top: calc(0.925rem - 1px);
+      left: 50%;
+      width: 100%;
+      height: 2px;
+    }
+    /* The return rail, below the outbound one, from each station back to the one before it. */
+    .station::after {
+      content: '';
+      position: absolute;
+      top: calc(1.75rem - 1px);
+      left: 50%;
+      width: 100%;
+      height: 2px;
+      background: var(--rail);
+      transition: background-color 160ms ease;
+    }
+    .station[data-station='provider']::before,
+    .station[data-station='provider']::after {
+      display: none;
+    }
+    .station.is-back::after {
+      background: var(--rail-back);
+    }
+    .station-module {
+      margin-left: 0;
+    }
+    /* The answer is the far end of the return rail, so its node sits on that rail only. */
+    .station-answer .node {
+      top: calc(1.75rem - 0.375rem);
+    }
+    .station:hover,
+    .station:focus-visible,
+    .station.is-current,
+    .station[aria-selected='true'] {
+      box-shadow: inset 0 -3px 0 var(--code-highlight-bar);
+    }
+
+    .trace-loop {
+      top: -1.35rem;
+      right: auto;
+      left: calc(100% / var(--cols) * (var(--loop-from) + 1.5));
+      width: calc(100% / var(--cols) * (var(--loop-to) - var(--loop-from)));
+      height: calc(2.275rem + 1px);
+      border: 2px dashed var(--rail);
+      border-bottom: 0;
+      border-radius: 0.9rem 0.9rem 0 0;
+    }
+    .trace-loop span {
+      display: block;
+      position: absolute;
+      bottom: 100%;
+      left: 0;
+      right: 0;
+      padding-bottom: 0.2rem;
+      font-size: 0.8125rem;
+      text-align: center;
+      color: #64748b;
+      white-space: nowrap;
+    }
+  }
+
+  .trace-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem 2rem;
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--code-border);
+  }
+  .trace-panel[hidden] {
+    display: none;
+  }
+  .trace-panel:focus-visible {
+    outline-offset: 4px;
+  }
+  @media (min-width: 64rem) {
+    .trace-panel {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+      align-items: start;
+    }
+  }
+  .panel-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.6rem;
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
+  :global(.dark) .panel-title {
+    color: #fff;
+  }
+  .panel-type {
+    font-family: var(--font-mono);
+    font-variant-ligatures: none;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #475569;
+  }
+  :global(.dark) .panel-type {
+    color: #94a3b8;
+  }
+  .panel-body {
+    margin: 0.5rem 0 0;
+    max-width: 60ch;
+    line-height: 1.65;
+    color: #334155; /* slate-700 */
+  }
+  :global(.dark) .panel-body {
+    color: #cbd5e1; /* slate-300 */
+  }
+  .panel-link {
+    display: inline-block;
+    margin-top: 0.75rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: #047857; /* brand-700 */
+    text-decoration: underline;
+    text-decoration-color: rgb(16 185 129 / 0.4);
+    text-underline-offset: 4px;
+  }
+  .panel-link:hover {
+    text-decoration-color: currentColor;
+  }
+  :global(.dark) .panel-link {
+    color: #34d399; /* brand-400 */
+  }
+  .panel-soon {
+    font-weight: 400;
+    color: #64748b;
+  }
+  /* A one-line snippet needs no line number. */
+  .panel-code :global(pre .line::before) {
+    display: none;
+  }
+  .panel-code :global(pre .line) {
+    padding-left: 14px;
+  }
+</style>
+
+<script>
+  // One orchestrated moment: the request runs out along the chain, round the tool loop once, back as an Answer,
+  // then the trace rests on ChatClient. Selecting a step (pointer or keyboard) ends the pass at once.
+  const trace = document.querySelector<HTMLElement>('[data-trace]');
+  if (trace) {
+    const tabs = [...trace.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    const route = tabs.filter((tab) => tab.dataset.station !== 'answer');
+    const answer = tabs.find((tab) => tab.dataset.station === 'answer');
+    const loop = trace.querySelector<HTMLElement>('[data-trace-loop]');
+    const loopFrom = Number(trace.dataset.loopFrom);
+    const loopTo = Number(trace.dataset.loopTo);
+    const rest = tabs.find((tab) => tab.dataset.station === trace.dataset.rest);
+    const timers: number[] = [];
+
+    const select = (tab: HTMLButtonElement, focus = false) => {
+      for (const t of tabs) {
+        const on = t === tab;
+        t.setAttribute('aria-selected', String(on));
+        t.tabIndex = on ? 0 : -1;
+        const panel = document.getElementById(t.getAttribute('aria-controls') ?? '');
+        if (panel) panel.hidden = !on;
+      }
+      if (focus) tab.focus();
+    };
+    const setCurrent = (tab?: HTMLButtonElement) => tabs.forEach((t) => t.classList.toggle('is-current', t === tab));
+    const paintRails = (out: number, back: number) =>
+      route.forEach((t, i) => {
+        t.classList.toggle('is-out', i < out);
+        t.classList.toggle('is-back', i >= back);
+      });
+    const finish = () => {
+      timers.forEach(clearTimeout);
+      timers.length = 0;
+      setCurrent(undefined);
+      loop?.classList.remove('is-on');
+      paintRails(route.length, 0);
+      answer?.classList.add('is-back');
+    };
+
+    // The pass: one frame per step, each a function of the trace state.
+    const frames: (() => void)[] = [];
+    route.forEach((tab, i) => frames.push(() => (setCurrent(tab), paintRails(i, route.length))));
+    for (const i of [loopFrom, ...Array.from({ length: loopTo - loopFrom }, (_, k) => loopFrom + 1 + k)]) {
+      frames.push(() => (setCurrent(route[i]), loop?.classList.add('is-on')));
+    }
+    route.forEach((_, k) => {
+      const i = route.length - 1 - k;
+      frames.push(() => (setCurrent(route[i]), loop?.classList.remove('is-on'), paintRails(route.length, i)));
+    });
+    if (answer) frames.push(() => (setCurrent(answer), answer.classList.add('is-back')));
+
+    if (rest) select(rest);
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      finish();
+    } else {
+      frames.forEach((frame, i) => timers.push(window.setTimeout(frame, 400 + i * 170)));
+      timers.push(window.setTimeout(finish, 400 + frames.length * 170 + 200));
+    }
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => (finish(), select(tab)));
+      tab.addEventListener('keydown', (event) => {
+        const keys: Record<string, number> = {
+          ArrowRight: index + 1,
+          ArrowDown: index + 1,
+          ArrowLeft: index - 1,
+          ArrowUp: index - 1,
+          Home: 0,
+          End: tabs.length - 1,
+        };
+        if (!(event.key in keys)) return;
+        event.preventDefault();
+        finish();
+        select(tabs[(keys[event.key] + tabs.length) % tabs.length], true);
+      });
+    });
+    trace.addEventListener('pointerenter', finish, { once: true });
+  }
+</script>

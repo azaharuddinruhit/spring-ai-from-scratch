@@ -1,0 +1,75 @@
+---
+import Logo from './Logo.astro';
+import { withBase } from '@/lib/course';
+import { SITE_VERSION } from '@/data/versions';
+
+interface Props {
+  hasSidebar: boolean;
+}
+
+const { hasSidebar } = Astro.props;
+---
+
+<header
+  class="sticky top-0 z-40 h-(--header-h) border-b border-slate-200 bg-white/85 backdrop-blur dark:border-slate-800 dark:bg-slate-900/85"
+>
+  <div class="mx-auto flex h-full max-w-[90rem] items-center gap-2 px-4 sm:gap-3 sm:px-6">
+    {
+      hasSidebar && (
+        <button
+          type="button"
+          data-sidebar-toggle
+          aria-controls="course-sidebar"
+          aria-expanded="false"
+          class="-ml-1 rounded-md p-1.5 text-slate-600 sm:p-2 hover:bg-slate-100 hover:text-slate-900 lg:hidden dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+          aria-label="Open course navigation"
+        >
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round" />
+          </svg>
+        </button>
+      )
+    }
+    <a href={withBase('/')} class="flex min-w-0 items-center gap-2 font-semibold tracking-tight whitespace-nowrap text-slate-900 sm:gap-2.5 dark:text-white">
+      <Logo class="size-7 shrink-0" />
+      <span class="truncate text-[0.9375rem] sm:text-base">Spring AI <span class="text-brand-700 dark:text-brand-400">from Scratch</span></span>
+    </a>
+    <div class="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+      <span
+        class="shrink-0 rounded-full border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600 tabular-nums dark:border-slate-700 dark:text-slate-400"
+        title={SITE_VERSION === 'dev' ? 'Local build' : `Site version ${SITE_VERSION}`}
+      >
+        {SITE_VERSION}
+      </span>
+      <button
+        type="button"
+        id="theme-toggle"
+        class="rounded-md p-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 sm:p-2 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+        aria-label="Dark mode"
+        aria-pressed="false"
+      >
+        <svg class="size-5 dark:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" stroke-linejoin="round"></path>
+        </svg>
+        <svg class="hidden size-5 dark:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="12" cy="12" r="4"></circle>
+          <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke-linecap="round"></path>
+        </svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<script>
+  const themeToggle = document.getElementById('theme-toggle');
+  const syncPressed = () => themeToggle?.setAttribute('aria-pressed', String(document.documentElement.classList.contains('dark')));
+  syncPressed();
+  themeToggle?.addEventListener('click', () => {
+    const dark = document.documentElement.classList.toggle('dark');
+    syncPressed();
+    try {
+      localStorage.setItem('theme', dark ? 'dark' : 'light');
+    } catch {}
+    document.dispatchEvent(new CustomEvent('themechange'));
+  });
+</script>

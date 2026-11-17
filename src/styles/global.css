@@ -1,0 +1,209 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-brand-50: #ecfdf5;
+  --color-brand-100: #d1fae5;
+  --color-brand-200: #a7f3d0;
+  --color-brand-300: #6ee7b7;
+  --color-brand-400: #34d399;
+  --color-brand-500: #10b981;
+  --color-brand-600: #059669;
+  --color-brand-700: #047857;
+  --color-brand-800: #065f46;
+  --color-brand-900: #064e3b;
+}
+
+/* Code surfaces: Catppuccin token colours on a near-white box (Latte, darkened to 4.6:1 in shiki.config.mjs) and on the
+   dark card colour (Mocha), so code reads as it does in an editor while the box stays part of the page. */
+:root {
+  --header-h: 3.5rem;
+  --code-bg: #f8fafc; /* slate-50 */
+  --code-border: #e2e8f0; /* slate-200 */
+  --code-fg: #4c4f69; /* latte text */
+  --code-muted: #6d7084; /* latte overlay2, darkened */
+  --code-gutter: #8c8fa1; /* latte overlay1 */
+  --code-highlight: rgb(64 160 43 / 0.12); /* latte green */
+  --code-highlight-bar: #40a02b;
+  /* The Answer type colour (the trace's return rail) and comment grey, from the same Catppuccin roles as the Shiki theme. */
+  --syn-type: #ac5e00; /* yellow, darkened */
+  --syn-comment: #6d7084; /* overlay2, darkened */
+  /* Browser surfaces: focus ring, text selection, form controls and scrollbars take the palette too. */
+  --focus-ring: #047857; /* brand-700 */
+  --selection: #a7f3d0; /* brand-200 */
+  --scrollbar: #cbd5e1; /* slate-300 */
+  color-scheme: light;
+}
+
+:root.dark {
+  --code-bg: #1e293b; /* slate-800, the dark card colour */
+  --code-border: #334155; /* slate-700 */
+  --code-fg: #cdd6f4; /* mocha text */
+  --code-muted: #9399b2; /* mocha overlay2 */
+  --code-gutter: #6c7086; /* mocha overlay0 */
+  --code-highlight: rgb(166 227 161 / 0.1); /* mocha green */
+  --code-highlight-bar: #a6e3a1;
+  --syn-type: #f9e2af;
+  --syn-comment: #9399b2;
+  --focus-ring: #34d399; /* brand-400 */
+  --selection: rgb(52 211 153 / 0.3);
+  --scrollbar: #475569; /* slate-600 */
+  color-scheme: dark;
+}
+
+html {
+  scroll-padding-top: calc(var(--header-h) + 1rem);
+  accent-color: var(--focus-ring);
+}
+
+@layer base {
+  /* Every scroller (page, sidebar, tables, diagrams, sandboxes) gets a thin scrollbar in the theme's slate. */
+  html,
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar) transparent;
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background-color: var(--selection);
+    color: inherit;
+  }
+}
+
+.skip-link {
+  @apply fixed top-2 left-2 z-50 -translate-y-16 rounded-md bg-brand-700 px-4 py-2 text-sm font-semibold text-white transition-transform focus-visible:translate-y-0 dark:bg-brand-500 dark:text-slate-950;
+}
+
+body {
+  @apply bg-white font-sans text-slate-800 antialiased dark:bg-slate-900 dark:text-slate-200;
+}
+
+/* Shiki dual themes: Markdown fences and build-time highlighted snippets. Colour only: code is never italic, whatever the
+   theme says for comments or keywords. */
+pre:is(.shiki, .astro-code),
+pre:is(.shiki, .astro-code) span {
+  color: var(--shiki-light);
+  font-style: normal;
+  font-weight: var(--shiki-light-font-weight);
+}
+.dark pre:is(.shiki, .astro-code),
+.dark pre:is(.shiki, .astro-code) span {
+  color: var(--shiki-dark);
+  font-weight: var(--shiki-dark-font-weight);
+}
+
+/* Code font: JetBrains Mono without ligatures, so != and -> show exactly as typed. */
+pre:is(.shiki, .astro-code),
+.code-mono {
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+}
+
+/* Code surfaces scroll on the code palette: Catppuccin gutter thumb on the code background. */
+pre:is(.shiki, .astro-code, .code-mono) {
+  scrollbar-color: var(--code-gutter) var(--code-bg);
+}
+
+pre:is(.shiki, .astro-code) {
+  margin: 0;
+  background-color: var(--code-bg) !important;
+  border: 1px solid var(--code-border);
+  border-radius: 6px;
+  padding: 12px 0;
+  overflow-x: auto;
+  font-size: 0.8rem;
+  line-height: 1.65;
+  tab-size: 4;
+}
+pre:is(.shiki, .astro-code) ::selection {
+  background-color: var(--code-border);
+}
+/* Lines stretch to the widest line, so highlight bands span the full scroll width. */
+pre:is(.shiki, .astro-code) code {
+  display: grid;
+  width: max-content;
+  min-width: 100%;
+  counter-reset: line;
+}
+pre:is(.shiki, .astro-code) .line {
+  min-height: 1lh;
+  padding: 0 14px 0 0;
+}
+/* Line numbers: a pseudo-element, so they are never part of copied or selected text. */
+pre:is(.shiki, .astro-code) .line::before {
+  counter-increment: line;
+  content: counter(line);
+  display: inline-block;
+  width: 3rem;
+  padding-right: 1rem;
+  text-align: right;
+  color: var(--code-gutter);
+}
+/* Key lines marked with fence meta {n-m}, and lines changed in the provider switcher. */
+pre:is(.shiki, .astro-code) .line.highlighted,
+pre:is(.shiki, .astro-code) .line.diff-changed {
+  background-color: var(--code-highlight);
+  box-shadow: inset 3px 0 0 var(--code-highlight-bar);
+}
+pre:is(.shiki, .astro-code) .line.highlighted::before,
+pre:is(.shiki, .astro-code) .line.diff-changed::before {
+  color: var(--code-highlight-bar);
+}
+
+/* Lesson prose */
+.lesson-prose {
+  @apply prose prose-slate max-w-none dark:prose-invert;
+  @apply prose-headings:scroll-mt-20 prose-headings:font-semibold prose-headings:tracking-tight;
+  @apply prose-a:text-brand-700 prose-a:underline-offset-2 dark:prose-a:text-brand-400;
+  @apply prose-code:before:content-none prose-code:after:content-none;
+  @apply prose-pre:bg-transparent prose-pre:p-0;
+}
+.lesson-prose :not(pre) > code {
+  @apply rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[0.85em] font-medium text-slate-800 dark:bg-slate-800 dark:text-slate-100;
+}
+.lesson-prose h2 {
+  @apply mt-14 border-t border-slate-200 pt-8 dark:border-slate-800;
+}
+/* The copy button beside every code box: icon only, a check while the copy is confirmed. */
+.copy-btn {
+  @apply inline-grid size-8 shrink-0 cursor-pointer place-items-center rounded-md border border-transparent text-slate-500 transition-colors hover:border-slate-200 hover:text-slate-900 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-white;
+}
+.copy-btn svg {
+  @apply size-4;
+}
+.copy-btn .icon-done,
+.copy-btn.is-done .icon-copy {
+  display: none;
+}
+.copy-btn.is-done .icon-done {
+  display: block;
+}
+.copy-btn.is-done {
+  @apply text-brand-700 dark:text-brand-400;
+}
+/* Wide comparison tables scroll inside the column instead of widening the page on phones. */
+.lesson-prose table {
+  display: block;
+  overflow-x: auto;
+}
+/* Without a floor, columns collapse to slivers on phones and rows grow very tall. The last column usually holds prose. */
+.lesson-prose :is(th, td) {
+  min-width: 9rem;
+}
+.lesson-prose :is(th, td):last-child {
+  min-width: 17rem;
+}
+
+/* Mermaid */
+.mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}

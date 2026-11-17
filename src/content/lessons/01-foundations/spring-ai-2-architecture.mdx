@@ -1,0 +1,264 @@
+---
+description: What changed in the Spring AI 2.x stack and why it matters. Boot 4 and Framework 7 as the baseline, Jackson 3, JSpecify null-safety, virtual threads, and immutable options that you change with mutate().
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import OptionsMergeLab from '@/components/islands/OptionsMergeLab';
+import { buildGradle } from '@/data/snippets';
+
+Spring AI doesn't invent a new programming model. It takes the patterns you already use for databases and HTTP and applies them to model APIs:
+a portable interface, vendor implementations picked by a starter, a fluent client, and ordered interceptors. Once you see that mapping,
+the rest of the course is mostly details.
+
+## 1. Spring mental model
+
+| Spring AI 2.x | The Spring primitive it mirrors | Why the analogy holds |
+| --- | --- | --- |
+| `ChatModel` | A JDBC `DataSource` / driver | A portable, low-level interface with one implementation per vendor (`AnthropicChatModel`, `OllamaChatModel`, …). |
+| `spring-ai-starter-model-*` | A JDBC driver plus Boot auto-configuration | Add the dependency and set `spring.ai.*` properties, and a ready `ChatModel` bean appears. |
+| `ChatClient` | `RestClient` / `JdbcClient` | A fluent API created from an auto-configured, prototype-scoped `ChatClient.Builder`. This is the API you'll use most. |
+| Advisors | Servlet filters / AOP `@Around` advice | Ordered interceptors that wrap every call. Memory, RAG, logging and tool calling are all advisors. |
+| `ChatOptions` | `@ConfigurationProperties` defaults | Defaults come from `application.yml`, and each request can override them. In 2.x, options are **immutable**. |
+
+<Mermaid
+  caption="Every ChatClient call passes through an ordered advisor chain before reaching the vendor-neutral ChatModel interface."
+  code={`
+flowchart TB
+  subgraph app["Your application"]
+    S["@Service"] --> CC["ChatClient"]
+  end
+  subgraph chain["Advisor chain (ordered)"]
+    direction LR
+    MA["Memory advisors<br/>order +200"] --> TA["ToolCallingAdvisor<br/>auto-registered, +300"] --> YA["RAG, logging and<br/>your advisors, order 0"] --> LAST["ChatModelCallAdvisor"]
+  end
+  CC --> MA
+  LAST --> CM{{"ChatModel"}}
+  CM --> A["AnthropicChatModel"]
+  CM --> O["OpenAiChatModel"]
+  CM --> L["OllamaChatModel"]
+  BOOT["Boot 4 auto-configuration<br/>spring.ai.* properties"] -. creates .-> CM
+  BOOT -. creates .-> CB["ChatClient.Builder"]
+  CB -. builds .-> CC
+`}
+/>
+
+### What the 2.x baseline changes
+
+- **Spring Boot 4 and Spring Framework 7 only.** Spring AI 2.0 won't load in a Boot 3.x context. Its own minimum is Java 17, and this course uses Java 25 throughout.
+- **Jackson 3.** JSON handling moved to Jackson 3, whose packages start with `tools.jackson` (for example `tools.jackson.databind.json.JsonMapper`).
+  Annotations such as `@JsonProperty` keep their `com.fasterxml.jackson.annotation` package, so your records don't change. Inside Spring AI, the new
+  `JsonHelper` replaces the old `JsonParser` and `ModelOptionsUtils` JSON helpers.
+- **JSpecify null-safety.** The codebase is annotated with `@NullMarked` and `@Nullable`. For example,
+  `ChatClient.CallResponseSpec#content()` is declared `@Nullable String`, so NullAway and IntelliJ warn you if you dereference it unchecked.
+- **Immutable options.** `ChatOptions` objects are created with builders and can't be changed afterwards, and their collections are unmodifiable.
+  `copy()`, `fromOptions()` and the setters are gone. To derive a variant, call `options.mutate()…build()`.
+- **One tool loop for every provider.** The per-model tool-execution loops are gone. `ToolCallingAdvisor` is auto-registered on every
+  `ChatClient` and runs the loop for all providers. Module 5 covers it in depth.
+- **Virtual threads are the normal choice.** A blocking `.call()` can wait several seconds for a model. With
+  `spring.threads.virtual.enabled=true`, each waiting request holds a cheap virtual thread instead of a platform thread from Tomcat's pool.
+  Java 24+ (JEP 491) also stops `synchronized` blocks from pinning the carrier thread.
+
+## 2. Interactive sandbox
+
+Options are resolved in layers. `ChatClient` **merges** them: per-request options win over the client's
+`defaultOptions`, which win over the model defaults in `application.yml`. The lower-level `ChatModel.call(Prompt)` **does not merge**.
+If the `Prompt` carries options, they replace the defaults entirely.
+
+<OptionsMergeLab client:visible />
+
+Things to try:
+
+1. With `chatClient.prompt()…` selected, uncheck every request option. The client and model defaults fill the gaps.
+2. Switch to `chatModel.call(prompt)` and set only `maxTokens`. `model` and `temperature` become `null`, which means the provider falls back
+   to its own defaults and ignores your `application.yml`.
+3. Click **`getStopSequences().add(…)`** and then **`mutate()…build()`** to see the 2.x immutability rules.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+Create the Gradle wrapper with `gradle wrapper --gradle-version 9.9.1`. Then use the build below, which pins
+Spring Boot and imports the Spring AI BOM so that individual Spring AI artifacts need no version numbers.
+
+<CodeFile title="settings.gradle">
+```groovy
+rootProject.name = 'assistant'
+```
+</CodeFile>
+
+<CodeFile title="build.gradle" lang="groovy" lines="3,12,22,28" code={buildGradle(['spring-ai-starter-model-anthropic'])} />
+
+<CodeFile title="src/main/resources/application.yml">
+```yaml
+spring:
+  application:
+    name: assistant
+  threads:
+    virtual:
+      enabled: true          # Tomcat, @Async and @Scheduled run on virtual threads
+  ai:
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY}
+      chat:
+        model: claude-haiku-4-5
+        temperature: 0.7
+        max-tokens: 4096     # In 2.x the .options segment is gone; spring.ai.anthropic.chat.options.* is deprecated
+```
+</CodeFile>
+
+Opt your own packages into JSpecify the same way the framework does. The `org.jspecify` annotations come transitively
+with Spring Framework 7, so you don't need an extra dependency.
+
+<CodeFile title="src/main/java/com/example/assistant/package-info.java">
+```java
+@NullMarked
+package com.example.assistant;
+
+import org.jspecify.annotations.NullMarked;
+```
+</CodeFile>
+
+Define the `ChatClient` once, as a bean. `defaultOptions` takes a **builder**, not built options. `ChatClient` merges it with the model defaults.
+
+<CodeFile title="src/main/java/com/example/assistant/AiConfig.java">
+```java {15-16}
+package com.example.assistant;
+
+import org.springframework.ai.anthropic.AnthropicChatOptions;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration(proxyBeanMethods = false)
+class AiConfig {
+
+    @Bean
+    ChatClient chatClient(ChatClient.Builder builder) {
+        return builder
+                .defaultSystem("You are a support assistant. Be concise and cite ticket IDs.")
+                .defaultOptions(AnthropicChatOptions.builder()
+                        .temperature(0.2))
+                .build();
+    }
+}
+```
+</CodeFile>
+
+The service below shows three habits for 2.x: treat `content()` as nullable, derive options with `mutate()`, and limit how many
+virtual threads call the model at once.
+
+<CodeFile title="src/main/java/com/example/assistant/TicketSummarizer.java">
+```java {42-46}
+package com.example.assistant;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.stereotype.Service;
+
+@Service
+public class TicketSummarizer {
+
+    /** Stay under the provider's concurrency/rate limit: virtual threads make it easy to blow through it. */
+    private static final int MAX_CONCURRENT_CALLS = 8;
+
+    private final ChatClient chatClient;
+    private final ChatModel chatModel;
+    private final Semaphore permits = new Semaphore(MAX_CONCURRENT_CALLS);
+
+    public TicketSummarizer(ChatClient chatClient, ChatModel chatModel) {
+        this.chatClient = chatClient;
+        this.chatModel = chatModel;
+    }
+
+    public String summarize(String ticket) {
+        String summary = chatClient.prompt()
+                .user(u -> u.text("Summarize this support ticket in two sentences:\n{ticket}")
+                        .param("ticket", ticket))
+                .call()
+                .content();                                   // @Nullable in 2.x
+        return Objects.requireNonNullElse(summary, "");
+    }
+
+    /** Low-level call with deterministic settings, derived from the model's defaults rather than built from scratch. */
+    public ChatResponse classify(String ticket) {
+        ChatOptions deterministic = chatModel.getOptions()
+                .mutate()                                     // copy-on-write: the defaults stay untouched
+                .temperature(0.0)
+                .maxTokens(20)
+                .build();
+        return chatModel.call(new Prompt("Classify as BUG, BILLING or OTHER: " + ticket, deterministic));
+    }
+
+    /** Fans out across virtual threads; resultNow() throws IllegalStateException if any task failed. */
+    public List<String> summarizeAll(List<String> tickets) {
+        List<Future<String>> futures;
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            futures = tickets.stream()
+                    .map(ticket -> executor.submit(() -> summarizeWithPermit(ticket)))
+                    .toList();
+        }                                                     // close() waits for every task
+        return futures.stream().map(Future::resultNow).toList();
+    }
+
+    private String summarizeWithPermit(String ticket) throws InterruptedException {
+        permits.acquire();
+        try {
+            return summarize(ticket);
+        } finally {
+            permits.release();
+        }
+    }
+}
+```
+</CodeFile>
+
+## 4. Production gotchas & security
+
+<Gotcha kind="reliability" title="ChatModel.call() silently drops your application.yml defaults">
+If you build `new Prompt(text, ChatOptions.builder().maxTokens(20).build())`, the model receives **only** `maxTokens`, and model and
+temperature fall back to the provider's defaults. Portable `ChatOptions.builder()` can also produce a `DefaultChatOptions` that a provider
+casts to its own type, which fails with a `ClassCastException`. Derive variants with `chatModel.getOptions().mutate()`, or use `ChatClient`, which merges.
+</Gotcha>
+
+<Gotcha kind="migration" title="Code that changed options in place no longer compiles or now throws">
+1.x code that called `options.copy()`, a setter, or `getStopSequences().add(…)` fails in 2.x: either it doesn't compile, or it throws
+`UnsupportedOperationException` at runtime. Search your code for `copy()` and `fromOptions(` before you upgrade, and replace each one with `mutate()`.
+</Gotcha>
+
+<Gotcha kind="cost" title="Virtual threads remove your accidental rate limiter">
+With platform threads, Tomcat's 200-thread pool capped how many model calls ran at once. With virtual threads there's no such cap. A traffic spike
+or a `parallelStream()` fan-out can send thousands of simultaneous requests, which leads to HTTP 429s and a surprise bill. Bound concurrency
+explicitly with a `Semaphore`, Resilience4j `Bulkhead`, or a rate limiter.
+</Gotcha>
+
+<Gotcha kind="reliability" title="content() can return null">
+Some responses have no text, for example when they are filtered by the provider or contain only tool calls. JSpecify marks `content()` and `entity()` as
+`@Nullable`. Turn on NullAway (or IntelliJ's JSpecify inspections) so the compiler flags unchecked dereferences instead of production throwing NPEs.
+</Gotcha>
+
+<Gotcha kind="security" title="Keep API keys out of source and out of logs">
+Reference keys as `${ANTHROPIC_API_KEY}` and inject them from the environment or a secret manager. Never commit them in `application.yml`.
+Remember that `/actuator/env` and `/actuator/configprops` expose properties if you enable them over the web.
+</Gotcha>
+
+<Gotcha kind="migration" title="Jackson 2 modules on the classpath are silently ignored">
+Jackson 3 modules use new Maven coordinates and packages. A leftover `com.fasterxml.jackson.datatype:jackson-datatype-*` module still compiles,
+but Boot 4's `JsonMapper` never registers it. Customize JSON with a `JsonMapperBuilderCustomizer` bean
+(`org.springframework.boot.jackson.autoconfigure`) and use the Jackson 3 versions of modules.
+</Gotcha>
+
+## Recap
+
+- Spring AI follows familiar Spring shapes: `ChatModel` is the driver, starters provide auto-configuration, `ChatClient` is the fluent client, and advisors are filters.
+- 2.x requires Boot 4 and Framework 7, and adopts Jackson 3, JSpecify and immutable options.
+- `ChatClient` merges options. `ChatModel.call(Prompt)` replaces them. Use `mutate()` to derive options instead of building them from scratch.
+- Virtual threads make blocking model calls cheap, but you must bound concurrency yourself.
