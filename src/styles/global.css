@@ -115,6 +115,14 @@ code {
   font-variant-ligatures: none;
 }
 
+/* Inline code has no spaces to break at, so a long name such as Builder().method(...) would push past a phone screen.
+   Let it break anywhere when it doesn't fit, and repeat its padding and background on each line. Code blocks keep scrolling. */
+:not(pre) > code {
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
 /* Code surfaces scroll on the code palette: Catppuccin gutter thumb on the code background. */
 pre:is(.shiki, .astro-code, .code-mono) {
   scrollbar-color: var(--code-gutter) var(--code-bg);
