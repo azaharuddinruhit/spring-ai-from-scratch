@@ -1,5 +1,6 @@
 package com.example.support.refund;
 
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,7 +21,13 @@ public class RefundRepository {
         jdbc.sql("""
                         INSERT INTO refunds (id, customer_id, order_number, amount, reason, status, expires_at)
                         VALUES (:id, :customerId, :orderNumber, :amount, :reason, :status, :expiresAt)""")
-                .paramSource(refund)
+                .param("id", refund.id())
+                .param("customerId", refund.customerId())
+                .param("orderNumber", refund.orderNumber())
+                .param("amount", refund.amount())
+                .param("reason", refund.reason())
+                .param("status", refund.status().name()) // the PostgreSQL driver can't bind an enum
+                .param("expiresAt", refund.expiresAt().atOffset(ZoneOffset.UTC)) // nor an Instant
                 .update();
     }
 

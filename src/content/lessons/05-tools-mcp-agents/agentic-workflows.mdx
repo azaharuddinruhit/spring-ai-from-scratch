@@ -1,0 +1,1262 @@
+---
+description: Keep a human in the loop for actions that move money, with a proposal the customer confirms, and build a ticket-reply workflow from orchestrator, routing, parallel workers and evaluator-optimizer steps in plain Java.
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import RefundApprovalLab from '@/components/islands/RefundApprovalLab';
+import TicketWorkflowLab from '@/components/islands/TicketWorkflowLab';
+
+The assistant can look things up. Two jobs need more than one tool loop. A refund moves money, so the model must not be the one
+who decides it. A support ticket with several questions needs several steps: split it, answer each part, merge the answers,
+then check the result. This lesson builds both. Spring AI 2.0.2 has no workflow engine, and it doesn't need one: each step is a
+`ChatClient` call, and plain Java connects the steps.
+
+## 1. Spring mental model
+
+Think of Spring Batch or Spring Integration. Your code defines the flow, and each step does one job. A **workflow** keeps the
+control flow in code and asks the model to fill in each step. An **agent** lets the model choose the next step, which is what
+the tool loop from lesson 1 does. Use a workflow when you know the steps. It is cheaper, it can be tested step by step, and it
+can't wander.
+
+| Pattern | What the code does | In this lesson |
+| --- | --- | --- |
+| Human in the loop | The model prepares an action; a person confirms it outside the model's loop | `proposeRefund`, then `POST /api/refunds/{id}/confirmation` |
+| Orchestrator | One call plans the work as structured output | The planner returns a `Plan` with `entity(Plan.class)` |
+| Routing | Code sends each input to a specialised client | One writer `ChatClient` per `Department` |
+| Parallel workers | Independent calls run at the same time | Writers run on virtual threads |
+| Evaluator-optimizer | A reviewer checks the result; an editor fixes it, up to a limit | `Review`, then a revision, at most `MAX_ROUNDS` times |
+
+<Mermaid
+  caption="A refund in two requests. The model only proposes it; the customer confirms it outside the model's loop."
+  code={`
+sequenceDiagram
+  participant C as Customer
+  participant A as Support app
+  participant M as Model
+  participant P as Payment provider
+  C->>A: "Order 1042 arrived broken"
+  A->>M: question + tools
+  M->>A: proposeRefund(1042, reason)
+  Note over A: PENDING refund for the order total, expires in 15 min
+  A-->>C: "Confirm it with the button below"
+  C->>A: POST /api/refunds/{id}/confirmation
+  Note over A: UPDATE ... WHERE status = 'PENDING'
+  A->>P: refund(1042, 59.90, idempotency key = refund id)
+`}
+/>
+
+<Mermaid
+  caption="TicketReplyService. The code decides every step; the model fills each one in."
+  code={`
+flowchart LR
+  T["Ticket"] --> P["Planner<br/>Plan, at most 4 issues"]
+  P --> W1["BILLING writer"]
+  P --> W2["ACCOUNT writer"]
+  W1 --> E["Editor<br/>merges"]
+  W2 --> E
+  E --> R["Reviewer<br/>Review"]
+  R -->|"problems,<br/>round < 3"| X["Editor<br/>revises"]
+  X --> R
+  R -->|"approved or round 3"| D["ReplyDraft<br/>for an agent"]
+`}
+/>
+
+These rules come from the 2.0.2 classes and from tests we ran against them:
+
+- `ToolCallingAdvisor.builder().toolExecutionEligibilityChecker(...)` can stop a tool from running and return the tool calls to
+  the caller. But `MessageChatMemoryAdvisor` has already saved the assistant's tool call, with no tool result after it, so the
+  conversation in memory is left with an unanswered call. That is why the refund is a proposal that the customer confirms in a
+  separate request.
+- `spring.ai.chat.client.tool-calling.enabled=false` stops `ChatClient` from registering `ToolCallingAdvisor`. The response then
+  carries the tool calls, nothing runs them, and `ToolCallingManager.executeToolCalls(prompt, response)` is yours to call.
+- `ChatClient.Builder.clone()` copies the auto-configured builder, so each role gets its own system prompt on the same model.
+- A `ChatModel` called from virtual threads must be thread-safe. Our test model records prompts in a `CopyOnWriteArrayList` for
+  that reason.
+
+## 2. Interactive sandbox
+
+<RefundApprovalLab client:visible />
+
+Things to try:
+
+- Pick **make it 500.00 for my trouble**. The tool has no amount parameter, so the proposal is for the order total, whatever the
+  customer asks for.
+- Let **Bob** confirm Alice's refund. The lookup filters by the signed-in customer, so Bob gets a `404`, not a `403` that would
+  tell him the refund exists.
+- Confirm twice, or wait 16 minutes and then confirm. Both get a `409`, and the payment counter stays at one or zero.
+
+<TicketWorkflowLab client:visible />
+
+Things to try:
+
+- Pick **One issue**. No merge step runs, and the writer's answer goes straight to the reviewer.
+- Pick **Two issues**. The billing writer promises a refund date, the reviewer catches it, and the editor revises the reply in
+  round 2.
+- Pick **Five issues**. The fifth issue is never sent, because the plan is capped at four. The reviewer keeps objecting, so
+  after `MAX_ROUNDS` the draft goes to an agent with `needsAgent: true`. Lower `MAX_ROUNDS` and count the model calls.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+No new dependencies: everything here uses `ChatClient`, the tools from lesson 1 and JDBC.
+
+### A refund the customer confirms
+
+A refund is a record with a status. It is created `PENDING` and becomes `CONFIRMED` once:
+
+<CodeFile title="src/main/java/com/example/support/refund/RefundStatus.java">
+```java
+package com.example.support.refund;
+
+public enum RefundStatus {
+    PENDING, CONFIRMED
+}
+```
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/refund/Refund.java">
+```java
+package com.example.support.refund;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
+
+public record Refund(UUID id, String customerId, String orderNumber, BigDecimal amount, String reason, RefundStatus status,
+                     Instant expiresAt) {
+
+    Refund confirmed() {
+        return new Refund(id, customerId, orderNumber, amount, reason, RefundStatus.CONFIRMED, expiresAt);
+    }
+}
+```
+</CodeFile>
+
+<CodeFile
+  title="refunds.sql"
+  lang="sql"
+  code={`CREATE TABLE refunds (
+    id           UUID           PRIMARY KEY,
+    customer_id  VARCHAR(100)   NOT NULL,
+    order_number VARCHAR(20)    NOT NULL REFERENCES orders (number),
+    amount       NUMERIC(12, 2) NOT NULL,
+    reason       VARCHAR(500)   NOT NULL,
+    status       VARCHAR(20)    NOT NULL,
+    expires_at   TIMESTAMPTZ    NOT NULL
+);`}
+/>
+
+The repository binds each value itself, because the PostgreSQL driver can't infer a type for an enum or an `Instant`. We ran it
+against PostgreSQL 17: `paramSource(refund)` fails with "Can't infer the SQL type". The conditional `UPDATE` is what makes a
+confirmation happen once:
+
+<CodeFile title="src/main/java/com/example/support/refund/RefundRepository.java">
+```java {29,30,51}
+package com.example.support.refund;
+
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class RefundRepository {
+
+    private final JdbcClient jdbc;
+
+    RefundRepository(JdbcClient jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    public void insert(Refund refund) {
+        jdbc.sql("""
+                        INSERT INTO refunds (id, customer_id, order_number, amount, reason, status, expires_at)
+                        VALUES (:id, :customerId, :orderNumber, :amount, :reason, :status, :expiresAt)""")
+                .param("id", refund.id())
+                .param("customerId", refund.customerId())
+                .param("orderNumber", refund.orderNumber())
+                .param("amount", refund.amount())
+                .param("reason", refund.reason())
+                .param("status", refund.status().name()) // the PostgreSQL driver can't bind an enum
+                .param("expiresAt", refund.expiresAt().atOffset(ZoneOffset.UTC)) // nor an Instant
+                .update();
+    }
+
+    public Optional<Refund> findForCustomer(String customerId, UUID id) {
+        return jdbc.sql("SELECT * FROM refunds WHERE customer_id = :customerId AND id = :id")
+                .param("customerId", customerId)
+                .param("id", id)
+                .query(Refund.class)
+                .optional();
+    }
+
+    public List<Refund> findPendingForCustomer(String customerId) {
+        return jdbc.sql("SELECT * FROM refunds WHERE customer_id = :customerId AND status = 'PENDING' ORDER BY expires_at")
+                .param("customerId", customerId)
+                .query(Refund.class)
+                .list();
+    }
+
+    /** Moves a refund from PENDING to CONFIRMED. False when another request confirmed it first. */
+    public boolean markConfirmed(UUID id) {
+        return jdbc.sql("UPDATE refunds SET status = 'CONFIRMED' WHERE id = :id AND status = 'PENDING'")
+                .param("id", id)
+                .update() == 1;
+    }
+}
+```
+</CodeFile>
+
+`PaymentClient` is your payment provider's client. Implement it with the provider's SDK, and pass the refund id as the
+idempotency key, so a retried call never pays twice:
+
+<CodeFile title="src/main/java/com/example/support/refund/PaymentClient.java">
+```java
+package com.example.support.refund;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+/** The payment provider. The refund id doubles as the idempotency key, so a retried refund never pays twice. */
+public interface PaymentClient {
+
+    void refund(String orderNumber, BigDecimal amount, UUID idempotencyKey);
+}
+```
+</CodeFile>
+
+The service takes the amount from the order and pays only on confirmation. If the payment call throws, the transaction rolls
+back and the refund is `PENDING` again, so the customer can retry with the same idempotency key:
+
+<CodeFile title="src/main/java/com/example/support/refund/RefundService.java">
+```java {46,60,63}
+package com.example.support.refund;
+
+import java.time.Clock;
+import java.time.Duration;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+import com.example.support.order.Order;
+import com.example.support.order.OrderRepository;
+import com.example.support.order.OrderStatus;
+import com.example.support.tools.ToolRefusalException;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/** The model can only propose a refund. Money moves when the customer confirms it, outside the model's loop. */
+@Service
+public class RefundService {
+
+    static final Duration CONFIRMATION_WINDOW = Duration.ofMinutes(15);
+
+    private static final Set<OrderStatus> REFUNDABLE = EnumSet.of(OrderStatus.SHIPPED, OrderStatus.DELIVERED);
+
+    private final OrderRepository orders;
+    private final RefundRepository refunds;
+    private final PaymentClient payments;
+    private final Clock clock;
+
+    RefundService(OrderRepository orders, RefundRepository refunds, PaymentClient payments, Clock clock) {
+        this.orders = orders;
+        this.refunds = refunds;
+        this.payments = payments;
+        this.clock = clock;
+    }
+
+    @Transactional
+    public Refund propose(String customerId, String orderNumber, String reason) {
+        Order order = orders.findForCustomer(customerId, orderNumber)
+                .orElseThrow(() -> new ToolRefusalException("This customer has no order " + orderNumber + "."));
+        if (!REFUNDABLE.contains(order.status())) {
+            throw new ToolRefusalException("Order " + orderNumber + " is " + order.status() + " and cannot be refunded.");
+        }
+        // The amount comes from the order, never from the model.
+        Refund refund = new Refund(UUID.randomUUID(), customerId, orderNumber, order.total(), reason, RefundStatus.PENDING,
+                clock.instant().plus(CONFIRMATION_WINDOW));
+        refunds.insert(refund);
+        return refund;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Refund> pending(String customerId) {
+        return refunds.findPendingForCustomer(customerId);
+    }
+
+    @Transactional
+    public Refund confirm(String customerId, UUID refundId) {
+        Refund refund = refunds.findForCustomer(customerId, refundId).orElseThrow(() -> new RefundNotFoundException(refundId));
+        if (clock.instant().isAfter(refund.expiresAt()) || !refunds.markConfirmed(refundId)) {
+            throw new RefundNotConfirmableException(refundId);
+        }
+        payments.refund(refund.orderNumber(), refund.amount(), refund.id());
+        return refund.confirmed();
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/refund/RefundConfig.java">
+```java
+package com.example.support.refund;
+
+import java.time.Clock;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration(proxyBeanMethods = false)
+class RefundConfig {
+
+    /** The confirmation window is measured with this clock, so tests can fix the time. */
+    @Bean
+    Clock clock() {
+        return Clock.systemUTC();
+    }
+}
+```
+</CodeFile>
+
+The tool can only propose. It has no amount parameter, and its description tells the model what to say to the customer:
+
+<CodeFile title="src/main/java/com/example/support/refund/RefundTools.java">
+```java {20,22}
+package com.example.support.refund;
+
+import static com.example.support.tools.CustomerToolContext.customerId;
+
+import org.springframework.ai.chat.model.ToolContext;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.stereotype.Component;
+
+@Component
+public class RefundTools {
+
+    private final RefundService refunds;
+
+    public RefundTools(RefundService refunds) {
+        this.refunds = refunds;
+    }
+
+    @Tool(description = """
+            Propose a refund of a whole order. Nothing is refunded until the customer confirms it in the app \
+            within 15 minutes, so tell them to look for the confirmation button.""")
+    Refund proposeRefund(@ToolParam(description = "The order number, such as 1042") String orderNumber,
+                         @ToolParam(description = "The customer's reason, in their words") String reason,
+                         ToolContext context) {
+        return refunds.propose(customerId(context), orderNumber, reason);
+    }
+}
+```
+</CodeFile>
+
+The customer's app lists pending refunds and confirms one. Both read the customer from the JWT:
+
+<CodeFile title="src/main/java/com/example/support/refund/RefundController.java">
+```java {30,32}
+package com.example.support.refund;
+
+import java.math.BigDecimal;
+import java.security.Principal;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/refunds")
+class RefundController {
+
+    private final RefundService refunds;
+
+    RefundController(RefundService refunds) {
+        this.refunds = refunds;
+    }
+
+    @GetMapping("/pending")
+    List<RefundResponse> pending(Principal principal) {
+        return refunds.pending(principal.getName()).stream().map(RefundResponse::from).toList();
+    }
+
+    @PostMapping("/{refundId}/confirmation")
+    RefundResponse confirm(@PathVariable UUID refundId, Principal principal) {
+        return RefundResponse.from(refunds.confirm(principal.getName(), refundId));
+    }
+
+    record RefundResponse(UUID id, String orderNumber, BigDecimal amount, RefundStatus status, Instant expiresAt) {
+
+        static RefundResponse from(Refund refund) {
+            return new RefundResponse(refund.id(), refund.orderNumber(), refund.amount(), refund.status(), refund.expiresAt());
+        }
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/refund/RefundNotFoundException.java">
+```java
+package com.example.support.refund;
+
+import java.util.UUID;
+
+public class RefundNotFoundException extends RuntimeException {
+
+    public RefundNotFoundException(UUID refundId) {
+        super("No refund " + refundId);
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/refund/RefundNotConfirmableException.java">
+```java
+package com.example.support.refund;
+
+import java.util.UUID;
+
+public class RefundNotConfirmableException extends RuntimeException {
+
+    public RefundNotConfirmableException(UUID refundId) {
+        super("Refund " + refundId + " is already confirmed or has expired");
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/refund/RefundErrorHandler.java">
+```java {13,18}
+package com.example.support.refund;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+@RestControllerAdvice
+class RefundErrorHandler {
+
+    @ExceptionHandler
+    ProblemDetail notFound(RefundNotFoundException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+    }
+
+    @ExceptionHandler
+    ProblemDetail notConfirmable(RefundNotConfirmableException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+    }
+}
+```
+</CodeFile>
+
+Register the refund tool on the support client:
+
+<CodeFile title="src/main/java/com/example/support/chat/SupportChatConfig.java">
+```java {28,42}
+package com.example.support.chat;
+
+import java.time.Clock;
+import java.util.List;
+
+import com.example.support.mcp.BestEffortToolCallbacks;
+import com.example.support.order.OrderTools;
+import com.example.support.refund.RefundTools;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.SafeGuardAdvisor;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
+import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+
+@Configuration(proxyBeanMethods = false)
+class SupportChatConfig {
+
+    @Bean
+    ChatClient supportChatClient(ChatClient.Builder builder, ChatMemory chatMemory,
+                                RetrievalAugmentationAdvisor knowledgeRagAdvisor, OrderTools orderTools,
+                                RefundTools refundTools, SyncMcpToolCallbackProvider mcpTools) {
+        return builder
+                .defaultSystem("You are the support assistant for Acme Cloud.")
+                .defaultAdvisors(
+                        SafeGuardAdvisor.builder()
+                                .sensitiveWords(List.of("internal only", "api_key"))
+                                .order(Ordered.HIGHEST_PRECEDENCE + 25)
+                                .build(),
+                        new TokenBudgetAdvisor(200_000, Clock.systemUTC()),   // + 50
+                        new PiiRedactionAdvisor(),                            // + 100
+                        MessageChatMemoryAdvisor.builder(chatMemory).build(), // + 200
+                        knowledgeRagAdvisor,                                  // + 225
+                        new AnswerLanguageAdvisor(),                          // + 250
+                        new SimpleLoggerAdvisor())                            // 0
+                .defaultTools(orderTools, refundTools, new BestEffortToolCallbacks(mcpTools))
+                .build();
+    }
+
+    @Bean
+    ChatClient faqChatClient(ChatClient.Builder builder, VectorStore vectorStore) {
+        return builder
+                .defaultSystem("Answer questions about Acme Cloud plans and billing.")
+                .defaultAdvisors(new PiiRedactionAdvisor(), new SemanticCacheAdvisor(vectorStore, 0.92))
+                .build();
+    }
+}
+```
+</CodeFile>
+
+The service test fixes the clock and covers the cases that matter: no payment on a proposal, an expired proposal, a race and
+another customer's refund:
+
+<CodeFile title="src/test/java/com/example/support/refund/RefundServiceTest.java">
+```java {79,84}
+package com.example.support.refund;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+
+import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.Optional;
+import java.util.UUID;
+
+import com.example.support.order.Order;
+import com.example.support.order.OrderRepository;
+import com.example.support.order.OrderStatus;
+import com.example.support.tools.ToolRefusalException;
+
+import org.junit.jupiter.api.Test;
+
+class RefundServiceTest {
+
+    private static final Instant NOW = Instant.parse("2026-11-18T10:00:00Z");
+    private static final UUID REFUND_ID = UUID.fromString("7c9e6679-7425-40de-944b-e07fc1f90ae7");
+
+    private final OrderRepository orders = mock(OrderRepository.class);
+    private final RefundRepository refunds = mock(RefundRepository.class);
+    private final PaymentClient payments = mock(PaymentClient.class);
+    private final RefundService service = new RefundService(orders, refunds, payments, Clock.fixed(NOW, ZoneOffset.UTC));
+
+    @Test
+    void proposesTheOrderTotalWithoutPaying() {
+        given(orders.findForCustomer("alice", "1042")).willReturn(Optional.of(order(OrderStatus.DELIVERED)));
+
+        Refund refund = service.propose("alice", "1042", "Arrived broken");
+
+        assertThat(refund.amount()).isEqualByComparingTo("59.90");
+        assertThat(refund.status()).isEqualTo(RefundStatus.PENDING);
+        assertThat(refund.expiresAt()).isEqualTo(NOW.plus(RefundService.CONFIRMATION_WINDOW));
+        then(refunds).should().insert(refund);
+        then(payments).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void refusesAnOrderThatCannotBeRefunded() {
+        given(orders.findForCustomer("alice", "1042")).willReturn(Optional.of(order(OrderStatus.REFUNDED)));
+
+        assertThatThrownBy(() -> service.propose("alice", "1042", "Again please"))
+                .isInstanceOf(ToolRefusalException.class)
+                .hasMessage("Order 1042 is REFUNDED and cannot be refunded.");
+        then(refunds).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void paysWhenTheCustomerConfirms() {
+        given(refunds.findForCustomer("alice", REFUND_ID)).willReturn(Optional.of(pending(NOW.plusSeconds(60))));
+        given(refunds.markConfirmed(REFUND_ID)).willReturn(true);
+
+        Refund refund = service.confirm("alice", REFUND_ID);
+
+        assertThat(refund.status()).isEqualTo(RefundStatus.CONFIRMED);
+        then(payments).should().refund("1042", new BigDecimal("59.90"), REFUND_ID);
+    }
+
+    @Test
+    void doesNotPayAnExpiredProposal() {
+        given(refunds.findForCustomer("alice", REFUND_ID)).willReturn(Optional.of(pending(NOW.minusSeconds(1))));
+
+        assertThatThrownBy(() -> service.confirm("alice", REFUND_ID)).isInstanceOf(RefundNotConfirmableException.class);
+        then(payments).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void paysOnceWhenTwoConfirmationsRace() {
+        given(refunds.findForCustomer("alice", REFUND_ID)).willReturn(Optional.of(pending(NOW.plusSeconds(60))));
+        given(refunds.markConfirmed(REFUND_ID)).willReturn(false);
+
+        assertThatThrownBy(() -> service.confirm("alice", REFUND_ID)).isInstanceOf(RefundNotConfirmableException.class);
+        then(payments).should(never()).refund(any(), any(), any());
+    }
+
+    @Test
+    void hidesAnotherCustomersRefund() {
+        given(refunds.findForCustomer("bob", REFUND_ID)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.confirm("bob", REFUND_ID)).isInstanceOf(RefundNotFoundException.class);
+    }
+
+    private static Order order(OrderStatus status) {
+        return new Order("1042", status, new BigDecimal("59.90"), LocalDate.of(2026, 11, 2), "1Z999AA10123456784");
+    }
+
+    private static Refund pending(Instant expiresAt) {
+        return new Refund(REFUND_ID, "alice", "1042", new BigDecimal("59.90"), "Arrived broken", RefundStatus.PENDING, expiresAt);
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/test/java/com/example/support/refund/RefundControllerTest.java">
+```java {59}
+package com.example.support.refund;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
+
+import com.example.support.security.SecurityConfig;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.assertj.MockMvcTester;
+
+@WebMvcTest(RefundController.class)
+@Import(SecurityConfig.class)
+class RefundControllerTest {
+
+    private static final UUID REFUND_ID = UUID.fromString("7c9e6679-7425-40de-944b-e07fc1f90ae7");
+
+    @Autowired
+    private MockMvcTester mvc;
+
+    @MockitoBean
+    private RefundService refunds;
+
+    @Test
+    void confirmsTheSignedInCustomersRefund() {
+        given(refunds.confirm("alice", REFUND_ID)).willReturn(new Refund(REFUND_ID, "alice", "1042", new BigDecimal("59.90"),
+                "Arrived broken", RefundStatus.CONFIRMED, Instant.parse("2026-11-18T10:15:00Z")));
+
+        assertThat(mvc.post().uri("/api/refunds/{id}/confirmation", REFUND_ID).with(jwt().jwt(token -> token.subject("alice"))))
+                .hasStatusOk()
+                .bodyJson()
+                .isLenientlyEqualTo("""
+                        {"orderNumber": "1042", "amount": 59.90, "status": "CONFIRMED"}
+                        """);
+    }
+
+    @Test
+    void reportsAnExpiredProposalAs409() {
+        given(refunds.confirm("alice", REFUND_ID)).willThrow(new RefundNotConfirmableException(REFUND_ID));
+
+        assertThat(mvc.post().uri("/api/refunds/{id}/confirmation", REFUND_ID).with(jwt().jwt(token -> token.subject("alice"))))
+                .hasStatus(HttpStatus.CONFLICT)
+                .bodyJson().extractingPath("$.detail").isEqualTo("Refund " + REFUND_ID + " is already confirmed or has expired");
+    }
+
+    @Test
+    void reportsSomeoneElsesRefundAs404() {
+        given(refunds.confirm("bob", REFUND_ID)).willThrow(new RefundNotFoundException(REFUND_ID));
+
+        assertThat(mvc.post().uri("/api/refunds/{id}/confirmation", REFUND_ID).with(jwt().jwt(token -> token.subject("bob"))))
+                .hasStatus(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void needsASignedInCustomer() {
+        assertThat(mvc.post().uri("/api/refunds/{id}/confirmation", REFUND_ID)).hasStatus(HttpStatus.UNAUTHORIZED);
+    }
+}
+```
+</CodeFile>
+
+### A ticket-reply workflow
+
+The workflow answers support tickets for the agents who handle them. Each step's output is a record, so the planner and the
+reviewer return structured output (Module 2):
+
+<CodeFile title="src/main/java/com/example/support/ticket/Department.java">
+```java
+package com.example.support.ticket;
+
+public enum Department {
+    BILLING, TECHNICAL, ACCOUNT
+}
+```
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/ticket/Issue.java">
+```java
+package com.example.support.ticket;
+
+public record Issue(Department department, String question) {
+}
+```
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/ticket/Plan.java">
+```java
+package com.example.support.ticket;
+
+import java.util.List;
+
+public record Plan(List<Issue> issues) {
+}
+```
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/ticket/Review.java">
+```java
+package com.example.support.ticket;
+
+import java.util.List;
+
+public record Review(boolean approved, List<String> problems) {
+}
+```
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/ticket/ReplyDraft.java">
+```java
+package com.example.support.ticket;
+
+import java.util.List;
+
+/** A reply for an agent to send. {@code needsAgent} means the reviewer still had objections after the last round. */
+public record ReplyDraft(List<Department> departments, String reply, int rounds, boolean needsAgent) {
+}
+```
+</CodeFile>
+
+The service holds the whole flow. The model decides how many issues there are, so the code caps the fan-out, and the review
+loop has a fixed number of rounds:
+
+<CodeFile title="src/main/java/com/example/support/ticket/TicketReplyService.java">
+```java {74,76,91,105}
+package com.example.support.ticket;
+
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.util.Assert;
+
+/**
+ * Three workflow patterns in one: a planner splits the ticket into issues (orchestrator), each issue goes to its
+ * department's writer (routing) and the writers run in parallel (workers); then a reviewer sends the merged reply back
+ * to the editor until it approves, at most {@value #MAX_ROUNDS} times (evaluator-optimizer). The code owns the control
+ * flow; the model fills in each step.
+ */
+public class TicketReplyService {
+
+    static final int MAX_ISSUES = 4;
+    static final int MAX_ROUNDS = 3;
+
+    private static final String ANSWER = """
+            Answer only this part of the ticket: {question}
+
+            The whole ticket, for context:
+            {ticket}""";
+
+    private static final String MERGE = """
+            Merge these answers into one reply to the ticket, in the order given.
+
+            Ticket:
+            {ticket}
+
+            Answers:
+            {answers}""";
+
+    private static final String REVIEW = """
+            Ticket:
+            {ticket}
+
+            Draft reply:
+            {reply}""";
+
+    private static final String REVISE = """
+            Rewrite this reply so that it fixes every problem listed.
+
+            Ticket:
+            {ticket}
+
+            Reply:
+            {reply}
+
+            Problems:
+            {problems}""";
+
+    private final ChatClient planner;
+    private final Map<Department, ChatClient> writers;
+    private final ChatClient editor;
+    private final ChatClient reviewer;
+
+    TicketReplyService(ChatClient planner, Map<Department, ChatClient> writers, ChatClient editor, ChatClient reviewer) {
+        Assert.isTrue(writers.keySet().containsAll(EnumSet.allOf(Department.class)), "Every department needs a writer");
+        this.planner = planner;
+        this.writers = Map.copyOf(writers);
+        this.editor = editor;
+        this.reviewer = reviewer;
+    }
+
+    public ReplyDraft draftReply(String subject, String body) {
+        String ticket = "Subject: " + subject + "\n\n" + body;
+        Plan plan = Objects.requireNonNull(planner.prompt().user(ticket).call().entity(Plan.class), "No plan");
+        // The model decides how many workers run, so cap the fan-out.
+        List<Issue> issues = plan.issues().stream().limit(MAX_ISSUES).toList();
+        Assert.state(!issues.isEmpty(), "The planner found no issue in the ticket");
+
+        List<String> answers = answerInParallel(ticket, issues);
+        String reply = answers.size() == 1 ? answers.getFirst() : editor.prompt()
+                .user(user -> user.text(MERGE).param("ticket", ticket).param("answers", String.join("\n\n---\n\n", answers)))
+                .call()
+                .content();
+
+        for (int round = 1; ; round++) {
+            String draft = reply;
+            Review review = Objects.requireNonNull(reviewer.prompt()
+                    .user(user -> user.text(REVIEW).param("ticket", ticket).param("reply", draft))
+                    .call()
+                    .entity(Review.class), "No review");
+            if (review.approved() || round == MAX_ROUNDS) {
+                return new ReplyDraft(issues.stream().map(Issue::department).distinct().toList(), draft, round, !review.approved());
+            }
+            reply = editor.prompt()
+                    .user(user -> user.text(REVISE)
+                            .param("ticket", ticket)
+                            .param("reply", draft)
+                            .param("problems", "- " + String.join("\n- ", review.problems())))
+                    .call()
+                    .content();
+        }
+    }
+
+    private List<String> answerInParallel(String ticket, List<Issue> issues) {
+        try (ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor()) {
+            List<CompletableFuture<String>> answers = issues.stream()
+                    .map(issue -> CompletableFuture.supplyAsync(() -> writers.get(issue.department()).prompt()
+                            .user(user -> user.text(ANSWER).param("question", issue.question()).param("ticket", ticket))
+                            .call()
+                            .content(), workers))
+                    .toList();
+            return answers.stream().map(CompletableFuture::join).toList();
+        }
+    }
+}
+```
+</CodeFile>
+
+Each role is a clone of the auto-configured builder with its own system prompt. The writers' instructions are kept in one map,
+keyed by department:
+
+<CodeFile title="src/main/java/com/example/support/ticket/TicketWorkflowConfig.java">
+```java {27}
+package com.example.support.ticket;
+
+import java.util.EnumMap;
+import java.util.Map;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration(proxyBeanMethods = false)
+class TicketWorkflowConfig {
+
+    private static final Map<Department, String> WRITERS = Map.of(
+            Department.BILLING, """
+                    You answer billing questions for Acme Cloud: invoices, charges and refunds. \
+                    Never promise a refund: refunds are proposed in the app and the customer confirms them.""",
+            Department.TECHNICAL, """
+                    You answer technical questions for Acme Cloud: outages, errors and configuration. \
+                    Ask for the request id or logs when the ticket has none.""",
+            Department.ACCOUNT, """
+                    You answer account questions for Acme Cloud: sign-in, users and plans. \
+                    You cannot change an account; explain the steps the customer takes.""");
+
+    @Bean
+    TicketReplyService ticketReplyService(ChatClient.Builder builder) {
+        Map<Department, ChatClient> writers = new EnumMap<>(Department.class);
+        WRITERS.forEach((department, instructions) -> writers.put(department, builder.clone().defaultSystem(instructions).build()));
+
+        ChatClient planner = builder.clone()
+                .defaultSystem("""
+                        Split an Acme Cloud support ticket into its separate issues, at most four, and give each one \
+                        to the department that handles it. Phrase each issue as a question.""")
+                .build();
+        ChatClient editor = builder.clone()
+                .defaultSystem("You edit Acme Cloud support replies: one greeting, one sign-off, plain sentences, nothing invented.")
+                .build();
+        ChatClient reviewer = builder.clone()
+                .defaultSystem("""
+                        You check support replies before an agent sends them. Approve a reply only if it answers every \
+                        issue in the ticket, promises no refund, credit or date, and contains no internal notes. \
+                        Otherwise list each problem in one sentence.""")
+                .build();
+        return new TicketReplyService(planner, writers, editor, reviewer);
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/ticket/TicketController.java">
+```java {27}
+package com.example.support.ticket;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/tickets")
+class TicketController {
+
+    private final TicketReplyService replies;
+
+    TicketController(TicketReplyService replies) {
+        this.replies = replies;
+    }
+
+    @PostMapping("/reply-drafts")
+    ReplyDraft draftReply(@Valid @RequestBody TicketRequest ticket) {
+        return replies.draftReply(ticket.subject(), ticket.body());
+    }
+
+    record TicketRequest(@NotBlank @Size(max = 200) String subject, @NotBlank @Size(max = 8000) String body) {
+    }
+}
+```
+</CodeFile>
+
+The drafts are for agents, so the endpoint needs an agent scope that customers' tokens don't have:
+
+<CodeFile title="src/main/java/com/example/support/security/SecurityConfig.java">
+```java {18}
+package com.example.support.security;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+
+@Configuration(proxyBeanMethods = false)
+public class SecurityConfig {
+
+    @Bean
+    SecurityFilterChain apiSecurity(HttpSecurity http) throws Exception {
+        return http
+                .authorizeHttpRequests(requests -> requests
+                        .requestMatchers("/api/tickets/**").hasAuthority("SCOPE_support.agent") // agents, not customers
+                        .anyRequest().authenticated())
+                .oauth2ResourceServer(server -> server.jwt(Customizer.withDefaults()))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .csrf(AbstractHttpConfigurer::disable) // bearer tokens only: no session cookie to forge
+                .build();
+    }
+}
+```
+</CodeFile>
+
+The test gives every role its own scripted model, so it can check which roles were called, and how often:
+
+<CodeFile title="src/test/java/com/example/support/ticket/TicketReplyServiceTest.java">
+```java {61,88}
+package com.example.support.ticket;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import com.example.support.ScriptedChatModel;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+
+class TicketReplyServiceTest {
+
+    private static final String APPROVED = """
+            {"approved": true, "problems": []}""";
+
+    private final ScriptedChatModel billing = replies("You were charged twice; a refund is waiting in the app.");
+    private final ScriptedChatModel technical = replies("Please send the request id of a failing call.");
+    private final ScriptedChatModel account = replies("Go to Settings, then Users, then Invite.");
+    private final ScriptedChatModel editor = replies("Merged reply", "Revised reply");
+
+    @Test
+    void sendsASingleIssueStraightToItsDepartment() {
+        var service = service(plan("TECHNICAL"), replies(APPROVED));
+
+        ReplyDraft draft = service.draftReply("502 errors", "Every call to /v1/chat fails since 9:00.");
+
+        assertThat(draft).isEqualTo(new ReplyDraft(List.of(Department.TECHNICAL), "Please send the request id of a failing call.", 1, false));
+        assertThat(billing.prompts()).isEmpty();
+        assertThat(editor.prompts()).isEmpty();
+    }
+
+    @Test
+    void answersEachIssueWithItsDepartmentAndMergesTheAnswers() {
+        var service = service(plan("BILLING", "ACCOUNT"), replies(APPROVED));
+
+        ReplyDraft draft = service.draftReply("Two things", "I was charged twice, and how do I add a colleague?");
+
+        assertThat(draft.reply()).isEqualTo("Merged reply");
+        assertThat(draft.departments()).containsExactly(Department.BILLING, Department.ACCOUNT);
+        assertThat(billing.prompts().getFirst().getUserMessage().getText()).startsWith("Answer only this part of the ticket: BILLING question");
+        assertThat(editor.prompts().getFirst().getUserMessage().getText())
+                .contains("You were charged twice; a refund is waiting in the app.", "Go to Settings, then Users, then Invite.");
+        assertThat(technical.prompts()).isEmpty();
+    }
+
+    @Test
+    void capsTheNumberOfWorkers() {
+        ScriptedChatModel everyBilling = new ScriptedChatModel(prompt -> new AssistantMessage("part"));
+        var service = new TicketReplyService(client(replies(plan("BILLING", "BILLING", "BILLING", "BILLING", "BILLING", "BILLING"))),
+                Map.of(Department.BILLING, client(everyBilling), Department.TECHNICAL, client(technical), Department.ACCOUNT, client(account)),
+                client(editor), client(replies(APPROVED)));
+
+        service.draftReply("Many", "Six billing questions");
+
+        assertThat(everyBilling.prompts()).hasSize(TicketReplyService.MAX_ISSUES);
+    }
+
+    @Test
+    void revisesTheReplyWithTheReviewersProblems() {
+        var service = service(plan("BILLING", "ACCOUNT"), replies("""
+                {"approved": false, "problems": ["It promises the refund by Friday."]}""", APPROVED));
+
+        ReplyDraft draft = service.draftReply("Two things", "Charged twice; add a colleague?");
+
+        assertThat(draft.reply()).isEqualTo("Revised reply");
+        assertThat(draft.rounds()).isEqualTo(2);
+        assertThat(editor.prompts().getLast().getUserMessage().getText()).contains("Merged reply", "- It promises the refund by Friday.");
+    }
+
+    @Test
+    void handsTheReplyToAnAgentWhenTheReviewerNeverApproves() {
+        ScriptedChatModel stubbornEditor = new ScriptedChatModel(prompt -> new AssistantMessage("Another try"));
+        var service = new TicketReplyService(client(replies(plan("ACCOUNT"))),
+                Map.of(Department.BILLING, client(billing), Department.TECHNICAL, client(technical), Department.ACCOUNT, client(account)),
+                client(stubbornEditor),
+                client(new ScriptedChatModel(prompt -> new AssistantMessage("""
+                        {"approved": false, "problems": ["Promises a date."]}"""))));
+
+        ReplyDraft draft = service.draftReply("Locked out", "I can't sign in.");
+
+        assertThat(draft.rounds()).isEqualTo(TicketReplyService.MAX_ROUNDS);
+        assertThat(draft.needsAgent()).isTrue();
+        assertThat(stubbornEditor.prompts()).hasSize(TicketReplyService.MAX_ROUNDS - 1);
+    }
+
+    @Test
+    void needsAWriterForEveryDepartment() {
+        assertThatThrownBy(() -> new TicketReplyService(client(editor), Map.of(Department.BILLING, client(billing)), client(editor), client(editor)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    private TicketReplyService service(String plan, ScriptedChatModel reviewer) {
+        return new TicketReplyService(client(replies(plan)),
+                Map.of(Department.BILLING, client(billing), Department.TECHNICAL, client(technical), Department.ACCOUNT, client(account)),
+                client(editor), client(reviewer));
+    }
+
+    /** A plan with one issue per department given, each phrased as "DEPARTMENT question". */
+    private static String plan(String... departments) {
+        return List.of(departments).stream()
+                .map(department -> "{\"department\": \"%s\", \"question\": \"%s question\"}".formatted(department, department))
+                .collect(Collectors.joining(", ", "{\"issues\": [", "]}"));
+    }
+
+    /** Answers with each reply in turn. */
+    private static ScriptedChatModel replies(String... replies) {
+        Iterator<String> next = List.of(replies).iterator();
+        return new ScriptedChatModel(prompt -> new AssistantMessage(next.next()));
+    }
+
+    private static ChatClient client(ScriptedChatModel model) {
+        return ChatClient.builder(model).build();
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/test/java/com/example/support/ticket/TicketControllerTest.java">
+```java {27,73}
+package com.example.support.ticket;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+
+import java.util.List;
+
+import com.example.support.security.SecurityConfig;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.assertj.MockMvcTester;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
+
+@WebMvcTest(TicketController.class)
+@Import(SecurityConfig.class)
+class TicketControllerTest {
+
+    private static final RequestPostProcessor AGENT = jwt().authorities(new SimpleGrantedAuthority("SCOPE_support.agent"));
+
+    @Autowired
+    private MockMvcTester mvc;
+
+    @MockitoBean
+    private TicketReplyService replies;
+
+    @Test
+    void draftsAReply() {
+        given(replies.draftReply("Charged twice", "My card was charged twice."))
+                .willReturn(new ReplyDraft(List.of(Department.BILLING), "A refund is waiting in the app.", 2, false));
+
+        assertThat(mvc.post().uri("/api/tickets/reply-drafts")
+                .with(AGENT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"subject": "Charged twice", "body": "My card was charged twice."}
+                        """))
+                .hasStatusOk()
+                .bodyJson()
+                .isLenientlyEqualTo("""
+                        {"departments": ["BILLING"], "reply": "A refund is waiting in the app.", "rounds": 2, "needsAgent": false}
+                        """);
+    }
+
+    @Test
+    void rejectsAnEmptyTicket() {
+        assertThat(mvc.post().uri("/api/tickets/reply-drafts")
+                .with(AGENT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"subject": "Help", "body": ""}
+                        """))
+                .hasStatus(HttpStatus.BAD_REQUEST);
+        then(replies).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void isNotOpenToCustomers() {
+        assertThat(mvc.post().uri("/api/tickets/reply-drafts")
+                .with(jwt().jwt(token -> token.subject("alice")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"subject": "Charged twice", "body": "My card was charged twice."}
+                        """))
+                .hasStatus(HttpStatus.FORBIDDEN);
+        then(replies).shouldHaveNoInteractions();
+    }
+}
+```
+</CodeFile>
+
+## 4. Production gotchas & security
+
+<Gotcha kind="security" title="The model never moves money">
+A tool that refunds directly does so whenever the conversation makes it seem right, and the conversation includes whatever the
+customer types. Let the tool create a proposal, take the amount from your own data, and move the money only when the signed-in
+customer confirms it in a request the model can't make.
+</Gotcha>
+
+<Gotcha kind="reliability" title="Stopping a tool call inside the loop corrupts memory">
+`toolExecutionEligibilityChecker` returns the tool calls to you without running them, but memory has already stored the
+assistant's tool call, with no tool result after it. The next turn sends that unanswered call to the model. A pending action
+that the customer confirms in its own request keeps the conversation clean.
+</Gotcha>
+
+<Gotcha kind="reliability" title="Confirm once, pay once">
+Two clicks, a retry or two browser tabs can confirm the same refund at the same time. `UPDATE ... WHERE status = 'PENDING'`
+lets one of them win, and the refund id as the provider's idempotency key covers a retry after the payment went through.
+Return `404` for another customer's refund, so its existence isn't revealed.
+</Gotcha>
+
+<Gotcha kind="cost" title="Count the model calls">
+A ticket with n issues costs one planner call, n writer calls, a merge when n is more than one, and up to `MAX_ROUNDS` reviews
+with a revision between each pair. Two issues, approved in round 2, make seven calls. Cap the fan-out yourself, because the
+planner decides how many issues there are, and give simple roles a cheaper model through their own builder.
+</Gotcha>
+
+<Gotcha kind="reliability" title="Every loop needs an exit">
+A reviewer can keep finding problems. Fix the number of rounds and, when they run out, return the draft with a flag for a
+person, as `needsAgent` does, instead of looping or failing the request.
+</Gotcha>
+
+<Gotcha kind="reliability" title="Parallel calls meet rate limits">
+Virtual threads make fan-out cheap, but your provider limits requests and tokens per minute. Many tickets at once multiply the
+calls. Keep the fan-out small and handle `429` responses with Spring AI's retry settings. A virtual thread also doesn't inherit
+the request's `SecurityContext`, so pass a worker anything it needs as an argument.
+</Gotcha>
+
+<Gotcha kind="security" title="Drafts go to agents, not to customers">
+The workflow writes text for a person to check before it is sent. Protect the endpoint with an agent scope, as
+`SecurityConfig` does, and test that a customer's token gets `403`.
+</Gotcha>
+
+## Recap
+
+- Workflows keep the control flow in code; agents let the model choose. Prefer a workflow when you know the steps.
+- Actions with side effects are proposals. The customer confirms them in a separate request, with the amount taken from your
+  own data, a conditional update and an idempotency key.
+- Orchestrator, routing, parallel workers and evaluator-optimizer are plain Java around `ChatClient` calls: structured output for
+  plans and reviews, `builder.clone()` per role and virtual threads for the fan-out.
+- Cap the fan-out and the rounds, and hand what is left to a person.

@@ -99,6 +99,24 @@ public record Order(String number, OrderStatus status, BigDecimal total, LocalDa
 ```
 </CodeFile>
 
+The table, for your migration tool. Every query filters by `customer_id`:
+
+<CodeFile
+  title="orders.sql"
+  lang="sql"
+  lines="3"
+  code={`CREATE TABLE orders (
+    number          VARCHAR(20)    PRIMARY KEY,
+    customer_id     VARCHAR(100)   NOT NULL,
+    status          VARCHAR(20)    NOT NULL,
+    total           NUMERIC(12, 2) NOT NULL,
+    placed_on       DATE           NOT NULL,
+    tracking_number VARCHAR(40)
+);
+
+CREATE INDEX orders_customer_placed_on ON orders (customer_id, placed_on DESC);`}
+/>
+
 <CodeFile title="src/main/java/com/example/support/order/OrderRepository.java">
 ```java {21,31}
 package com.example.support.order;

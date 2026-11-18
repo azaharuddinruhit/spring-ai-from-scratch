@@ -260,7 +260,7 @@ does:
 The support app's own API now checks the customer's JWT. The `Principal` the controller reads is the token's subject:
 
 <CodeFile title="src/main/java/com/example/support/security/SecurityConfig.java">
-@@CODE main/com/example/support/security/SecurityConfig.java | anyRequest\(\)\.authenticated; jwt\(@@
+@@CODE lesson2/SecurityConfig.java | anyRequest\(\)\.authenticated; jwt\(@@
 </CodeFile>
 
 The Module 3 controller test now imports that configuration and sends a JWT instead of a plain principal:

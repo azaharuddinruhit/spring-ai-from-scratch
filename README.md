@@ -30,7 +30,7 @@ These versions are pinned in [`src/data/versions.ts`](src/data/versions.ts), and
 | 2 | Deterministic structured outputs | Published |
 | 3 | The Advisors API & chat memory | Published |
 | 4 | RAG & ETL pipelines | Published |
-| 5 | Tool calling, MCP & agents | Planned |
+| 5 | Tool calling, MCP & agents | Published |
 | 6 | Testing, evaluation & production hardening | Planned |
 | 7 | Capstone: enterprise support & knowledge assistant | Planned |
 

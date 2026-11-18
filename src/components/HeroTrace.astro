@@ -63,10 +63,11 @@ const STEPS: Step[] = [
     label: 'Tool loop',
     type: 'ToolCallingAdvisor',
     module: 5,
-    body: 'Registered automatically at HIGHEST_PRECEDENCE + 300. When the model asks for a tool, it runs your @Tool method and sends the result back down the chain, so RAG and the model run again.',
-    code: `@Tool(description = "Look up an order by its id")
-Order findOrder(String orderId) {
-    return orders.findById(orderId);
+    body: 'Registered automatically at HIGHEST_PRECEDENCE + 300. When the model asks for a tool, it runs your @Tool method and sends the result back down the chain, so RAG and the model run again. The customer comes from the ToolContext, which the model can’t see or set.',
+    code: `@Tool(description = "Find one of the signed-in customer's orders")
+Order findOrder(String orderNumber, ToolContext context) {
+    return orders.findForCustomer(customerId(context), orderNumber)
+            .orElseThrow(() -> new ToolRefusalException("No order " + orderNumber));
 }`,
     lang: 'java',
   },
