@@ -1,0 +1,767 @@
+---
+description: Give the support assistant tools with @Tool and ToolContext, see how ToolCallingAdvisor runs the loop, control what the model reads when a tool fails, and cap runaway loops with spring.ai.tools.limits.
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import ToolLoopLab from '@/components/islands/ToolLoopLab';
+
+The support assistant answers from the knowledge base, but it can't see a customer's orders. "Where is my order 1042?" needs
+data that lives in your database. With tool calling, the model asks your application to run a method, reads the result and then
+answers. The model only asks. Your code decides which tools exist, whose data they read and when the loop stops.
+
+## 1. Spring mental model
+
+A tool works like a controller method that the model calls instead of a browser. `@Tool` marks the method. Its description is the
+documentation the model reads. Spring AI turns the parameters into a JSON schema, much as springdoc does for a `@RequestBody`.
+`ToolCallingAdvisor` plays the `DispatcherServlet` part: it receives the model's tool calls, runs the matching methods and sends
+the results back.
+
+<Mermaid
+  caption="ToolCallingAdvisor at HIGHEST_PRECEDENCE + 300. It loops until the model answers in text or a limit is reached."
+  code={`
+flowchart LR
+  P["Prompt<br/>messages + tool definitions"] --> M["ChatModel<br/>call"]
+  M -->|"tool calls"| X["ToolCallingManager<br/>runs each tool"]
+  X -->|"results appended<br/>as tool messages"| M
+  M -->|"text"| A["Answer"]
+  X -->|"limit reached"| L["finish reason<br/>toolCallLimitExceeded"]
+`}
+/>
+
+These rules come from the 2.0.2 classes and from tests we ran against them:
+
+- `ChatClient` registers `ToolCallingAdvisor` itself, at `HIGHEST_PRECEDENCE + 300`. Every model call in the loop sends the whole
+  exchange so far, including earlier tool calls and their results. Advisors ordered after it run once per model call (Module 3).
+- A `ToolContext` parameter is left out of the schema, so the model can't see it or set it. A parameter with `@ToolParam` is
+  part of the schema, and the model fills it with whatever it reads in the conversation.
+- The return value goes back to the model as JSON. A record becomes a JSON object.
+- When a tool throws, a `ToolExecutionExceptionProcessor` decides what the model reads. The default one sends the exception
+  message. A bean of your own replaces it.
+- `spring.ai.tools.limits` caps the loop: `max-calls-per-tool-default` (40), `max-calls-per-tool` per tool name,
+  `max-total-tool-calls` (150) and `excluded-tools`. `-1` turns a limit off.
+- With `on-limit-exceeded: THROW` (the default), the call that would go over the limit doesn't run. The advisor stops the loop and
+  returns one generation, with finish reason `toolCallLimitExceeded` and the limit message as its text, such as "Tool call limit
+  (3) exceeded for tool 'findOrder'. No further calls to this tool are allowed in this turn." With a limit of 3, the model is
+  called four times. `RETURN_ERROR_RESPONSE` sends that message to the model as the tool's result instead, and the loop goes on.
+- `defaultTools(Object...)` and `tools(Object...)` take `@Tool` objects, `ToolCallback`s and `ToolCallbackProvider`s.
+  `defaultToolCallbacks` and `toolCallbacks` are deprecated for removal in 2.0.
+
+Who decides what:
+
+| Decision | Made by |
+| --- | --- |
+| Whether to call a tool, which one, and with which arguments | The model |
+| Which tools exist and what each description says | Your `@Tool` methods |
+| Whose data a tool reads | `ToolContext`, set by your service from the signed-in user |
+| What the model reads when a tool fails | Your `ToolExecutionExceptionProcessor` |
+| When the loop stops | `spring.ai.tools.limits`, then your service reads the finish reason |
+
+## 2. Interactive sandbox
+
+<ToolLoopLab client:visible />
+
+Things to try:
+
+- Step through **Where is my order?** It takes three model calls: one per tool, and one for the answer.
+- Pick **Someone else's order** and set the customer id to come from **@ToolParam**. The model copies "bob" from the question,
+  and Alice reads Bob's order. Switch back to **ToolContext**: the schema has no customer id, so the lookup can only use Alice's.
+- Pick **The database times out** with the **Default processor**. The model reads your SQL and the database error, and repeats
+  them to the customer. With **ModelSafeToolErrors**, it reads one sentence it can act on.
+- Pick **Keep checking** and change the limit. The tool runs N times, the model is called N + 1 times, and the service answers with
+  its own fallback instead of the limit message.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+Tool calling is part of `spring-ai-model`, which every model starter already brings, so `build.gradle` doesn't change. The order
+lookup lives in its own package. An order is a record, and the repository always filters by customer:
+
+<CodeFile title="src/main/java/com/example/support/order/OrderStatus.java">
+```java
+package com.example.support.order;
+
+public enum OrderStatus {
+    PLACED, SHIPPED, DELIVERED, CANCELLED, REFUNDED
+}
+```
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/order/Order.java">
+```java
+package com.example.support.order;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+public record Order(String number, OrderStatus status, BigDecimal total, LocalDate placedOn, String trackingNumber) {
+}
+```
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/order/OrderRepository.java">
+```java {21,31}
+package com.example.support.order;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class OrderRepository {
+
+    private final JdbcClient jdbc;
+
+    OrderRepository(JdbcClient jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    public Optional<Order> findForCustomer(String customerId, String orderNumber) {
+        return jdbc.sql("""
+                        SELECT number, status, total, placed_on, tracking_number FROM orders
+                        WHERE customer_id = :customerId AND number = :number""")
+                .param("customerId", customerId)
+                .param("number", orderNumber)
+                .query(Order.class)
+                .optional();
+    }
+
+    public List<Order> findRecentForCustomer(String customerId, int limit) {
+        return jdbc.sql("""
+                        SELECT number, status, total, placed_on, tracking_number FROM orders
+                        WHERE customer_id = :customerId ORDER BY placed_on DESC LIMIT :limit""")
+                .param("customerId", customerId)
+                .param("limit", limit)
+                .query(Order.class)
+                .list();
+    }
+}
+```
+</CodeFile>
+
+The service puts the signed-in customer into the tool context, and the tools read it from there. One small class owns the key:
+
+<CodeFile title="src/main/java/com/example/support/tools/CustomerToolContext.java">
+```java {20}
+package com.example.support.tools;
+
+import java.util.Map;
+
+import org.springframework.ai.chat.model.ToolContext;
+
+/** The signed-in customer, handed to tools by the application. The model never sees or sets it. */
+public final class CustomerToolContext {
+
+    private static final String CUSTOMER_ID = "customerId";
+
+    private CustomerToolContext() {
+    }
+
+    public static Map<String, Object> of(String customerId) {
+        return Map.of(CUSTOMER_ID, customerId);
+    }
+
+    public static String customerId(ToolContext context) {
+        if (context.getContext().get(CUSTOMER_ID) instanceof String customerId) {
+            return customerId;
+        }
+        throw new IllegalStateException("No customer in the tool context");
+    }
+}
+```
+</CodeFile>
+
+A refusal is an exception whose message the model may read, such as an unknown order number:
+
+<CodeFile title="src/main/java/com/example/support/tools/ToolRefusalException.java">
+```java
+package com.example.support.tools;
+
+/** A tool turned the request down for a reason the model may read and repeat, such as an unknown order number. */
+public class ToolRefusalException extends RuntimeException {
+
+    public ToolRefusalException(String message) {
+        super(message);
+    }
+}
+```
+</CodeFile>
+
+The tools are two methods on a component. The model sees `orderNumber` and `count`; the customer comes from the context:
+
+<CodeFile title="src/main/java/com/example/support/order/OrderTools.java">
+```java {24,26,30,32}
+package com.example.support.order;
+
+import static com.example.support.tools.CustomerToolContext.customerId;
+
+import java.util.List;
+
+import com.example.support.tools.ToolRefusalException;
+
+import org.springframework.ai.chat.model.ToolContext;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.stereotype.Component;
+
+/** Order lookups for the assistant. The customer comes from the tool context, never from the model. */
+@Component
+public class OrderTools {
+
+    private final OrderRepository orders;
+
+    public OrderTools(OrderRepository orders) {
+        this.orders = orders;
+    }
+
+    @Tool(description = "Find one of the signed-in customer's orders by its order number")
+    Order findOrder(@ToolParam(description = "The order number, such as 1042") String orderNumber, ToolContext context) {
+        return orders.findForCustomer(customerId(context), orderNumber)
+                .orElseThrow(() -> new ToolRefusalException("This customer has no order " + orderNumber + "."));
+    }
+
+    @Tool(description = "List the signed-in customer's most recent orders, newest first")
+    List<Order> recentOrders(@ToolParam(description = "How many orders to return, from 1 to 10") int count, ToolContext context) {
+        return orders.findRecentForCustomer(customerId(context), Math.clamp(count, 1, 10));
+    }
+}
+```
+</CodeFile>
+
+This processor replaces the default one. It passes refusals through and replaces every other failure with a sentence that leaks
+nothing:
+
+<CodeFile title="src/main/java/com/example/support/tools/ModelSafeToolErrors.java">
+```java {19,22}
+package com.example.support.tools;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.ai.tool.execution.ToolExecutionException;
+import org.springframework.ai.tool.execution.ToolExecutionExceptionProcessor;
+import org.springframework.stereotype.Component;
+
+/** Decides what the model reads when a tool fails. Only refusals pass through; everything else is logged and replaced. */
+@Component
+class ModelSafeToolErrors implements ToolExecutionExceptionProcessor {
+
+    private static final Logger log = LoggerFactory.getLogger(ModelSafeToolErrors.class);
+
+    @Override
+    public String process(ToolExecutionException exception) {
+        String tool = exception.getToolDefinition().name();
+        return switch (exception.getCause()) {
+            case ToolRefusalException refusal -> refusal.getMessage();
+            case RuntimeException failure -> {
+                log.error("Tool {} failed", tool, failure);
+                yield "The " + tool + " tool is unavailable right now. Say so and do not guess the answer.";
+            }
+            default -> throw exception;
+        };
+    }
+}
+```
+</CodeFile>
+
+Register the tools on the support client from Module 4:
+
+<CodeFile title="src/main/java/com/example/support/chat/SupportChatConfig.java">
+```java {24,38}
+package com.example.support.chat;
+
+import java.time.Clock;
+import java.util.List;
+
+import com.example.support.order.OrderTools;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.SafeGuardAdvisor;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+
+@Configuration(proxyBeanMethods = false)
+class SupportChatConfig {
+
+    @Bean
+    ChatClient supportChatClient(ChatClient.Builder builder, ChatMemory chatMemory,
+                                RetrievalAugmentationAdvisor knowledgeRagAdvisor, OrderTools orderTools) {
+        return builder
+                .defaultSystem("You are the support assistant for Acme Cloud.")
+                .defaultAdvisors(
+                        SafeGuardAdvisor.builder()
+                                .sensitiveWords(List.of("internal only", "api_key"))
+                                .order(Ordered.HIGHEST_PRECEDENCE + 25)
+                                .build(),
+                        new TokenBudgetAdvisor(200_000, Clock.systemUTC()),   // + 50
+                        new PiiRedactionAdvisor(),                            // + 100
+                        MessageChatMemoryAdvisor.builder(chatMemory).build(), // + 200
+                        knowledgeRagAdvisor,                                  // + 225
+                        new AnswerLanguageAdvisor(),                          // + 250
+                        new SimpleLoggerAdvisor())                            // 0
+                .defaultTools(orderTools)
+                .build();
+    }
+
+    @Bean
+    ChatClient faqChatClient(ChatClient.Builder builder, VectorStore vectorStore) {
+        return builder
+                .defaultSystem("Answer questions about Acme Cloud plans and billing.")
+                .defaultAdvisors(new PiiRedactionAdvisor(), new SemanticCacheAdvisor(vectorStore, 0.92))
+                .build();
+    }
+}
+```
+</CodeFile>
+
+The service sets the tool context and reads the finish reason. Without that check, a customer whose question hit the limit reads
+"Tool call limit (5) exceeded for tool 'findOrder'" as the answer:
+
+<CodeFile title="src/main/java/com/example/support/chat/SupportChatService.java">
+```java {38,51}
+package com.example.support.chat;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
+import java.util.UUID;
+
+import com.example.support.knowledge.KnowledgeFilters;
+import com.example.support.tools.CustomerToolContext;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.model.tool.ToolCallLimitExceededException;
+import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
+import org.springframework.stereotype.Service;
+
+@Service
+public class SupportChatService {
+
+    static final String TOOL_LIMIT_ANSWER = "I couldn't finish looking that up. A support agent will follow up in this chat.";
+
+    private static final Logger log = LoggerFactory.getLogger(SupportChatService.class);
+
+    private final ChatClient supportChatClient;
+    private final ChatMemory chatMemory;
+
+    public SupportChatService(ChatClient supportChatClient, ChatMemory chatMemory) {
+        this.supportChatClient = supportChatClient;
+        this.chatMemory = chatMemory;
+    }
+
+    public String ask(String userId, UUID chatId, String product, String question, Locale language) {
+        ChatResponse response = supportChatClient.prompt()
+                .user(question)
+                .toolContext(CustomerToolContext.of(userId))
+                .advisors(advisor -> advisor
+                        .param(ChatMemory.CONVERSATION_ID, conversationId(userId, chatId))
+                        .param(TokenBudgetAdvisor.USER_ID, userId)
+                        .param(AnswerLanguageAdvisor.LANGUAGE, language)
+                        // Replaces the retriever's default filter, so it must keep the audience condition.
+                        .param(VectorStoreDocumentRetriever.FILTER_EXPRESSION, KnowledgeFilters.customerDocuments(product)))
+                .call()
+                .chatResponse();
+        Generation answer = response == null ? null : response.getResult();
+        if (answer == null) {
+            throw new IllegalStateException("The model returned no answer");
+        }
+        if (ToolCallLimitExceededException.FINISH_REASON.equals(answer.getMetadata().getFinishReason())) {
+            log.warn("Tool call limit reached for {}: {}", userId, answer.getOutput().getText());
+            return TOOL_LIMIT_ANSWER;
+        }
+        return answer.getOutput().getText();
+    }
+
+    public void forget(String userId, UUID chatId) {
+        chatMemory.clear(conversationId(userId, chatId));
+    }
+
+    /** A UUID that only this user's chat maps to, and that fits the 36-character JDBC column. */
+    static String conversationId(String userId, UUID chatId) {
+        return UUID.nameUUIDFromBytes((userId + ":" + chatId).getBytes(StandardCharsets.UTF_8)).toString();
+    }
+}
+```
+</CodeFile>
+
+Set limits that fit your tools. The defaults allow 40 calls per tool and 150 per question, each one followed by a model call:
+
+<CodeFile
+  title="src/main/resources/application.yaml"
+  lang="yaml"
+  lines="5-8"
+  code={`spring:
+  ai:
+    tools:
+      limits:
+        max-calls-per-tool-default: 5
+        max-calls-per-tool:
+          recentOrders: 2
+        max-total-tool-calls: 12
+        # on-limit-exceeded: THROW is the default; SupportChatService checks the finish reason`}
+/>
+
+The tests call the tool methods directly, then run the real advisor against a scripted model. The model in the tests is a small
+`ChatModel` that answers from a function and records every prompt:
+
+<CodeFile title="src/test/java/com/example/support/ScriptedChatModel.java">
+```java {28}
+package com.example.support;
+
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Function;
+
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.model.tool.ToolCallingChatOptions;
+
+/** A chat model that answers from a script and records every prompt. Its options accept tools, like a real provider's. */
+public class ScriptedChatModel implements ChatModel {
+
+    private final Function<Prompt, AssistantMessage> script;
+    private final List<Prompt> prompts = new CopyOnWriteArrayList<>(); // workers call it from several threads
+
+    public ScriptedChatModel(Function<Prompt, AssistantMessage> script) {
+        this.script = script;
+    }
+
+    public static AssistantMessage toolCall(String name, String arguments) {
+        return AssistantMessage.builder()
+                .content("")
+                .toolCalls(List.of(new AssistantMessage.ToolCall("call-" + name, "function", name, arguments)))
+                .build();
+    }
+
+    @Override
+    public ChatResponse call(Prompt prompt) {
+        prompts.add(prompt);
+        return new ChatResponse(List.of(new Generation(script.apply(prompt))));
+    }
+
+    @Override
+    public ChatOptions getOptions() {
+        return ToolCallingChatOptions.builder().build();
+    }
+
+    public List<Prompt> prompts() {
+        return prompts;
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/test/java/com/example/support/order/OrderToolsTest.java">
+```java {57,65}
+package com.example.support.order;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.mock;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+
+import com.example.support.tools.CustomerToolContext;
+import com.example.support.tools.ToolRefusalException;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.model.ToolContext;
+import org.springframework.ai.support.ToolCallbacks;
+import org.springframework.ai.tool.ToolCallback;
+
+class OrderToolsTest {
+
+    private static final ToolContext ALICE = new ToolContext(CustomerToolContext.of("alice"));
+    private static final Order ORDER_1042 =
+            new Order("1042", OrderStatus.SHIPPED, new BigDecimal("59.90"), LocalDate.of(2026, 11, 2), "1Z999AA10123456784");
+
+    private final OrderRepository orders = mock(OrderRepository.class);
+    private final OrderTools tools = new OrderTools(orders);
+
+    @Test
+    void findsTheOrderOfTheCustomerInTheToolContext() {
+        given(orders.findForCustomer("alice", "1042")).willReturn(Optional.of(ORDER_1042));
+
+        assertThat(tools.findOrder("1042", ALICE)).isEqualTo(ORDER_1042);
+    }
+
+    @Test
+    void refusesAnOrderOfAnotherCustomer() {
+        given(orders.findForCustomer("alice", "2001")).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> tools.findOrder("2001", ALICE))
+                .isInstanceOf(ToolRefusalException.class)
+                .hasMessage("This customer has no order 2001.");
+    }
+
+    @Test
+    void keepsTheRequestedCountBetweenOneAndTen() {
+        given(orders.findRecentForCustomer("alice", 10)).willReturn(List.of(ORDER_1042));
+
+        assertThat(tools.recentOrders(500, ALICE)).containsExactly(ORDER_1042);
+        then(orders).should().findRecentForCustomer("alice", 10);
+    }
+
+    @Test
+    void theModelCannotChooseTheCustomer() {
+        ToolCallback findOrder = Arrays.stream(ToolCallbacks.from(tools))
+                .filter(tool -> tool.getToolDefinition().name().equals("findOrder"))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(findOrder.getToolDefinition().inputSchema())
+                .contains("\"orderNumber\"")
+                .doesNotContain("customer", "context");
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/test/java/com/example/support/tools/ModelSafeToolErrorsTest.java">
+```java {34}
+package com.example.support.tools;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.io.IOException;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.ai.tool.definition.ToolDefinition;
+import org.springframework.ai.tool.execution.ToolExecutionException;
+import org.springframework.dao.DataAccessResourceFailureException;
+
+class ModelSafeToolErrorsTest {
+
+    private static final ToolDefinition FIND_ORDER =
+            ToolDefinition.builder().name("findOrder").description("Find an order").inputSchema("{}").build();
+
+    private final ModelSafeToolErrors errors = new ModelSafeToolErrors();
+
+    @Test
+    void passesARefusalToTheModel() {
+        var exception = new ToolExecutionException(FIND_ORDER, new ToolRefusalException("This customer has no order 2001."));
+
+        assertThat(errors.process(exception)).isEqualTo("This customer has no order 2001.");
+    }
+
+    @Test
+    void hidesInfrastructureDetails() {
+        var exception = new ToolExecutionException(FIND_ORDER,
+                new DataAccessResourceFailureException("Connection to db-prod-3:5432 refused"));
+
+        assertThat(errors.process(exception))
+                .isEqualTo("The findOrder tool is unavailable right now. Say so and do not guess the answer.")
+                .doesNotContain("db-prod-3");
+    }
+
+    @Test
+    void rethrowsCheckedFailures() {
+        var exception = new ToolExecutionException(FIND_ORDER, new IOException("disk full"));
+
+        assertThatThrownBy(() -> errors.process(exception)).isSameAs(exception);
+    }
+}
+```
+</CodeFile>
+
+The first four tests come from Module 3. The last two script a model that asks for Bob's order, and one that never stops asking:
+
+<CodeFile title="src/test/java/com/example/support/chat/SupportChatServiceTest.java">
+```java {98,103,111,119}
+package com.example.support.chat;
+
+import static com.example.support.ScriptedChatModel.toolCall;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.mock;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.UUID;
+
+import com.example.support.ScriptedChatModel;
+import com.example.support.order.Order;
+import com.example.support.order.OrderRepository;
+import com.example.support.order.OrderStatus;
+import com.example.support.order.OrderTools;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.ToolCallingAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.model.tool.DefaultToolCallingManager;
+
+class SupportChatServiceTest {
+
+    private final List<Prompt> prompts = new ArrayList<>();
+    private final ChatMemory chatMemory = MessageWindowChatMemory.builder().build();
+    private final UUID chatId = UUID.fromString("0f8e2a4c-6b1d-4c3e-9a7f-5d2b8c1e4a60");
+
+    private final SupportChatService service = new SupportChatService(
+            ChatClient.builder(prompt -> {
+                        prompts.add(prompt);
+                        return new ChatResponse(List.of(new Generation(new AssistantMessage("Noted."))));
+                    })
+                    .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                    .build(),
+            chatMemory);
+
+    @Test
+    void usersWithTheSameChatIdDoNotShareAConversation() {
+        service.ask("alice", chatId, "billing", "My order number is 1042.", Locale.ENGLISH);
+        service.ask("bob", chatId, "billing", "What is my order number?", Locale.ENGLISH);
+
+        assertThat(prompts.getLast().getInstructions())
+                .extracting(Message::getText)
+                .containsExactly("What is my order number?");
+    }
+
+    @Test
+    void aUserSeesTheirOwnHistory() {
+        service.ask("alice", chatId, "billing", "My order number is 1042.", Locale.ENGLISH);
+        service.ask("alice", chatId, "billing", "What is my order number?", Locale.ENGLISH);
+
+        assertThat(prompts.getLast().getInstructions())
+                .extracting(Message::getText)
+                .containsExactly("My order number is 1042.", "Noted.", "What is my order number?");
+    }
+
+    @Test
+    void conversationIdsFitTheJdbcColumn() {
+        String id = SupportChatService.conversationId("alice.long-name@customer.example.com", chatId);
+
+        assertThat(id).hasSize(36).isEqualTo(SupportChatService.conversationId("alice.long-name@customer.example.com", chatId));
+    }
+
+    @Test
+    void forgetClearsOnlyThatUsersChat() {
+        service.ask("alice", chatId, "billing", "Hello", Locale.ENGLISH);
+        service.ask("bob", chatId, "billing", "Hello", Locale.ENGLISH);
+
+        service.forget("alice", chatId);
+
+        assertThat(chatMemory.get(SupportChatService.conversationId("alice", chatId))).isEmpty();
+        assertThat(chatMemory.get(SupportChatService.conversationId("bob", chatId))).hasSize(2);
+    }
+
+    @Test
+    void toolsLookUpTheSignedInCustomersOrders() {
+        OrderRepository orders = mock(OrderRepository.class);
+        given(orders.findForCustomer("alice", "1042")).willReturn(Optional.of(
+                new Order("1042", OrderStatus.SHIPPED, new BigDecimal("59.90"), LocalDate.of(2026, 11, 2), "1Z999AA10123456784")));
+        var model = new ScriptedChatModel(prompt -> prompt.getInstructions().getLast() instanceof ToolResponseMessage
+                ? new AssistantMessage("Order 1042 has shipped.")
+                : toolCall("findOrder", """
+                        {"orderNumber": "1042", "customerId": "bob"}"""));
+        var service = new SupportChatService(ChatClient.builder(model).defaultTools(new OrderTools(orders)).build(), chatMemory);
+
+        assertThat(service.ask("alice", chatId, "billing", "Where is order 1042?", Locale.ENGLISH))
+                .isEqualTo("Order 1042 has shipped.");
+        then(orders).should().findForCustomer("alice", "1042");
+    }
+
+    @Test
+    void stopsARunawayToolLoop() {
+        var model = new ScriptedChatModel(prompt -> toolCall("recentOrders", """
+                {"count": 5}"""));
+        var limited = ToolCallingAdvisor.builder()
+                .toolCallingManager(DefaultToolCallingManager.builder().maxCallsPerTool(3).build())
+                .build();
+        var service = new SupportChatService(
+                ChatClient.builder(model).defaultAdvisors(limited).defaultTools(new OrderTools(mock(OrderRepository.class))).build(),
+                chatMemory);
+
+        assertThat(service.ask("alice", chatId, "billing", "Show my orders", Locale.ENGLISH))
+                .isEqualTo(SupportChatService.TOOL_LIMIT_ANSWER);
+        assertThat(model.prompts()).hasSize(4);
+    }
+}
+```
+</CodeFile>
+
+## 4. Production gotchas & security
+
+<Gotcha kind="security" title="Never let the model choose whose data a tool reads">
+A `@ToolParam String customerId` is filled by the model, from anything in the conversation, including "my husband's id is bob" or
+text in a retrieved document. Take identity from the signed-in user, pass it with `.toolContext(...)`, and filter every query by
+it. A test that checks the tool's input schema for `customer` keeps it that way.
+</Gotcha>
+
+<Gotcha kind="security" title="The default processor sends exception messages to the model">
+`DefaultToolExecutionExceptionProcessor` returns the exception message as the tool result. For a JDBC failure that is your SQL,
+table and column names, and host names, and the model may repeat them to the customer. Define one
+`ToolExecutionExceptionProcessor` bean that passes only messages written for the model and logs the rest.
+</Gotcha>
+
+<Gotcha kind="reliability" title="A limit ends the loop with a technical message as the answer">
+With the default `THROW`, `.content()` returns "Tool call limit (3) exceeded for tool 'findOrder'. No further calls to this tool
+are allowed in this turn." No exception is thrown. Read the finish reason and compare it with
+`ToolCallLimitExceededException.FINISH_REASON`, as `SupportChatService` does, or the customer reads the limit message.
+</Gotcha>
+
+<Gotcha kind="cost" title="Every tool round is another full model call">
+Each round sends the whole exchange again: system prompt, memory, retrieved documents, every tool definition and every earlier
+result. The defaults of 40 calls per tool and 150 per question are far more than a support question needs. Set limits near
+what a real question takes, and keep tool results small: return a record with the fields the model needs, not the whole entity.
+</Gotcha>
+
+<Gotcha kind="cost" title="Many tools mean a long prompt on every call">
+Every tool definition goes with every model call. With dozens of tools, consider `ToolSearchToolCallingAdvisor`
+(`spring-ai-starter-tool-search-advisor`, enabled with `spring.ai.chat.client.tool-search-advisor.enabled=true`). It sends only a
+`toolSearchTool` at first, then adds the tools the model's searches find. In our test, a scripted model searched for "order" and the next
+call carried `findOrder` and `toolSearchTool`. It needs `ChatMemory.CONVERSATION_ID` on the request, and fails without it.
+</Gotcha>
+
+<Gotcha kind="security" title="Keep tools that change things out of the model's reach">
+The model calls a tool whenever the conversation makes it seem right, and the conversation can include a customer's
+instructions or a poisoned document. Read-only tools scoped to the signed-in customer are safe to expose. A tool that refunds,
+cancels or deletes should only prepare the action for the customer to confirm. Lesson 3 builds that.
+</Gotcha>
+
+<Gotcha kind="migration" title="defaultToolCallbacks is deprecated for removal">
+In 2.0, `defaultToolCallbacks(...)` and `toolCallbacks(...)` are deprecated for removal. `defaultTools(...)` and `tools(...)`
+accept `@Tool` objects, `ToolCallback`s and `ToolCallbackProvider`s, so one call registers all of them.
+</Gotcha>
+
+## Recap
+
+- `@Tool` methods are what the model may call. `ToolCallingAdvisor` (`+ 300`) runs the loop, and each round is a full model call.
+- A `ToolContext` parameter is invisible to the model. Use it for identity, and filter every query by it.
+- A `ToolExecutionExceptionProcessor` bean decides what the model reads when a tool fails. Pass only messages written for it.
+- `spring.ai.tools.limits` caps the loop. With the default `THROW`, check the finish reason `toolCallLimitExceeded` and answer with
+  your own text.
