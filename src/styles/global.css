@@ -189,16 +189,17 @@ pre:is(.shiki, .astro-code) .line.diff-changed::before {
 .copy-btn.is-done {
   @apply text-brand-700 dark:text-brand-400;
 }
-/* Wide comparison tables scroll inside the column instead of widening the page on phones. */
-.lesson-prose table {
+/* Wide comparison tables scroll inside the column instead of widening the page on phones. Sandboxes (.not-prose) lay out
+   their own tables. */
+.lesson-prose table:not(.not-prose table) {
   display: block;
   overflow-x: auto;
 }
 /* Without a floor, columns collapse to slivers on phones and rows grow very tall. The last column usually holds prose. */
-.lesson-prose :is(th, td) {
+.lesson-prose :is(th, td):not(.not-prose *) {
   min-width: 9rem;
 }
-.lesson-prose :is(th, td):last-child {
+.lesson-prose :is(th, td):last-child:not(.not-prose *) {
   min-width: 17rem;
 }
 

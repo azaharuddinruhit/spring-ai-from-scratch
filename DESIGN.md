@@ -211,7 +211,8 @@ Small UI labels are Plex.
 - Lesson pages: a sticky 18rem sidebar from lg (an off-canvas drawer below lg), an article column capped at 48rem, and an
   "On this page" list from xl. Lesson h2s get 56px of space above, a top rule, and 32px below the rule.
 - Wide tables and code scroll horizontally inside their column; the page itself never scrolls sideways. Table cells have a 9rem floor
-  and the last (prose) column 17rem, so rows stay short and the clipped column signals that the table scrolls.
+  and the last (prose) column 17rem, so rows stay short and the clipped column signals that the table scrolls. These rules skip
+  sandboxes (`.not-prose`): a sandbox table sizes its own columns and folds secondary columns into the main cell below `sm`.
 - Every page starts with a "Skip to content" link that targets `#content` on the page's `main`.
 
 ## Elevation & Depth

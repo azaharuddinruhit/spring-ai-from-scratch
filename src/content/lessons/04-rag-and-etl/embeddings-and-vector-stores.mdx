@@ -1,0 +1,407 @@
+---
+description: How EmbeddingModel turns text into vectors, how VectorStore stores and searches them on PostgreSQL with PgVector, and how to filter by metadata with Filter.Expression without leaking documents.
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import VectorSearchLab from '@/components/islands/VectorSearchLab';
+
+The previous lesson ended with `vectorStore.add(chunks)`. This one opens that call: an `EmbeddingModel` turns each chunk into a
+vector, a `VectorStore` saves it next to the text and metadata, and a search turns the question into a vector and returns the
+nearest chunks. The metadata filter on that search is where most RAG data leaks happen, so it gets the most attention.
+
+## 1. Spring mental model
+
+A vector store is a repository whose `WHERE` clause has one extra condition, "close in meaning":
+
+| Spring you know | Spring AI 2.0 | In short |
+| --- | --- | --- |
+| A Spring Data repository | `VectorStore` | `add`, `delete(ids)`, `delete(filter)`, `similaritySearch(request)` |
+| A query with `WHERE` and `LIMIT` | `SearchRequest` | `query`, `topK` (default 4), `similarityThreshold` (default 0.0, accept all), `filterExpression` |
+| The Criteria API | `Filter.Expression`, built with `FilterExpressionBuilder` | One filter syntax that each store converts to its own query language |
+| A `Converter` | `EmbeddingModel` | `embed(String)` returns a `float[]`; `dimensions()` returns its length |
+
+On PostgreSQL, `PgVectorStore` stores each chunk in one row of `vector_store`: an `id`, the `content`, the `metadata` as JSON and
+the `embedding` as `vector(n)`. A search with a filter sends this SQL, read from the 2.0.2 class:
+
+<Mermaid
+  caption="One similaritySearch on PgVectorStore. The score Spring AI returns is 1 minus the cosine distance."
+  code={`
+sequenceDiagram
+  autonumber
+  participant S as KnowledgeSearchService
+  participant V as PgVectorStore
+  participant E as EmbeddingModel
+  participant P as PostgreSQL
+  S->>V: similaritySearch(query, topK, threshold, filter)
+  V->>E: embed(query)
+  E-->>V: float[1536]
+  V->>P: SELECT ... WHERE embedding <=> ? < 1 - threshold<br/>AND metadata::jsonb @@ 'filter'::jsonpath<br/>ORDER BY distance LIMIT topK
+  P-->>V: rows with distance
+  V-->>S: Documents, score = 1 - distance
+`}
+/>
+
+The 2.0.2 BOM has 21 vector store starters, among them `spring-ai-starter-vector-store-pgvector`, `-qdrant`, `-redis`, `-oracle`,
+`-mongodb-atlas`, `-elasticsearch`, `-opensearch`, `-milvus`, `-weaviate` and `-pinecone`. Your code only sees `VectorStore`, and
+`Filter.Expression` is converted by each store, so moving between them is mostly a dependency and configuration change.
+
+For embeddings, the OpenAI starter registers an `EmbeddingModel` next to its chat model. Ollama, Mistral AI and Amazon Bedrock
+do too, Google GenAI has a separate `spring-ai-starter-model-google-genai-embedding`, and `spring-ai-starter-model-transformers`
+runs an ONNX model locally. Anthropic has no embedding model, so
+with Claude for chat you add a second provider for embeddings and set `spring.ai.model.chat=anthropic` and
+`spring.ai.model.embedding=openai` to choose which one serves which.
+
+Filters can be written as text or with the builder. The text grammar, checked against the 2.0.2 parser:
+
+- Comparisons `==`, `!=`, `>`, `>=`, `<`, `<=`, lists with `in` and `nin` (or `NOT IN`), and `&&`/`AND`/`and`, `||`/`OR`/`or`.
+  Strings take single or double quotes.
+- `AND` binds tighter than `OR`, and parentheses group.
+- `NOT` has the lowest precedence and takes everything to its right: `NOT a == 1 && b == 2` means `NOT (a == 1 && b == 2)`.
+- `!` is not an operator. The lexer skips it, so `! audience == 'STAFF'` parses as `audience == 'STAFF'`.
+- A key with a dot, such as `meta.region`, is one key named `meta.region`, not a nested field.
+
+## 2. Interactive sandbox
+
+<VectorSearchLab client:visible />
+
+Things to try:
+
+- With **no filter** and the default `topK` of 4, the staff runbooks come back for a customer's question.
+- Choose **Product by concatenation** and pick the last product value. The quote ends the string, and the rest becomes part of
+  the filter, so staff documents come back. Switch to **Product with the builder**: the value is escaped and matches nothing.
+- Choose **Builder: OR inside AND** without `b.group()`. The SQL loses the parentheses, PostgreSQL reads it as
+  `(audience == "CUSTOMER" && product == "billing") || product == "shipping"`, and a staff document comes back. We ran this
+  against PostgreSQL 17 with PgVector to confirm it.
+- Try the `NOT` and `!` presets and read the SQL: neither means what it looks like.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+Add the PgVector starter and the PostgreSQL driver. The embedding model comes from the OpenAI starter you added in Module 1:
+
+<CodeFile
+  title="build.gradle"
+  lang="groovy"
+  lines="2-3"
+  code={`dependencies {
+    implementation 'org.springframework.ai:spring-ai-starter-vector-store-pgvector'
+    runtimeOnly 'org.postgresql:postgresql'
+}`}
+/>
+
+Set the embedding model and its dimensions explicitly, and let the store create its table. The `pgvector/pgvector` Docker image
+has the extension installed:
+
+<CodeFile title="src/main/resources/application.yaml" lang="yaml">
+```yaml {10,11,14,15}
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/support
+    username: support
+    password: ${SUPPORT_DB_PASSWORD}
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      embedding:
+        model: text-embedding-3-small
+        metadata-mode: none
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        dimensions: 1536
+        distance-type: cosine-distance
+        index-type: hnsw
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: always
+```
+</CodeFile>
+
+All the metadata keys and the customer filters live in one place, built with `FilterExpressionBuilder`, so no caller assembles a
+filter string:
+
+<CodeFile title="src/main/java/com/example/support/knowledge/KnowledgeFilters.java">
+```java {21,26}
+package com.example.support.knowledge;
+
+import org.springframework.ai.vectorstore.filter.Filter;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+
+/** The metadata keys on every knowledge chunk, and the filters customer-facing searches must use. */
+public final class KnowledgeFilters {
+
+    public static final String SOURCE = "source";
+    public static final String PRODUCT = "product";
+    public static final String AUDIENCE = "audience";
+    public static final String REVISION = "revision";
+
+    private static final FilterExpressionBuilder FILTER = new FilterExpressionBuilder();
+
+    private KnowledgeFilters() {
+    }
+
+    /** Every document a customer may read. */
+    public static Filter.Expression customerDocuments() {
+        return FILTER.eq(AUDIENCE, Audience.CUSTOMER.name()).build();
+    }
+
+    /** The customer documents about one product. Values are escaped, so user input can't change the filter. */
+    public static Filter.Expression customerDocuments(String product) {
+        return FILTER.and(FILTER.eq(AUDIENCE, Audience.CUSTOMER.name()), FILTER.eq(PRODUCT, product)).build();
+    }
+}
+```
+</CodeFile>
+
+The search service backs the help center's search box. It needs no chat model, only embeddings:
+
+<CodeFile title="src/main/java/com/example/support/knowledge/KnowledgeSearchService.java">
+```java {15,28}
+package com.example.support.knowledge;
+
+import java.util.List;
+
+import org.springframework.ai.document.Document;
+import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.stereotype.Service;
+
+@Service
+public class KnowledgeSearchService {
+
+    private static final int TOP_K = 5;
+    private static final double MIN_SIMILARITY = 0.5; // calibrated for text-embedding-3-small; re-check if the model changes
+
+    private final VectorStore vectorStore;
+
+    public KnowledgeSearchService(VectorStore vectorStore) {
+        this.vectorStore = vectorStore;
+    }
+
+    public List<KnowledgeHit> search(String query, String product) {
+        return vectorStore.similaritySearch(SearchRequest.builder()
+                        .query(query)
+                        .topK(TOP_K)
+                        .similarityThreshold(MIN_SIMILARITY)
+                        .filterExpression(KnowledgeFilters.customerDocuments(product))
+                        .build())
+                .stream()
+                .map(KnowledgeSearchService::toHit)
+                .toList();
+    }
+
+    private static KnowledgeHit toHit(Document chunk) {
+        return new KnowledgeHit(
+                (String) chunk.getMetadata().get(KnowledgeFilters.SOURCE),
+                (Integer) chunk.getMetadata().get(PagePdfDocumentReader.METADATA_START_PAGE_NUMBER),
+                chunk.getScore(),
+                chunk.getText());
+    }
+
+    /** One search result. {@code page} is null for sources without pages, such as Markdown. */
+    public record KnowledgeHit(String source, Integer page, Double score, String text) {
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/knowledge/KnowledgeSearchController.java">
+```java {24,25}
+package com.example.support.knowledge;
+
+import java.util.List;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+import com.example.support.knowledge.KnowledgeSearchService.KnowledgeHit;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+class KnowledgeSearchController {
+
+    private final KnowledgeSearchService searchService;
+
+    KnowledgeSearchController(KnowledgeSearchService searchService) {
+        this.searchService = searchService;
+    }
+
+    @GetMapping("/api/knowledge/search")
+    List<KnowledgeHit> search(@RequestParam @NotBlank @Size(max = 500) String q,
+                              @RequestParam @NotBlank @Size(max = 50) String product) {
+        return searchService.search(q, product);
+    }
+}
+```
+</CodeFile>
+
+The tests use `SimpleVectorStore` with the keyword embedding model from the previous lesson. The last one checks the SQL itself,
+because `SimpleVectorStore` evaluates filters differently from PostgreSQL:
+
+<CodeFile title="src/test/java/com/example/support/knowledge/KnowledgeSearchServiceTest.java">
+```java {35,40}
+package com.example.support.knowledge;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.List;
+import java.util.Map;
+
+import com.example.support.knowledge.KnowledgeSearchService.KnowledgeHit;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SimpleVectorStore;
+import org.springframework.ai.vectorstore.pgvector.PgVectorFilterExpressionConverter;
+
+class KnowledgeSearchServiceTest {
+
+    private final SimpleVectorStore vectorStore = SimpleVectorStore.builder(new KeywordEmbeddingModel()).build();
+    private final KnowledgeSearchService search = new KnowledgeSearchService(vectorStore);
+
+    KnowledgeSearchServiceTest() {
+        vectorStore.add(List.of(
+                chunk("Refunds take 5 business days.", "billing", Audience.CUSTOMER),
+                chunk("Refunds over 500 USD need a manager override in the admin console.", "billing", Audience.STAFF),
+                chunk("Refunds for lost parcels take 10 business days.", "shipping", Audience.CUSTOMER)));
+    }
+
+    @Test
+    void findsOnlyCustomerDocumentsForTheProduct() {
+        assertThat(search.search("How many days do refunds take?", "billing"))
+                .extracting(KnowledgeHit::text)
+                .containsExactly("Refunds take 5 business days.");
+    }
+
+    @Test
+    void userInputCannotWidenTheFilter() {
+        assertThat(search.search("refunds override", "billing' || audience == 'STAFF")).isEmpty();
+    }
+
+    @Test
+    void theFilterIsEscapedInTheSqlToo() {
+        String sql = new PgVectorFilterExpressionConverter()
+                .convertExpression(KnowledgeFilters.customerDocuments("billing' || audience == 'STAFF"));
+
+        assertThat(sql).isEqualTo("metadata::jsonb @@ "
+                + "'$.\"audience\" == \"CUSTOMER\" && $.\"product\" == \"billing'' || audience == ''STAFF\"'::jsonpath");
+    }
+
+    private static Document chunk(String text, String product, Audience audience) {
+        return new Document(text, Map.of(
+                KnowledgeFilters.SOURCE, product + ".md",
+                KnowledgeFilters.PRODUCT, product,
+                KnowledgeFilters.AUDIENCE, audience.name()));
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/test/java/com/example/support/knowledge/KnowledgeSearchControllerTest.java">
+```java {17,41}
+package com.example.support.knowledge;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
+
+import java.util.List;
+
+import com.example.support.knowledge.KnowledgeSearchService.KnowledgeHit;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.http.HttpStatus;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.assertj.MockMvcTester;
+
+@WebMvcTest(KnowledgeSearchController.class)
+class KnowledgeSearchControllerTest {
+
+    @Autowired
+    private MockMvcTester mvc;
+
+    @MockitoBean
+    private KnowledgeSearchService searchService;
+
+    @Test
+    void returnsTheHits() {
+        given(searchService.search("refund time", "billing"))
+                .willReturn(List.of(new KnowledgeHit("billing-handbook.pdf", 4, 0.82, "Refunds take 5 business days.")));
+
+        assertThat(mvc.get().uri("/api/knowledge/search?q={q}&product={p}", "refund time", "billing"))
+                .hasStatusOk()
+                .bodyJson()
+                .isLenientlyEqualTo("""
+                        [{"source": "billing-handbook.pdf", "page": 4, "score": 0.82, "text": "Refunds take 5 business days."}]
+                        """);
+    }
+
+    @Test
+    void rejectsABlankQuery() {
+        assertThat(mvc.get().uri("/api/knowledge/search?q= &product=billing")).hasStatus(HttpStatus.BAD_REQUEST);
+    }
+}
+```
+</CodeFile>
+
+One more change, to Module 3. The semantic cache stores its entries in the same `VectorStore`, so its search now filters on
+`kind == 'semantic-cache'` and its entries carry that tag. Without it, a cache lookup could return a knowledge chunk as the
+"cached answer". The Module 3 code has been updated.
+
+## 4. Production gotchas & security
+
+<Gotcha kind="security" title="Never build a filter string from user input">
+`"product == '" + product + "'"` lets a caller close the string and add `|| audience == 'STAFF'`, which the parser accepts. The
+filter is then turned into SQL text, not a bind parameter. Build filters with `FilterExpressionBuilder`: the converter escapes
+values, so a quote in the input stays inside the value.
+</Gotcha>
+
+<Gotcha kind="security" title="An OR inside an AND needs b.group()">
+`b.and(b.eq("audience", "CUSTOMER"), b.or(b.eq("product", "billing"), b.eq("product", "shipping")))` becomes
+`... && $.product == "billing" || $.product == "shipping"` in PgVector's SQL, and PostgreSQL returns every shipping document,
+staff ones included. `SimpleVectorStore` evaluates the expression tree instead, so tests against it pass. Wrap the inner `or` in
+`b.group(...)`, or use `b.in("product", "billing", "shipping")`, which the converter wraps for you.
+</Gotcha>
+
+<Gotcha kind="reliability" title="NOT and ! don't mean what they look like">
+In the text syntax `NOT` takes everything to its right, so `NOT audience == 'STAFF' && product == 'billing'` becomes
+`audience != 'STAFF' || product != 'billing'`. A lone `!` is skipped by the lexer, which only prints a "token recognition error"
+to standard error, so `! audience == 'STAFF'` selects the staff documents. Use parentheses with `NOT`, and `!=` for one key.
+</Gotcha>
+
+<Gotcha kind="reliability" title="Set the dimensions yourself">
+Without `dimensions`, `PgVectorStore` embeds the string "Test String" at startup to measure the model, which is an API call on
+every boot. If that call fails, it logs a warning and uses 1536. PgVector's HNSW index takes at most 2,000 dimensions, so
+`text-embedding-3-large` (3,072) fails at startup with "column cannot have more than 2000 dimensions for hnsw index": set
+`spring.ai.openai.embedding.dimensions: 1536` to shorten its vectors, or use a smaller model.
+</Gotcha>
+
+<Gotcha kind="reliability" title="OpenAI embeds the metadata with the text">
+`OpenAiEmbeddingModel` sends `getFormattedContent(MetadataMode.EMBED)`: every metadata key and value on a line above the chunk,
+including `parent_document_id` UUIDs and the ingestion revision. Those strings shift the vectors and make chunks of the same file
+look alike. Set `spring.ai.openai.embedding.metadata-mode: none` and filter on metadata instead.
+</Gotcha>
+
+<Gotcha kind="migration" title="A new embedding model means re-embedding everything">
+Vectors from different models, or different dimensions, can't be compared, and the `vector(1536)` column only accepts one size.
+Changing the model means a new table and a full re-ingest. Score ranges differ between models too, so recalibrate every
+`similarityThreshold` on real questions.
+</Gotcha>
+
+## Recap
+
+- `EmbeddingModel` turns text into a `float[]`; `VectorStore` stores chunks with their vectors and searches with `SearchRequest`
+  (`topK` 4 and threshold 0.0 by default).
+- `PgVectorStore` searches with `embedding <=> ? < 1 - threshold` plus the filter as a jsonpath, and returns `1 - distance` as
+  the score.
+- Build filters with `FilterExpressionBuilder` from server-side values, group an `or` inside an `and`, and never concatenate user
+  input into a filter string.
+- Set the embedding model, `dimensions` and `initialize-schema` explicitly, and turn off metadata embedding.

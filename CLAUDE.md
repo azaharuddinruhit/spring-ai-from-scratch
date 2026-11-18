@@ -40,6 +40,10 @@ There are no unit tests. `npm run build` is the gate.
   the code palette).
 - Islands live in `src/components/islands/` and share `LabFrame`, `Pill` and `CodeView`. Code an island shows that is static per variant is
   highlighted at build time in an Astro wrapper (see `ProviderSwitcherLab.astro`), so islands don't ship Shiki.
+- `src/lib/` holds exact TypeScript ports used by the Module 4 labs: `token-text-splitter.ts` (`TokenTextSplitter.doSplit`, with
+  `js-tiktoken` cl100k_base loaded by dynamic import so only that lab fetches the 1 MB rank table) and `vector-filter.ts` (the
+  `Filter.Expression` text parser, `PgVectorFilterExpressionConverter` and a jsonpath evaluator with PostgreSQL semantics). Both
+  were diffed against the 2.0.2 classes (and the evaluator against PostgreSQL 17) with zero differences; re-check them on upgrade.
 - The site is deployed under the `/spring-ai-from-scratch` base path. Build internal links with `withBase()` / `lessonHref()` from `src/lib/course.ts`.
 - Dark mode is a `dark` class on `<html>`. Shiki uses dual themes through CSS variables in `src/styles/global.css`.
 
@@ -74,6 +78,22 @@ starter auto-configures it over `InMemoryChatMemoryRepository`; a missing conver
 `spring.ai.chat.memory.repository.jdbc.initialize-schema` defaults to `embedded`; `VectorStoreChatMemoryAdvisor` lives in
 `spring-ai-vector-store-advisor` (top-K 20, order `+ 200`); there is no `PromptChatMemoryAdvisor` in 2.0.2.
 `AdvisorChainLab`, `GuardrailLab` and `ChatMemoryLab` simulate exactly these rules; update them together with the lessons.
+RAG and ETL (verified by running the 2.0.2 classes, filters also on PostgreSQL 17 with PgVector): `TokenTextSplitter` defaults are
+800 / 350 / 5 / 10000 / keepSeparator true, its constructors are deprecated (use the builder), `keepSeparator(false)` replaces
+`System.lineSeparator()`, and chunks get `parent_document_id`, `chunk_index` and `total_chunks`; `PagePdfDocumentReader` keeps the
+layout spaces and `ExtractedTextFormatter` needs `overrideLineSeparator("
+")` on Windows; `MarkdownDocumentReader` splits code
+blocks and blockquotes into their own documents by default; `Document` ids are random, so re-ingesting duplicates (the lesson tags
+a revision, adds, then deletes the old revision); `OpenAiEmbeddingModel` embeds metadata unless `metadata-mode: none`;
+`PgVectorStore` `initialize-schema` defaults to false, embeds "Test String" at startup without `dimensions`, and HNSW fails above
+2000 dimensions; filter text: AND binds tighter than OR, `NOT` takes everything to its right, a lone `!` is skipped by the lexer;
+the builder's `and(x, or(y, z))` loses its parentheses in PgVector SQL unless wrapped in `group()`, and builder values are escaped
+while concatenated text is injectable. `RetrievalAugmentationAdvisor` defaults to order 0 (the lesson uses `+ 225`, after memory and
+before tools); a request's `FILTER_EXPRESSION` replaces the retriever's filter; `ContextualQueryAugmenter` replaces the question
+with a refusal instruction when no documents come back unless `allowEmptyContext(true)`; `MultiQueryExpander` falls back to the
+original query when the line count is wrong, and a duplicate query throws `IllegalStateException: Duplicate key`; the semantic cache
+from Module 3 tags its entries `kind: semantic-cache` and filters on it because it shares the knowledge base's store.
+`TextSplitterLab`, `VectorSearchLab` and `RagPipelineLab` simulate these rules (their scores and model replies are invented).
 
 MDX pitfall: `{` and `<` in prose are parsed as JSX. Put generics and braces inside backticks.
 

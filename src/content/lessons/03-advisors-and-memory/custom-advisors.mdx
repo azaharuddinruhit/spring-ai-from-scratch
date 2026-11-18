@@ -209,10 +209,11 @@ class SupportChatErrorHandler {
 
 A semantic cache answers without the model. It searches a vector store for an earlier question that means the same thing and
 returns the stored answer as the response. It only caches a first question: a follow-up such as "and the other one?" depends on
-the history, so another conversation's answer can't fit it.
+the history, so another conversation's answer can't fit it. Its entries carry `kind: semantic-cache` and its search filters on
+that, so it never matches other documents in the same store, such as the knowledge base from Module 4.
 
 <CodeFile title="src/main/java/com/example/support/chat/SemanticCacheAdvisor.java">
-```java {44,51,55,63}
+```java {47,54,55,59,67}
 package com.example.support.chat;
 
 import java.util.List;
@@ -228,12 +229,15 @@ import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.core.Ordered;
 
 /** Answers a first question with the stored answer to a similar one, without calling the model. */
 public final class SemanticCacheAdvisor implements CallAdvisor {
 
     private static final String ANSWER = "answer";
+    private static final String KIND = "kind";
+    private static final String CACHE_ENTRY = "semantic-cache"; // keeps cache entries apart from other documents
 
     private final VectorStore vectorStore;
     private final double similarityThreshold;
@@ -264,6 +268,7 @@ public final class SemanticCacheAdvisor implements CallAdvisor {
                 .query(question)
                 .topK(1)
                 .similarityThreshold(similarityThreshold)
+                .filterExpression(new FilterExpressionBuilder().eq(KIND, CACHE_ENTRY).build())
                 .build());
         if (!hits.isEmpty()) {
             var cached = new AssistantMessage((String) hits.getFirst().getMetadata().get(ANSWER));
@@ -275,7 +280,7 @@ public final class SemanticCacheAdvisor implements CallAdvisor {
         ChatClientResponse response = chain.nextCall(request);
         String answer = response.chatResponse().getResult().getOutput().getText();
         if (answer != null && !answer.isBlank()) {
-            vectorStore.add(List.of(new Document(question, Map.of(ANSWER, answer))));
+            vectorStore.add(List.of(new Document(question, Map.of(KIND, CACHE_ENTRY, ANSWER, answer))));
         }
         return response;
     }

@@ -1,0 +1,373 @@
+---
+description: Load PDFs and Markdown with Spring AI's DocumentReaders, split them with TokenTextSplitter, enrich the chunks, and write them to a VectorStore so that re-running the job replaces a file instead of duplicating it.
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import TextSplitterLab from '@/components/islands/TextSplitterLab';
+
+Retrieval-augmented generation answers from your documents, so the first job is getting those documents into a form a
+model can search: small pieces of text, each stored with a vector and some metadata. Spring AI calls this the ETL pipeline,
+and it is three functional interfaces you already know the shape of.
+
+## 1. Spring mental model
+
+If you have written a Spring Batch job, you have written this pipeline:
+
+| Spring Batch | Spring AI 2.0 | Java type |
+| --- | --- | --- |
+| `ItemReader` | `DocumentReader` | `Supplier<List<Document>>` |
+| `ItemProcessor` | `DocumentTransformer` | `Function<List<Document>, List<Document>>` |
+| `ItemWriter` | `DocumentWriter` (every `VectorStore` is one) | `Consumer<List<Document>>` |
+
+A `Document` is a piece of text, a `Map<String, Object>` of metadata, an id and, after a search, a score. Readers create one
+`Document` per page, section or file; transformers split and annotate them; the writer embeds and stores them.
+
+<Mermaid
+  caption="Ingesting one PDF. Each step is a plain Java object you can call yourself or wire into a scheduled job."
+  code={`
+flowchart LR
+  R["Resource<br/>billing-handbook.pdf"] --> P["PagePdfDocumentReader<br/>one Document per page"]
+  P --> S["TokenTextSplitter<br/>chunks of at most N tokens"]
+  S --> E["KeywordMetadataEnricher<br/>optional: one chat call per chunk"]
+  E --> V["VectorStore.add<br/>EmbeddingModel, then INSERT"]
+`}
+/>
+
+These readers ship in 2.0.2. Each is its own artifact, except the two in `spring-ai-commons`, which every model starter brings in:
+
+| Reader | Artifact | One `Document` per | Metadata it adds |
+| --- | --- | --- | --- |
+| `PagePdfDocumentReader` | `spring-ai-pdf-document-reader` | page, or `pagesPerDocument` pages | `page_number`, `end_page_number`, `file_name` |
+| `MarkdownDocumentReader` | `spring-ai-markdown-document-reader` | section under a heading | `category`, `title`, `lang` |
+| `TikaDocumentReader` | `spring-ai-tika-document-reader` | file (DOCX, PPTX, HTML and others) | `source` |
+| `JsonReader`, `TextReader` | `spring-ai-commons` | array element, or file | the keys you choose; `charset`, `source` |
+
+`PdfDocumentReaderConfig.builder().addPageRange(2, 3)` reads only those pages, one-based and inclusive, and you can add several
+ranges. A page range with `withPagesPerDocument(2)` never joins pages across a gap: pages 2 and 3 become one `Document` and page
+5 becomes another.
+
+The transformer you always need is `TokenTextSplitter`. These are its rules, from the 2.0.2 source:
+
+- It encodes the text with the `cl100k_base` tokenizer and takes `chunkSize` tokens (default 800).
+- If more text follows, it cuts after the last `.`, `?`, `!` or line break in that window, but only if that mark comes after
+  character `minChunkSizeChars` (default 350). Otherwise it cuts at the token limit, even mid-word.
+- With `keepSeparator(false)` it replaces `System.lineSeparator()` with a space: `\n` on Linux, `\r\n` on Windows.
+- It drops chunks of 5 characters or fewer (`minChunkLengthToEmbed`).
+- Every chunk gets a new random id and a copy of the parent's metadata, plus `parent_document_id`, `chunk_index` and
+  `total_chunks`.
+
+Two transformers add metadata by asking the chat model: `KeywordMetadataEnricher` writes `excerpt_keywords`, and
+`SummaryMetadataEnricher` writes `section_summary` (and optionally the previous and next sections' summaries). Both make one chat
+call per document.
+
+## 2. Interactive sandbox
+
+<TextSplitterLab client:visible />
+
+Things to try:
+
+- With the refund policy at `chunkSize` 100, the chunks end at sentence ends. Raise `minChunkSizeChars` to 600: 100 tokens
+  are only about 450 characters here, so no punctuation qualifies and every chunk is cut at the token limit, mid-sentence.
+- Pick **A PDF page, as read**. It is the exact text `PagePdfDocumentReader` returned for a page of a generated handbook with the
+  default config: 1,508 characters for about 300 characters of words, the rest layout spaces, plus the running header and the
+  page footer. Look at the token count, then imagine that header in every chunk of a 300-page handbook.
+- Set `keepSeparator` to `false` and watch the line breaks (↵) turn into spaces.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+Add the readers you need. The `VectorStore` comes from the next lesson; the tests here use `SimpleVectorStore`, which lives in
+memory.
+
+<CodeFile
+  title="build.gradle"
+  lang="groovy"
+  lines="2-3"
+  code={`dependencies {
+    implementation 'org.springframework.ai:spring-ai-pdf-document-reader'
+    implementation 'org.springframework.ai:spring-ai-markdown-document-reader'
+}`}
+/>
+
+The ingestion service reads a file, splits it, tags every chunk and writes the chunks. Two decisions in it matter in production.
+The PDF formatter strips the layout, the header and the footer before splitting. And each run tags its chunks with a new
+revision, stores them, and only then deletes the file's older chunks, so a failed run leaves the previous version searchable:
+
+<CodeFile title="src/main/java/com/example/support/knowledge/KnowledgeIngestionService.java">
+```java {31,34,39,64,68,76}
+package com.example.support.knowledge;
+
+import static com.example.support.knowledge.KnowledgeFilters.AUDIENCE;
+import static com.example.support.knowledge.KnowledgeFilters.PRODUCT;
+import static com.example.support.knowledge.KnowledgeFilters.REVISION;
+import static com.example.support.knowledge.KnowledgeFilters.SOURCE;
+
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import org.springframework.ai.document.Document;
+import org.springframework.ai.document.DocumentReader;
+import org.springframework.ai.reader.ExtractedTextFormatter;
+import org.springframework.ai.reader.markdown.MarkdownDocumentReader;
+import org.springframework.ai.reader.markdown.config.MarkdownDocumentReaderConfig;
+import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
+import org.springframework.ai.reader.pdf.config.PdfDocumentReaderConfig;
+import org.springframework.ai.transformer.splitter.TokenTextSplitter;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+import org.springframework.core.io.Resource;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+@Service
+public class KnowledgeIngestionService {
+
+    private static final PdfDocumentReaderConfig PDF = PdfDocumentReaderConfig.builder()
+            .withPageExtractedTextFormatter(ExtractedTextFormatter.builder()
+                    .withLeftAlignment(true)
+                    .withNumberOfTopTextLinesToDelete(1)    // the running header
+                    .withNumberOfBottomTextLinesToDelete(2) // the page footer and the blank line after it
+                    .overrideLineSeparator("\n")            // PDFBox always uses \n, on Windows too
+                    .build())
+            .build();
+
+    private static final MarkdownDocumentReaderConfig MARKDOWN = MarkdownDocumentReaderConfig.builder()
+            .withIncludeCodeBlock(true) // keep code with the text that explains it
+            .build();
+
+    private final TokenTextSplitter splitter = TokenTextSplitter.builder()
+            .withChunkSize(400)
+            .withMinChunkSizeChars(200)
+            .build();
+
+    private final VectorStore vectorStore;
+
+    public KnowledgeIngestionService(VectorStore vectorStore) {
+        this.vectorStore = vectorStore;
+    }
+
+    /** Reads, splits and stores one file, replacing the chunks of its previous version. Returns the chunk count. */
+    public int ingest(Resource file, String product, Audience audience) {
+        String source = file.getFilename();
+        String revision = UUID.randomUUID().toString();
+
+        List<Document> chunks = splitter.split(readerFor(file).read());
+        chunks.forEach(chunk -> chunk.getMetadata().putAll(Map.of(
+                SOURCE, source,
+                PRODUCT, product,
+                AUDIENCE, audience.name(),
+                REVISION, revision)));
+        vectorStore.add(chunks);
+
+        // Only after the new chunks are stored: if embedding fails, the old version stays searchable.
+        var filter = new FilterExpressionBuilder();
+        vectorStore.delete(filter.and(filter.eq(SOURCE, source), filter.ne(REVISION, revision)).build());
+        return chunks.size();
+    }
+
+    private static DocumentReader readerFor(Resource file) {
+        return switch (StringUtils.getFilenameExtension(file.getFilename())) {
+            case "pdf" -> new PagePdfDocumentReader(file, PDF);
+            case "md" -> new MarkdownDocumentReader(file, MARKDOWN);
+            case null, default -> throw new IllegalArgumentException("Unsupported knowledge file: " + file.getFilename());
+        };
+    }
+}
+```
+</CodeFile>
+
+Who may read a document is part of its metadata. The next lesson filters on it, together with the key names, which live in
+`KnowledgeFilters`:
+
+<CodeFile title="src/main/java/com/example/support/knowledge/Audience.java">
+```java
+package com.example.support.knowledge;
+
+/** Who may read a knowledge document. Stored on every chunk as the {@code audience} metadata value. */
+public enum Audience {
+    CUSTOMER,
+    STAFF
+}
+```
+</CodeFile>
+
+Call `ingest` from wherever new documents arrive: an admin upload endpoint behind Spring Security, a scheduled job that scans a
+bucket, or a message listener. It blocks while the chunks are embedded, so keep it off the request path for large files.
+
+The test needs an embedding model. A small deterministic one, where texts that share words get similar vectors, keeps the test
+fast and offline:
+
+<CodeFile title="src/test/java/com/example/support/knowledge/KeywordEmbeddingModel.java">
+```java {32}
+package com.example.support.knowledge;
+
+import java.util.List;
+import java.util.Locale;
+import java.util.stream.IntStream;
+
+import org.springframework.ai.document.Document;
+import org.springframework.ai.embedding.Embedding;
+import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.embedding.EmbeddingRequest;
+import org.springframework.ai.embedding.EmbeddingResponse;
+
+/** A deterministic stand-in for a real embedding model: texts that share words get similar vectors. */
+class KeywordEmbeddingModel implements EmbeddingModel {
+
+    private static final int DIMENSIONS = 256;
+
+    @Override
+    public EmbeddingResponse call(EmbeddingRequest request) {
+        List<String> texts = request.getInstructions();
+        return new EmbeddingResponse(IntStream.range(0, texts.size())
+                .mapToObj(i -> new Embedding(embed(texts.get(i)), i))
+                .toList());
+    }
+
+    @Override
+    public float[] embed(Document document) {
+        return embed(document.getText());
+    }
+
+    @Override
+    public float[] embed(String text) {
+        float[] vector = new float[DIMENSIONS];
+        for (String word : text.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+")) {
+            if (word.length() > 2) {
+                vector[Math.floorMod(stem(word).hashCode(), DIMENSIONS)] += 1;
+            }
+        }
+        return vector;
+    }
+
+    private static String stem(String word) {
+        return word.endsWith("s") ? word.substring(0, word.length() - 1) : word;
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/test/java/com/example/support/knowledge/KnowledgeIngestionServiceTest.java">
+```java {43,47}
+package com.example.support.knowledge;
+
+import static com.example.support.knowledge.KnowledgeFilters.AUDIENCE;
+import static com.example.support.knowledge.KnowledgeFilters.PRODUCT;
+import static com.example.support.knowledge.KnowledgeFilters.SOURCE;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.SimpleVectorStore;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+
+class KnowledgeIngestionServiceTest {
+
+    private final SimpleVectorStore vectorStore = SimpleVectorStore.builder(new KeywordEmbeddingModel()).build();
+    private final KnowledgeIngestionService ingestion = new KnowledgeIngestionService(vectorStore);
+
+    @Test
+    void tagsEveryChunkWithItsSourceProductAndAudience() {
+        int chunks = ingestion.ingest(file("refunds.md", """
+                # Refunds
+
+                Refunds take 5 business days.
+
+                ## Gift cards
+
+                Gift cards can't be refunded.
+                """), "billing", Audience.CUSTOMER);
+
+        assertThat(allChunks()).hasSize(chunks).isNotEmpty().allSatisfy(chunk -> assertThat(chunk.getMetadata())
+                .containsEntry(SOURCE, "refunds.md")
+                .containsEntry(PRODUCT, "billing")
+                .containsEntry(AUDIENCE, "CUSTOMER"));
+    }
+
+    @Test
+    void reIngestingAFileReplacesItsOldChunks() {
+        ingestion.ingest(file("refunds.md", "# Refunds\n\nRefunds take 30 days.\n"), "billing", Audience.CUSTOMER);
+        ingestion.ingest(file("refunds.md", "# Refunds\n\nRefunds take 5 business days.\n"), "billing", Audience.CUSTOMER);
+
+        assertThat(allChunks()).extracting(Document::getText).containsExactly("Refunds take 5 business days.");
+    }
+
+    @Test
+    void rejectsFilesItCannotRead() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> ingestion.ingest(file("refunds.docx", "..."), "billing", Audience.CUSTOMER))
+                .withMessage("Unsupported knowledge file: refunds.docx");
+    }
+
+    private List<Document> allChunks() {
+        return vectorStore.similaritySearch(SearchRequest.builder().query("refunds").topK(100).build());
+    }
+
+    private static Resource file(String name, String content) {
+        return new ByteArrayResource(content.getBytes(StandardCharsets.UTF_8)) {
+            @Override
+            public String getFilename() {
+                return name;
+            }
+        };
+    }
+}
+```
+</CodeFile>
+
+## 4. Production gotchas & security
+
+<Gotcha kind="reliability" title="Running ingestion twice stores every chunk twice">
+`Document` ids are random UUIDs, and `VectorStore.add` upserts by id, so a second run inserts a second copy of everything and
+searches return duplicates. Tag chunks with their source and delete the old ones. Store the new chunks first and delete the
+old revision after, as the service does: deleting first leaves nothing searchable if the embedding call then fails.
+</Gotcha>
+
+<Gotcha kind="cost" title="A PDF page brings its layout, header and footer">
+`PagePdfDocumentReader` keeps the page layout: a test page with about 300 characters of words came back as 1,508 characters,
+padded with spaces that the splitter counts as tokens. Running headers and page footers repeat in every chunk. Use `ExtractedTextFormatter` with
+`withLeftAlignment(true)` and delete the header and footer lines. The extracted text ends with a blank line, so a one-line footer
+needs `withNumberOfBottomTextLinesToDelete(2)`.
+</Gotcha>
+
+<Gotcha kind="reliability" title="Header and footer removal does nothing on Windows">
+`ExtractedTextFormatter` finds lines with `System.lineSeparator()`, which is `\r\n` on Windows, but PDFBox always returns `\n`.
+On a Windows laptop no line is deleted, and the same code works on the Linux server. Call `overrideLineSeparator("\n")` so it
+behaves the same everywhere.
+</Gotcha>
+
+<Gotcha kind="reliability" title="Markdown code blocks become documents of their own">
+By default `MarkdownDocumentReader` turns each fenced code block into a separate `Document` with `category: code_block`, away from
+the text that explains it, and it does the same with blockquotes. A blockquote's text is also joined to the next paragraph with
+no space ("A quoted tip.After the rule."). Use `withIncludeCodeBlock(true)` and `withIncludeBlockquote(true)` to keep them with
+their section.
+</Gotcha>
+
+<Gotcha kind="cost" title="Enrichers make one chat call per chunk">
+`KeywordMetadataEnricher` and `SummaryMetadataEnricher` call the chat model once for every document they get, so enriching after
+splitting 10,000 chunks makes 10,000 calls on every run. Run them before splitting, on whole sections, or only on new files. Note
+that `KeywordMetadataEnricher.builder(model).build()` without `keywordCount(...)` throws `IllegalArgumentException`.
+</Gotcha>
+
+<Gotcha kind="migration" title="The TokenTextSplitter constructors are deprecated">
+The 1.x constructors, such as `new TokenTextSplitter(800, 350, 5, 10000, true)`, are deprecated for removal since 2.0.0-M3.
+Use `TokenTextSplitter.builder()` with `withChunkSize`, `withMinChunkSizeChars`, `withKeepSeparator` and the other `with...`
+methods.
+</Gotcha>
+
+## Recap
+
+- The ETL pipeline is `DocumentReader` (a `Supplier`), `DocumentTransformer` (a `Function`) and `DocumentWriter` (a `Consumer`),
+  and a `VectorStore` is a writer.
+- `TokenTextSplitter` cuts at `chunkSize` tokens, preferring the last punctuation after `minChunkSizeChars`, and adds
+  `parent_document_id`, `chunk_index` and `total_chunks` to every chunk.
+- Clean PDF text before splitting: left-align it and remove headers and footers, with `overrideLineSeparator("\n")`.
+- Make ingestion repeatable: tag chunks with their source and a revision, store the new chunks, then delete the old ones.
