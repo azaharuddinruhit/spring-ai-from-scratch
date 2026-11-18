@@ -51,6 +51,9 @@ There are no unit tests. `npm run build` is the gate.
   `Filter.Expression` text parser, `PgVectorFilterExpressionConverter` and a jsonpath evaluator with PostgreSQL semantics). Both
   were diffed against the 2.0.2 classes (and the evaluator against PostgreSQL 17) with zero differences; re-check them on upgrade.
 - The site is deployed under the `/spring-ai-from-scratch` base path. Build internal links with `withBase()` / `lessonHref()` from `src/lib/course.ts`.
+- Phones: zoom is off by the owner's decision (viewport `user-scalable=no`, `touch-action: pan-x pan-y` on `html, body`, and an inline
+  `gesturestart` handler in `BaseLayout.astro` for Safari). Don't turn it back on unasked. Inline code wraps (`overflow-wrap: anywhere`)
+  so nothing widens the page; check new pages at 320px and 390px for horizontal overflow.
 - Dark mode is a `dark` class on `<html>`. Shiki uses dual themes through CSS variables in `src/styles/global.css`.
 
 ## Product and design
@@ -120,6 +123,7 @@ driver can't bind an enum or an `Instant`, so `JdbcClient.paramSource(record)` f
 Module 5 lesson code lives in `lesson-src/module-5/code` (63 tests; `lesson1/`, `lesson2/` hold the earlier versions of files the later
 lessons change). Lessons are generated from `lesson-src/module-5/templates/*.mdx` with `python lesson-src/module-5/assemble.py <template> <out> lesson-src/module-5/code`,
 which turns `@@CODE file | regex; regex@@` lines into fenced code with those lines highlighted. Edit the template, not the MDX.
+`lesson-src/module-5/run-tests.sh` compiles that code and runs its tests (it needs a local `cp.arg` classpath; see its header).
 
 MDX pitfall: `{` and `<` in prose are parsed as JSX. Put generics and braces inside backticks.
 

@@ -3,11 +3,11 @@
 An interactive course for Java and Spring Boot developers who want to build production AI applications with Spring AI. It runs from
 the first `ChatClient` call to a multi-tenant, tool-calling, RAG-backed assistant.
 
-Every lesson has four parts:
+Every lesson has four parts, then a short recap:
 
 1. **Spring mental model.** The abstraction is mapped to Spring primitives you already know, with a Mermaid diagram of the request lifecycle.
 2. **Interactive sandbox.** A deterministic simulation that runs in the browser, with no backend and no API keys.
-3. **Idiomatic code.** Copy-pasteable Java, `application.yml` and `build.gradle` (Groovy DSL) files.
+3. **Idiomatic code.** Copy-pasteable Java, `application.yaml` and `build.gradle` (Groovy DSL) files, with their tests.
 4. **Production gotchas.** Reliability, security, cost and migration pitfalls, and how to avoid them.
 
 ## Stack taught in the lessons
@@ -56,7 +56,11 @@ src/
   components/islands/       React sandboxes (client-side simulations)
   components/               Astro components: HeroTrace (home), Mermaid, CodeFile, Gotcha, layout pieces
   layouts/                  base and lesson layouts
+lesson-src/module-5/        Module 5 lesson sources: the verified Java code and tests, MDX templates, findings and probes
 ```
+
+The Module 5 lessons are generated from `lesson-src/module-5/templates/` so their code is exactly the code that compiled and
+passed its tests; see [`lesson-src/module-5/README.md`](lesson-src/module-5/README.md).
 
 A lesson goes live when its MDX file exists at the path that matches its entry in `curriculum.ts`. Until then it appears as "soon" in the navigation.
 
