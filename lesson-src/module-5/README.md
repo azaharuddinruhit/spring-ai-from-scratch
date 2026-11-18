@@ -15,4 +15,6 @@ The three Module 5 lessons are published. This folder holds what they are genera
   Edit the template, then regenerate the MDX.
 - `findings.md` — every verified 2.0.2 fact, with the probe that showed it (summarised in CLAUDE.md).
 - `probes/` — the programs that produced the findings. `RepoProbe` ran the order and refund repositories against PostgreSQL 17.
-  `run5.sh` and `pom.xml` built them; they need a classpath file, `cp5.arg`, from `mvn dependency:build-classpath`.
+  Their classpath comes from `pom.xml`.
+- `run-tests.sh` compiles `code/main` and `code/test` and runs the 63 tests. It needs `cp.arg`, the classpath of `pom.xml`; the
+  script's header shows how to write it. Build output (`out/`) and `cp.arg` are ignored.

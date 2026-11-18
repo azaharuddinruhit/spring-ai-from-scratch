@@ -17,3 +17,9 @@ npm-debug.log*
 .vscode/
 .DS_Store
 Thumbs.db
+
+# lesson code build output and local classpath
+lesson-src/*/out/
+lesson-src/*/cp.arg
+lesson-src/*/cp.txt
+*.class

@@ -1,5 +1,8 @@
 # Module 5 findings (verified by running 2.0.2 classes unless marked "source")
 
+The probes ran in a scratch folder (`tool-probe/`), so paths below use that layout: `tool-probe/l5` is now `code/`, and the
+probe sources are in `probes/`.
+
 ## MCP (probes: tool-probe/p/mcpprobe/McpProbe.java, McpSecurityProbe.java, StdioProbe.java)
 - WebMVC server without `spring.ai.mcp.server.protocol` starts the SSE transport (EnabledSseServerCondition matchIfMissing=true,
   Streamable matchIfMissing=false), although McpServerProperties declares STREAMABLE. A streamable-http client then fails startup with
@@ -66,23 +69,13 @@
 - Server test (ShipmentToolsMcpTest): no scope -> isError with "Access Denied"; bad token -> client initialize fails with
   "Authorization error when sending message". `httpRequestCustomizer` deprecated: use addHttpRequestCustomizer.
 
-## Progress (2026-11-18)
-- Lesson code DONE in tool-probe/l5 (58 tests pass via tool-probe/run5.sh):
-  L1 tools: order/{Order,OrderStatus,OrderRepository,OrderTools}, tools/{CustomerToolContext,ToolRefusalException,ModelSafeToolErrors},
-     chat/SupportChatService (toolContext + toolCallLimitExceeded), chat/SupportChatConfig (defaultTools).
-  L2 MCP: shipping/{ShippingMcpApplication,Shipment,ShipmentRepository,ShipmentTools,McpSecurityConfig} + ShipmentToolsMcpTest;
-     support/mcp/{McpClientConfig,SupportMcpProperties,BestEffortToolCallbacks}; support/security/SecurityConfig;
-     yaml/support-application.yaml (binding verified by p5/.../YamlProbe.java); shipping yaml = config/application.properties values.
-  L3 workflows: refund/* (propose via tool, confirm via POST /api/refunds/{id}/confirmation), ticket/* (routing + evaluator-optimizer).
-- Site: reading time per section shipped (1.3.8). Module 5 branch module-5-tools-mcp == main (df30085).
-- NEXT: labs (ToolLoopLab, McpLab, WorkflowLab), three MDX lessons, docs, build, screenshots, ask before merge/bump 1.4/deploy.
+## Later findings
 - VERIFIED: @McpPrompt returning String or List<String> -> PromptMessage role ASSISTANT (AbstractMcpPromptMethodCallback
   .convertToGetPromptResult). Return PromptMessage.builder(Role.USER, TextContent.builder(text).build()).build() for instructions.
   ReadResourceRequest(String)/GetPromptRequest(String,Map) constructors deprecated: use .builder(...).
 - L2 shipping server now also has ShippingGuides (@McpResource shipping://policies/delivery text/markdown, @McpPrompt explain-delay).
 - L3 TicketReplyService reworked: planner (orchestrator) -> Plan(issues<=MAX_ISSUES 4) -> department writers in parallel on virtual
   threads (routing + workers) -> editor merges (if >1) -> reviewer/editor loop MAX_ROUNDS 3. 62 tests pass.
-- NEXT: labs + MDX.
 - VERIFIED (p/tsprobe/ToolSearchProbe.java): ToolSearchToolCallingAdvisor (spring-ai-tool-search-advisor; Boot: starter
   spring-ai-starter-tool-search-advisor + spring.ai.chat.client.tool-search-advisor.enabled=true, tool-index-type regex default |
   lucene | vector, max-results, replaces the ToolCallingAdvisor.Builder bean). Tools sent per model call:
@@ -96,3 +89,6 @@
   No further tool calls are allowed."). RETURN_ERROR_RESPONSE: model gets that text as the tool response and continues.
   -1 disables a limit; excluded-tools list. throw-exception-on-error default false.
 - Added refund/RefundConfig (Clock bean): RefundService needs a Clock. PaymentClient has no implementation (learner's provider).
+- VERIFIED on PostgreSQL 17 (probes/RepoProbe.java): OrderRepository and RefundRepository work; the driver cannot bind an enum or
+  an Instant (`Can't infer the SQL type`), so `paramSource(refund)` failed; RefundRepository binds `.name()` and `OffsetDateTime`.
+  `UPDATE ... WHERE status = 'PENDING'` returns 1 then 0 for a second confirmation.
