@@ -21,7 +21,8 @@ const ogImage = new URL(withBase('og.png'), Astro.site).href;
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Zoom is off by the owner's choice (DESIGN.md). iOS ignores user-scalable, so global.css and the script below cover Safari. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <meta name="description" content={description} />
     <title>{pageTitle}</title>
     <link rel="canonical" href={canonical} />
@@ -53,6 +54,8 @@ const ogImage = new URL(withBase('og.png'), Astro.site).href;
         const dark = stored ? stored === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
         document.documentElement.classList.toggle('dark', dark);
       })();
+      // Safari's pinch gesture, which touch-action alone doesn't stop on older iOS.
+      document.addEventListener('gesturestart', (event) => event.preventDefault(), { passive: false });
     </script>
   </head>
   <body class="min-h-screen">

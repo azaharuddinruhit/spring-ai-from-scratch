@@ -60,6 +60,13 @@ html {
   accent-color: var(--focus-ring);
 }
 
+/* Zoom is off by the owner's choice (DESIGN.md): scrolling works in both directions, pinch and double-tap zoom don't.
+   This is what stops pinch-zoom on iOS, which ignores user-scalable=no in the viewport tag. */
+html,
+body {
+  touch-action: pan-x pan-y;
+}
+
 @layer base {
   /* Every scroller (page, sidebar, tables, diagrams, sandboxes) gets a thin scrollbar in the theme's slate. */
   html,
