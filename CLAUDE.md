@@ -117,8 +117,8 @@ added to `ChatClient` automatically; the default `ToolContextToMcpMetaConverter`
 an ASSISTANT message; STDIO servers need `stdio=true`, no web app, no banner and an empty console log pattern. JDBC: the PostgreSQL
 driver can't bind an enum or an `Instant`, so `JdbcClient.paramSource(record)` fails; bind `.name()` and `OffsetDateTime`.
 `ToolLoopLab`, `McpLab`, `RefundApprovalLab` and `TicketWorkflowLab` simulate these rules (model replies invented).
-Module 5 lesson code lives in `wip/module-5/code` (63 tests; `lesson1/`, `lesson2/` hold the earlier versions of files the later
-lessons change). Lessons are generated from `wip/module-5/templates/*.mdx` with `python wip/module-5/assemble.py <template> <out> wip/module-5/code`,
+Module 5 lesson code lives in `lesson-src/module-5/code` (63 tests; `lesson1/`, `lesson2/` hold the earlier versions of files the later
+lessons change). Lessons are generated from `lesson-src/module-5/templates/*.mdx` with `python lesson-src/module-5/assemble.py <template> <out> lesson-src/module-5/code`,
 which turns `@@CODE file | regex; regex@@` lines into fenced code with those lines highlighted. Edit the template, not the MDX.
 
 MDX pitfall: `{` and `<` in prose are parsed as JSX. Put generics and braces inside backticks.

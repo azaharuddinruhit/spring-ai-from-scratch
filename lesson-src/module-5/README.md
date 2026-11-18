@@ -8,8 +8,8 @@ The three Module 5 lessons are published. This folder holds what they are genera
   highlighted:
 
   ```bash
-  python wip/module-5/assemble.py wip/module-5/templates/tool-calling.mdx \
-    src/content/lessons/05-tools-mcp-agents/tool-calling.mdx wip/module-5/code
+  python lesson-src/module-5/assemble.py lesson-src/module-5/templates/tool-calling.mdx \
+    src/content/lessons/05-tools-mcp-agents/tool-calling.mdx lesson-src/module-5/code
   ```
 
   Edit the template, then regenerate the MDX.
