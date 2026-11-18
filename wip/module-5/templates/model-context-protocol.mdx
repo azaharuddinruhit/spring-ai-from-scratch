@@ -1,0 +1,332 @@
+---
+description: Build a Spring AI MCP server with @McpTool, @McpResource and @McpPrompt over Streamable HTTP, secure it with OAuth2 scopes, and connect the support assistant to it with a tool allow-list, no leaked tool context and a token for each server.
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import McpLab from '@/components/islands/McpLab';
+
+The order tools from the last lesson live in the support app. Parcel tracking doesn't: the shipping team owns it, in its own
+service. The Model Context Protocol (MCP) lets that team publish its tools once, and any MCP client can use them. That includes
+our support assistant, an IDE or a desktop chat app. This lesson builds both sides: the shipping MCP server, and the support app
+as its client.
+
+## 1. Spring mental model
+
+MCP does for tools what JDBC does for databases. It is one protocol, and either side can be swapped. A server offers three kinds of
+things:
+
+| Server offers | Annotation (2.0.2) | Who uses it |
+| --- | --- | --- |
+| Tools: functions with a JSON schema | `@McpTool`, `@McpToolParam` | The model, through `ChatClient`, like any `@Tool` |
+| Resources: documents addressed by a URI | `@McpResource` | The client application, which chooses what to attach |
+| Prompts: message templates with arguments | `@McpPrompt`, `@McpArg` | The client application or its user |
+
+The messages are JSON-RPC. Over Streamable HTTP, the client sends every message as a `POST` to one endpoint, `/mcp`. STDIO is the
+other transport: the client starts the server as a child process and talks through its standard input and output. The client
+connects at startup, lists the server's tools once and caches them. When the model asks for one of them, the client sends a
+`tools/call` request.
+
+<Mermaid
+  caption="The support app starts, then answers one tracking question. Tokens come from the login server and are reused until they expire."
+  code={`
+sequenceDiagram
+  participant S as Support app
+  participant L as Login server
+  participant M as Shipping MCP server
+  S->>L: client_credentials, scope mcp shipments.read
+  L-->>S: access token
+  S->>M: POST /mcp initialize
+  M-->>S: capabilities, server info
+  S->>M: POST /mcp tools/list
+  M-->>S: track_shipment, reroute_shipment
+  Note over S: McpToolFilter keeps track_shipment
+  S->>M: POST /mcp tools/call track_shipment
+  M-->>S: shipment as JSON text
+`}
+/>
+
+These rules come from the 2.0.2 classes and from tests we ran against them:
+
+- A WebMVC server without `spring.ai.mcp.server.protocol` starts the old SSE transport, which serves `/sse` and `/mcp/message`. A
+  Streamable HTTP client then gets a `404` for `POST /mcp`, and with `initialized: true` (the default) the client app fails to start.
+- `@McpTool` annotation hints default to `readOnlyHint = false`, `destructiveHint = true`, `idempotentHint = false` and
+  `openWorldHint = true`. They describe the tool to clients; they don't enforce anything.
+- `@PreAuthorize` works on an `@McpTool` method with `@EnableMethodSecurity`. A token without the scope still lists the tool, but
+  calling it returns a result with `isError` and the text "Access Denied".
+- A missing or rejected token fails the client's `initialize` with `McpHttpClientTransportAuthorizationException`.
+- MCP tools are not added to `ChatClient` for you. Pass the auto-configured `SyncMcpToolCallbackProvider` to `defaultTools`.
+- The default `ToolContextToMcpMetaConverter` copies the whole `ToolContext` into each call's `_meta`, so the server receives
+  our customer id. `ToolContextToMcpMetaConverter.noOp()` sends `{}`.
+- An `McpToolFilter` bean decides which listed tools reach `ChatClient`. When two connections offer a tool with the same name, the
+  second one is renamed `alt_1_<name>`, with a warning.
+- An `@McpPrompt` method that returns a `String` reaches the client as an `ASSISTANT` message. Return a `PromptMessage` with
+  `Role.USER` for an instruction.
+
+## 2. Interactive sandbox
+
+<McpLab client:visible />
+
+Things to try:
+
+- Set the shipping server's protocol to **Not set**. The server starts SSE, the client's first `POST /mcp` gets a `404`, and the
+  support app doesn't start.
+- Pick the scope **mcp** alone. The connection works and the tools are listed, but the call fails with "Access Denied", because
+  `@PreAuthorize` on the tool needs `shipments.read`.
+- Switch the tool filter to **None**. The shipping team's new `reroute_shipment` reaches the model.
+- Switch `_meta` to **Default**. The shipping server now receives Alice's customer id with every call.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+### The shipping server
+
+The shipping server is its own Boot project, made like the one in Module 1, with these dependencies:
+
+<CodeFile
+  title="build.gradle"
+  lang="groovy"
+  lines="3,4"
+  code={`dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.ai:spring-ai-starter-mcp-server-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    runtimeOnly 'org.postgresql:postgresql'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+}`}
+/>
+
+Set the protocol. Without it, the server starts SSE, and Streamable HTTP clients get a `404`:
+
+<CodeFile
+  title="src/main/resources/application.yaml"
+  lang="yaml"
+  lines="8"
+  code={`spring:
+  application:
+    name: shipping
+  ai:
+    mcp:
+      server:
+        name: shipping
+        protocol: STREAMABLE   # the WebMVC default is SSE
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://login.example.com
+  datasource:
+    url: jdbc:postgresql://localhost:5432/shipping
+    username: shipping
+    password: \${SHIPPING_DB_PASSWORD}`}
+/>
+
+The application class and the data are plain Spring:
+
+<CodeFile title="src/main/java/com/example/shipping/ShippingMcpApplication.java">
+@@CODE main/com/example/shipping/ShippingMcpApplication.java@@
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/shipping/Shipment.java">
+@@CODE main/com/example/shipping/Shipment.java@@
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/shipping/ShipmentRepository.java">
+@@CODE main/com/example/shipping/ShipmentRepository.java@@
+</CodeFile>
+
+The tool states its hints, because the defaults describe a destructive tool, and requires the read scope:
+
+<CodeFile title="src/main/java/com/example/shipping/ShipmentTools.java">
+@@CODE main/com/example/shipping/ShipmentTools.java | @McpTool\(; annotations = ; @PreAuthorize@@
+</CodeFile>
+
+A resource and a prompt sit next to it. The prompt returns a `USER` message, because a plain `String` would arrive as an
+`ASSISTANT` message:
+
+<CodeFile title="src/main/java/com/example/shipping/ShippingGuides.java">
+@@CODE main/com/example/shipping/ShippingGuides.java | @McpResource\(; @McpPrompt\(; Role\.USER@@
+</CodeFile>
+
+Every request to `/mcp` needs a token with the `mcp` scope. Each tool then checks its own scope:
+
+<CodeFile title="src/main/java/com/example/shipping/McpSecurityConfig.java">
+@@CODE main/com/example/shipping/McpSecurityConfig.java | @EnableMethodSecurity; hasAuthority\("SCOPE_mcp"\)@@
+</CodeFile>
+
+The test starts the server on a random port and connects a real MCP client. It mocks only the repository and the JWT decoder:
+
+<CodeFile title="src/test/java/com/example/shipping/ShippingMcpServerTest.java">
+@@CODE test/com/example/shipping/ShippingMcpServerTest.java | Role\.USER; contains\("Access Denied"\); Authorization error when sending message@@
+</CodeFile>
+
+### The support app as a client
+
+Add the MCP client and OAuth2. The OAuth2 client brings Spring Security, so the support app now needs its own security
+configuration too:
+
+<CodeFile
+  title="build.gradle"
+  lang="groovy"
+  lines="2-5"
+  code={`dependencies {
+    implementation 'org.springframework.ai:spring-ai-starter-mcp-client'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+}`}
+/>
+
+The connection and the OAuth2 registration share the name `shipping`, and the customizer below uses that to match them. The
+allow-list lists the tools we reviewed:
+
+<CodeFile
+  title="src/main/resources/application.yaml"
+  lang="yaml"
+  lines="12,16,22,37"
+  code={`spring:
+  ai:
+    tools:
+      limits:
+        max-calls-per-tool-default: 5
+        max-calls-per-tool:
+          recentOrders: 2
+        max-total-tool-calls: 12
+    mcp:
+      client:
+        type: SYNC
+        initialized: false     # start even when an MCP server is down
+        request-timeout: 5s
+        streamable-http:
+          connections:
+            shipping:
+              url: https://shipping-mcp.internal.example.com
+  security:
+    oauth2:
+      client:
+        registration:
+          shipping:            # same name as the MCP connection: its token goes only there
+            provider: acme-login
+            client-id: support-assistant
+            client-secret: \${SHIPPING_MCP_CLIENT_SECRET}
+            authorization-grant-type: client_credentials
+            scope: mcp,shipments.read
+        provider:
+          acme-login:
+            token-uri: https://login.example.com/oauth2/token
+      resourceserver:
+        jwt:
+          issuer-uri: https://login.example.com
+
+support:
+  mcp:
+    allowed-tools: track_shipment`}
+/>
+
+<CodeFile title="src/main/java/com/example/support/mcp/SupportMcpProperties.java">
+@@CODE main/com/example/support/mcp/SupportMcpProperties.java | @NotEmpty@@
+</CodeFile>
+
+Three beans configure the client: no tool context in `_meta`, the allow-list, and a token for each server that has a
+registration. Boot doesn't define an `OAuth2AuthorizedClientManager` bean, so the configuration defines one that works outside a
+web request:
+
+<CodeFile title="src/main/java/com/example/support/mcp/McpClientConfig.java">
+@@CODE main/com/example/support/mcp/McpClientConfig.java | ToolContextToMcpMetaConverter\.noOp; allowedTools\(\)\.contains; addHttpRequestCustomizer; new AuthorizedClientServiceOAuth2AuthorizedClientManager@@
+</CodeFile>
+
+With `initialized: false`, the app starts while the shipping server is down, but `ChatClient` asks the provider for its tools on
+every request, and the provider throws. Every chat would fail, including chats that don't need shipping. This wrapper answers
+without the MCP tools instead:
+
+<CodeFile title="src/main/java/com/example/support/mcp/BestEffortToolCallbacks.java">
+@@CODE main/com/example/support/mcp/BestEffortToolCallbacks.java | return new ToolCallback\[0\]@@
+</CodeFile>
+
+Register the MCP tools next to the order tools:
+
+<CodeFile title="src/main/java/com/example/support/chat/SupportChatConfig.java">
+@@CODE lesson2/SupportChatConfig.java | SyncMcpToolCallbackProvider mcpTools\); defaultTools@@
+</CodeFile>
+
+A failed token request isn't something the model can fix, so `ModelSafeToolErrors` rethrows it, as Spring AI's default processor
+does:
+
+<CodeFile title="src/main/java/com/example/support/tools/ModelSafeToolErrors.java">
+@@CODE main/com/example/support/tools/ModelSafeToolErrors.java | case ClientAuthorizationException@@
+</CodeFile>
+
+The support app's own API now checks the customer's JWT. The `Principal` the controller reads is the token's subject:
+
+<CodeFile title="src/main/java/com/example/support/security/SecurityConfig.java">
+@@CODE main/com/example/support/security/SecurityConfig.java | anyRequest\(\)\.authenticated; jwt\(@@
+</CodeFile>
+
+The Module 3 controller test now imports that configuration and sends a JWT instead of a plain principal:
+
+<CodeFile title="src/test/java/com/example/support/chat/SupportChatControllerTest.java">
+@@CODE test/com/example/support/chat/SupportChatControllerTest.java | @Import\(SecurityConfig; \.with\(jwt\(\)\.jwt\(token -> token\.subject\("alice"\)\)\)$@@
+</CodeFile>
+
+<CodeFile title="src/test/java/com/example/support/mcp/BestEffortToolCallbacksTest.java">
+@@CODE test/com/example/support/mcp/BestEffortToolCallbacksTest.java | isEmpty\(\)@@
+</CodeFile>
+
+## 4. Production gotchas & security
+
+<Gotcha kind="reliability" title="A WebMVC MCP server starts SSE unless you set the protocol">
+`McpServerProperties` declares `STREAMABLE`, but the WebMVC auto-configuration starts the SSE transport when
+`spring.ai.mcp.server.protocol` is missing. Streamable HTTP clients then get a `404` for `POST /mcp`. Set `protocol: STREAMABLE`
+on the server, and test it with a real client, as `ShippingMcpServerTest` does.
+</Gotcha>
+
+<Gotcha kind="security" title="The default converter sends your tool context to every MCP server">
+`ToolContext` holds what the model must not see, such as the customer id, and the default `ToolContextToMcpMetaConverter`
+copies all of it into `_meta` on every `tools/call`. In our test, a tenant API key in the tool context reached the server this
+way. Define `ToolContextToMcpMetaConverter.noOp()`, and pass a server what it needs as a tool argument it declares.
+</Gotcha>
+
+<Gotcha kind="security" title="A server can add tools without asking you">
+The client lists whatever the server offers, and the model may call all of it. A tool that the server team adds next week reaches
+your assistant on the next restart, with a description you never read. Keep an `McpToolFilter` allow-list of reviewed tools.
+Annotation hints such as `readOnlyHint` are claims made by the server, not checks.
+</Gotcha>
+
+<Gotcha kind="security" title="Give each server its own token">
+A global `McpSyncHttpClientRequestCustomizer` adds its header to every connection. In our test, one header reached two servers, so
+a token for one server would be sent to every other. Use an `McpClientCustomizer<HttpClientStreamableHttpTransport.Builder>`,
+which gets the connection name, and request a client-credentials token per server with only the scopes that server needs.
+</Gotcha>
+
+<Gotcha kind="reliability" title="A server that is down breaks startup, or every chat">
+With `initialized: true` (the default), the client app doesn't start while a server is down or rejects the token. With
+`initialized: false`, it starts, but every chat request fails, because `ChatClient` asks the tool provider for its tools on each
+request. Wrap the provider so that it answers without those tools, and let `ModelSafeToolErrors` handle a server that fails
+during a call.
+</Gotcha>
+
+<Gotcha kind="security" title="Tool descriptions and results are prompt text">
+The model reads every tool's description and every result. A server you don't control can put instructions into either. Connect
+only to servers you trust, keep the allow-list short, and treat what they return like retrieved documents: untrusted input.
+</Gotcha>
+
+<Gotcha kind="reliability" title="A STDIO server must keep its standard output clean">
+Over STDIO, every line the server prints is read as a protocol message. The Boot banner and console logs break the connection:
+the client logs "Error processing inbound message" and times out at startup. Set `spring.ai.mcp.server.stdio=true`,
+`spring.main.web-application-type=none`, `spring.main.banner-mode=off` and an empty `logging.pattern.console`.
+</Gotcha>
+
+<Gotcha kind="migration" title="Deprecated in 2.0">
+On the transport builder, `httpRequestCustomizer` is deprecated: use `addHttpRequestCustomizer`. The `ReadResourceRequest(String)`
+and `GetPromptRequest(String, Map)` constructors are deprecated: use their `builder(...)` methods. SSE is the older transport;
+new servers should use Streamable HTTP.
+</Gotcha>
+
+## Recap
+
+- An MCP server offers tools, resources and prompts. Spring AI builds them from `@McpTool`, `@McpResource` and `@McpPrompt`.
+- A WebMVC server needs `protocol: STREAMABLE`. Secure `/mcp` with a scope, and each tool with `@PreAuthorize`.
+- On the client, pass `SyncMcpToolCallbackProvider` to `defaultTools`, filter the tools, send no tool context, and give each server
+  its own token.
+- Plan for a server that is down: at startup with `initialized`, and on every request with a provider that answers without it.

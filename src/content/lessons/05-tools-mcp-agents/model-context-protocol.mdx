@@ -1,0 +1,937 @@
+---
+description: Build a Spring AI MCP server with @McpTool, @McpResource and @McpPrompt over Streamable HTTP, secure it with OAuth2 scopes, and connect the support assistant to it with a tool allow-list, no leaked tool context and a token for each server.
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import McpLab from '@/components/islands/McpLab';
+
+The order tools from the last lesson live in the support app. Parcel tracking doesn't: the shipping team owns it, in its own
+service. The Model Context Protocol (MCP) lets that team publish its tools once, and any MCP client can use them. That includes
+our support assistant, an IDE or a desktop chat app. This lesson builds both sides: the shipping MCP server, and the support app
+as its client.
+
+## 1. Spring mental model
+
+MCP does for tools what JDBC does for databases. It is one protocol, and either side can be swapped. A server offers three kinds of
+things:
+
+| Server offers | Annotation (2.0.2) | Who uses it |
+| --- | --- | --- |
+| Tools: functions with a JSON schema | `@McpTool`, `@McpToolParam` | The model, through `ChatClient`, like any `@Tool` |
+| Resources: documents addressed by a URI | `@McpResource` | The client application, which chooses what to attach |
+| Prompts: message templates with arguments | `@McpPrompt`, `@McpArg` | The client application or its user |
+
+The messages are JSON-RPC. Over Streamable HTTP, the client sends every message as a `POST` to one endpoint, `/mcp`. STDIO is the
+other transport: the client starts the server as a child process and talks through its standard input and output. The client
+connects at startup, lists the server's tools once and caches them. When the model asks for one of them, the client sends a
+`tools/call` request.
+
+<Mermaid
+  caption="The support app starts, then answers one tracking question. Tokens come from the login server and are reused until they expire."
+  code={`
+sequenceDiagram
+  participant S as Support app
+  participant L as Login server
+  participant M as Shipping MCP server
+  S->>L: client_credentials, scope mcp shipments.read
+  L-->>S: access token
+  S->>M: POST /mcp initialize
+  M-->>S: capabilities, server info
+  S->>M: POST /mcp tools/list
+  M-->>S: track_shipment, reroute_shipment
+  Note over S: McpToolFilter keeps track_shipment
+  S->>M: POST /mcp tools/call track_shipment
+  M-->>S: shipment as JSON text
+`}
+/>
+
+These rules come from the 2.0.2 classes and from tests we ran against them:
+
+- A WebMVC server without `spring.ai.mcp.server.protocol` starts the old SSE transport, which serves `/sse` and `/mcp/message`. A
+  Streamable HTTP client then gets a `404` for `POST /mcp`, and with `initialized: true` (the default) the client app fails to start.
+- `@McpTool` annotation hints default to `readOnlyHint = false`, `destructiveHint = true`, `idempotentHint = false` and
+  `openWorldHint = true`. They describe the tool to clients; they don't enforce anything.
+- `@PreAuthorize` works on an `@McpTool` method with `@EnableMethodSecurity`. A token without the scope still lists the tool, but
+  calling it returns a result with `isError` and the text "Access Denied".
+- A missing or rejected token fails the client's `initialize` with `McpHttpClientTransportAuthorizationException`.
+- MCP tools are not added to `ChatClient` for you. Pass the auto-configured `SyncMcpToolCallbackProvider` to `defaultTools`.
+- The default `ToolContextToMcpMetaConverter` copies the whole `ToolContext` into each call's `_meta`, so the server receives
+  our customer id. `ToolContextToMcpMetaConverter.noOp()` sends `{}`.
+- An `McpToolFilter` bean decides which listed tools reach `ChatClient`. When two connections offer a tool with the same name, the
+  second one is renamed `alt_1_<name>`, with a warning.
+- An `@McpPrompt` method that returns a `String` reaches the client as an `ASSISTANT` message. Return a `PromptMessage` with
+  `Role.USER` for an instruction.
+
+## 2. Interactive sandbox
+
+<McpLab client:visible />
+
+Things to try:
+
+- Set the shipping server's protocol to **Not set**. The server starts SSE, the client's first `POST /mcp` gets a `404`, and the
+  support app doesn't start.
+- Pick the scope **mcp** alone. The connection works and the tools are listed, but the call fails with "Access Denied", because
+  `@PreAuthorize` on the tool needs `shipments.read`.
+- Switch the tool filter to **None**. The shipping team's new `reroute_shipment` reaches the model.
+- Switch `_meta` to **Default**. The shipping server now receives Alice's customer id with every call.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+### The shipping server
+
+The shipping server is its own Boot project, made like the one in Module 1, with these dependencies:
+
+<CodeFile
+  title="build.gradle"
+  lang="groovy"
+  lines="3,4"
+  code={`dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.ai:spring-ai-starter-mcp-server-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    runtimeOnly 'org.postgresql:postgresql'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+}`}
+/>
+
+Set the protocol. Without it, the server starts SSE, and Streamable HTTP clients get a `404`:
+
+<CodeFile
+  title="src/main/resources/application.yaml"
+  lang="yaml"
+  lines="8"
+  code={`spring:
+  application:
+    name: shipping
+  ai:
+    mcp:
+      server:
+        name: shipping
+        protocol: STREAMABLE   # the WebMVC default is SSE
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://login.example.com
+  datasource:
+    url: jdbc:postgresql://localhost:5432/shipping
+    username: shipping
+    password: \${SHIPPING_DB_PASSWORD}`}
+/>
+
+The application class and the data are plain Spring:
+
+<CodeFile title="src/main/java/com/example/shipping/ShippingMcpApplication.java">
+```java
+package com.example.shipping;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class ShippingMcpApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(ShippingMcpApplication.class, args);
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/shipping/Shipment.java">
+```java
+package com.example.shipping;
+
+import java.time.Instant;
+import java.time.LocalDate;
+
+public record Shipment(String trackingNumber, String carrier, String status, String lastScan, Instant lastScanAt,
+                       LocalDate estimatedDelivery) {
+}
+```
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/shipping/ShipmentRepository.java">
+```java
+package com.example.shipping;
+
+import java.util.Optional;
+
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class ShipmentRepository {
+
+    private final JdbcClient jdbc;
+
+    ShipmentRepository(JdbcClient jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    public Optional<Shipment> findByTrackingNumber(String trackingNumber) {
+        return jdbc.sql("""
+                        SELECT tracking_number, carrier, status, last_scan, last_scan_at, estimated_delivery
+                        FROM shipments WHERE tracking_number = :trackingNumber""")
+                .param("trackingNumber", trackingNumber)
+                .query(Shipment.class)
+                .optional();
+    }
+}
+```
+</CodeFile>
+
+The tool states its hints, because the defaults describe a destructive tool, and requires the read scope:
+
+<CodeFile title="src/main/java/com/example/shipping/ShipmentTools.java">
+```java {18,19,20}
+package com.example.shipping;
+
+import org.springframework.ai.mcp.annotation.McpTool;
+import org.springframework.ai.mcp.annotation.McpTool.McpAnnotations;
+import org.springframework.ai.mcp.annotation.McpToolParam;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Component;
+
+@Component
+public class ShipmentTools {
+
+    private final ShipmentRepository shipments;
+
+    ShipmentTools(ShipmentRepository shipments) {
+        this.shipments = shipments;
+    }
+
+    @McpTool(name = "track_shipment", description = "Current status, last scan and estimated delivery of a parcel",
+            annotations = @McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = false))
+    @PreAuthorize("hasAuthority('SCOPE_shipments.read')")
+    public Shipment trackShipment(
+            @McpToolParam(description = "The carrier tracking number, such as 1Z999AA10123456784") String trackingNumber) {
+        return shipments.findByTrackingNumber(trackingNumber)
+                .orElseThrow(() -> new IllegalArgumentException("No shipment with tracking number " + trackingNumber));
+    }
+}
+```
+</CodeFile>
+
+A resource and a prompt sit next to it. The prompt returns a `USER` message, because a plain `String` would arrive as an
+`ASSISTANT` message:
+
+<CodeFile title="src/main/java/com/example/shipping/ShippingGuides.java">
+```java {28,34,47}
+package com.example.shipping;
+
+import io.modelcontextprotocol.spec.McpSchema.PromptMessage;
+import io.modelcontextprotocol.spec.McpSchema.Role;
+import io.modelcontextprotocol.spec.McpSchema.TextContent;
+
+import org.springframework.ai.mcp.annotation.McpArg;
+import org.springframework.ai.mcp.annotation.McpPrompt;
+import org.springframework.ai.mcp.annotation.McpResource;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Component;
+
+/** Read-only context for the client: a document it can attach (resource) and a ready-made instruction (prompt). */
+@Component
+public class ShippingGuides {
+
+    static final String DELIVERY_POLICY = """
+            # Delivery policy
+            A parcel is late one business day after its estimated delivery date.
+            A parcel is lost when it has had no scan for 10 business days; the customer then gets a replacement.""";
+
+    private final ShipmentRepository shipments;
+
+    ShippingGuides(ShipmentRepository shipments) {
+        this.shipments = shipments;
+    }
+
+    @McpResource(uri = "shipping://policies/delivery", name = "delivery-policy", mimeType = "text/markdown",
+            description = "When a parcel counts as late or lost, and what the customer gets")
+    public String deliveryPolicy() {
+        return DELIVERY_POLICY;
+    }
+
+    @McpPrompt(name = "explain-delay", description = "Explain to a customer why their parcel is late")
+    @PreAuthorize("hasAuthority('SCOPE_shipments.read')")
+    public PromptMessage explainDelay(
+            @McpArg(name = "trackingNumber", description = "The carrier tracking number", required = true) String trackingNumber) {
+        Shipment shipment = shipments.findByTrackingNumber(trackingNumber)
+                .orElseThrow(() -> new IllegalArgumentException("No shipment with tracking number " + trackingNumber));
+        // A plain String would reach the client as an ASSISTANT message; an instruction belongs in a USER message.
+        String instruction = """
+                Explain to the customer, in three sentences, where parcel %s is and when it should arrive. \
+                It is %s, last scanned at %s on %s, and expected on %s. Follow the delivery policy below.
+
+                %s""".formatted(shipment.trackingNumber(), shipment.status(), shipment.lastScan(), shipment.lastScanAt(),
+                shipment.estimatedDelivery(), DELIVERY_POLICY);
+        return PromptMessage.builder(Role.USER, TextContent.builder(instruction).build()).build();
+    }
+}
+```
+</CodeFile>
+
+Every request to `/mcp` needs a token with the `mcp` scope. Each tool then checks its own scope:
+
+<CodeFile title="src/main/java/com/example/shipping/McpSecurityConfig.java">
+```java {12,19}
+package com.example.shipping;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.web.SecurityFilterChain;
+
+@Configuration(proxyBeanMethods = false)
+@EnableMethodSecurity
+class McpSecurityConfig {
+
+    @Bean
+    SecurityFilterChain mcpSecurity(HttpSecurity http) throws Exception {
+        return http
+                .authorizeHttpRequests(requests -> requests
+                        .requestMatchers("/mcp").hasAuthority("SCOPE_mcp")
+                        .anyRequest().denyAll())
+                .oauth2ResourceServer(server -> server.jwt(Customizer.withDefaults()))
+                .csrf(AbstractHttpConfigurer::disable) // bearer tokens only: no session cookie to forge
+                .build();
+    }
+}
+```
+</CodeFile>
+
+The test starts the server on a random port and connects a real MCP client. It mocks only the repository and the JWT decoder:
+
+<CodeFile title="src/test/java/com/example/shipping/ShippingMcpServerTest.java">
+```java {81,93,101}
+package com.example.shipping;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.BDDMockito.given;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Map;
+import java.util.Optional;
+
+import io.modelcontextprotocol.client.McpClient;
+import io.modelcontextprotocol.client.McpSyncClient;
+import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTransport;
+import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
+import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
+import io.modelcontextprotocol.spec.McpSchema.GetPromptRequest;
+import io.modelcontextprotocol.spec.McpSchema.GetPromptResult;
+import io.modelcontextprotocol.spec.McpSchema.ReadResourceRequest;
+import io.modelcontextprotocol.spec.McpSchema.Resource;
+import io.modelcontextprotocol.spec.McpSchema.Role;
+import io.modelcontextprotocol.spec.McpSchema.TextContent;
+import io.modelcontextprotocol.spec.McpSchema.TextResourceContents;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
+class ShippingMcpServerTest {
+
+    @LocalServerPort
+    private int port;
+
+    @MockitoBean
+    private ShipmentRepository shipments;
+
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
+
+    @Test
+    void tracksAParcelForAClientWithTheReadScope() {
+        given(shipments.findByTrackingNumber("1Z999AA10123456784")).willReturn(Optional.of(new Shipment("1Z999AA10123456784",
+                "UPS", "IN_TRANSIT", "Leipzig hub", Instant.parse("2026-11-17T21:04:00Z"), LocalDate.of(2026, 11, 19))));
+
+        try (McpSyncClient client = connect("token-with", "mcp shipments.read")) {
+            CallToolResult result = client.callTool(trackShipment("1Z999AA10123456784"));
+
+            assertThat(result.isError()).isFalse();
+            assertThat(((TextContent) result.content().getFirst()).text()).contains("\"status\":\"IN_TRANSIT\"");
+        }
+    }
+
+    @Test
+    void servesTheDeliveryPolicyAsAResource() {
+        try (McpSyncClient client = connect("token-with", "mcp shipments.read")) {
+            assertThat(client.listResources().resources()).extracting(Resource::uri).containsExactly("shipping://policies/delivery");
+
+            var policy = (TextResourceContents) client.readResource(ReadResourceRequest.builder("shipping://policies/delivery").build())
+                    .contents().getFirst();
+            assertThat(policy.mimeType()).isEqualTo("text/markdown");
+            assertThat(policy.text()).startsWith("# Delivery policy");
+        }
+    }
+
+    @Test
+    void buildsTheDelayPromptFromTheShipment() {
+        given(shipments.findByTrackingNumber("1Z999AA10123456784")).willReturn(Optional.of(new Shipment("1Z999AA10123456784",
+                "UPS", "DELAYED", "Leipzig hub", Instant.parse("2026-11-17T21:04:00Z"), LocalDate.of(2026, 11, 19))));
+
+        try (McpSyncClient client = connect("token-with", "mcp shipments.read")) {
+            GetPromptResult prompt = client.getPrompt(GetPromptRequest.builder("explain-delay")
+                    .arguments(Map.of("trackingNumber", "1Z999AA10123456784"))
+                    .build());
+
+            assertThat(prompt.messages()).singleElement().satisfies(message -> {
+                assertThat(message.role()).isEqualTo(Role.USER);
+                assertThat(((TextContent) message.content()).text()).contains("DELAYED", "Leipzig hub", "# Delivery policy");
+            });
+        }
+    }
+
+    @Test
+    void refusesTheToolWithoutTheReadScope() {
+        try (McpSyncClient client = connect("token-without", "mcp")) {
+            CallToolResult result = client.callTool(trackShipment("1Z999AA10123456784"));
+
+            assertThat(result.isError()).isTrue();
+            assertThat(((TextContent) result.content().getFirst()).text()).contains("Access Denied");
+        }
+    }
+
+    @Test
+    void rejectsAnUnknownToken() {
+        given(jwtDecoder.decode("forged")).willThrow(new JwtException("bad signature"));
+
+        assertThatThrownBy(() -> connect("forged", null)).hasRootCauseMessage("Authorization error when sending message");
+    }
+
+    private McpSyncClient connect(String token, String scope) {
+        if (scope != null) {
+            given(jwtDecoder.decode(token)).willReturn(Jwt.withTokenValue(token)
+                    .header("alg", "RS256").subject("support-assistant").claim("scope", scope).build());
+        }
+        var transport = HttpClientStreamableHttpTransport.builder("http://localhost:" + port)
+                .addHttpRequestCustomizer((request, method, endpoint, body, context) -> request.header("Authorization", "Bearer " + token))
+                .build();
+        McpSyncClient client = McpClient.sync(transport).build();
+        client.initialize();
+        return client;
+    }
+
+    private static CallToolRequest trackShipment(String trackingNumber) {
+        return CallToolRequest.builder("track_shipment").arguments(Map.of("trackingNumber", trackingNumber)).build();
+    }
+}
+```
+</CodeFile>
+
+### The support app as a client
+
+Add the MCP client and OAuth2. The OAuth2 client brings Spring Security, so the support app now needs its own security
+configuration too:
+
+<CodeFile
+  title="build.gradle"
+  lang="groovy"
+  lines="2-5"
+  code={`dependencies {
+    implementation 'org.springframework.ai:spring-ai-starter-mcp-client'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+}`}
+/>
+
+The connection and the OAuth2 registration share the name `shipping`, and the customizer below uses that to match them. The
+allow-list lists the tools we reviewed:
+
+<CodeFile
+  title="src/main/resources/application.yaml"
+  lang="yaml"
+  lines="12,16,22,37"
+  code={`spring:
+  ai:
+    tools:
+      limits:
+        max-calls-per-tool-default: 5
+        max-calls-per-tool:
+          recentOrders: 2
+        max-total-tool-calls: 12
+    mcp:
+      client:
+        type: SYNC
+        initialized: false     # start even when an MCP server is down
+        request-timeout: 5s
+        streamable-http:
+          connections:
+            shipping:
+              url: https://shipping-mcp.internal.example.com
+  security:
+    oauth2:
+      client:
+        registration:
+          shipping:            # same name as the MCP connection: its token goes only there
+            provider: acme-login
+            client-id: support-assistant
+            client-secret: \${SHIPPING_MCP_CLIENT_SECRET}
+            authorization-grant-type: client_credentials
+            scope: mcp,shipments.read
+        provider:
+          acme-login:
+            token-uri: https://login.example.com/oauth2/token
+      resourceserver:
+        jwt:
+          issuer-uri: https://login.example.com
+
+support:
+  mcp:
+    allowed-tools: track_shipment`}
+/>
+
+<CodeFile title="src/main/java/com/example/support/mcp/SupportMcpProperties.java">
+```java {13}
+package com.example.support.mcp;
+
+import java.util.Set;
+
+import jakarta.validation.constraints.NotEmpty;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
+
+/** The MCP tools we reviewed. A tool a server adds later stays hidden from the model until it is listed here. */
+@Validated
+@ConfigurationProperties("support.mcp")
+public record SupportMcpProperties(@NotEmpty Set<String> allowedTools) {
+}
+```
+</CodeFile>
+
+Three beans configure the client: no tool context in `_meta`, the allow-list, and a token for each server that has a
+registration. Boot doesn't define an `OAuth2AuthorizedClientManager` bean, so the configuration defines one that works outside a
+web request:
+
+<CodeFile title="src/main/java/com/example/support/mcp/McpClientConfig.java">
+```java {27,32,41,51}
+package com.example.support.mcp;
+
+import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTransport;
+
+import org.springframework.ai.mcp.McpToolFilter;
+import org.springframework.ai.mcp.ToolContextToMcpMetaConverter;
+import org.springframework.ai.mcp.customizer.McpClientCustomizer;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
+import org.springframework.security.oauth2.client.AuthorizedClientServiceOAuth2AuthorizedClientManager;
+import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.util.Assert;
+
+@Configuration(proxyBeanMethods = false)
+@EnableConfigurationProperties(SupportMcpProperties.class)
+class McpClientConfig {
+
+    /** The default copies the whole ToolContext (our customer id included) into every MCP call's _meta. */
+    @Bean
+    ToolContextToMcpMetaConverter noToolContextForMcpServers() {
+        return ToolContextToMcpMetaConverter.noOp();
+    }
+
+    @Bean
+    McpToolFilter reviewedToolsOnly(SupportMcpProperties properties) {
+        return (connection, tool) -> properties.allowedTools().contains(tool.name());
+    }
+
+    /** A connection named like an OAuth2 client registration gets that registration's token, and no other connection does. */
+    @Bean
+    McpClientCustomizer<HttpClientStreamableHttpTransport.Builder> accessTokenPerServer(
+            ClientRegistrationRepository registrations, OAuth2AuthorizedClientManager authorizedClients) {
+        return (connection, transport) -> {
+            if (registrations.findByRegistrationId(connection) != null) {
+                transport.addHttpRequestCustomizer((request, method, endpoint, body, context) ->
+                        request.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken(authorizedClients, connection)));
+            }
+        };
+    }
+
+    /** Fetches client-credentials tokens outside a web request, and reuses each one until it expires. */
+    @Bean
+    OAuth2AuthorizedClientManager authorizedClientManager(ClientRegistrationRepository registrations,
+                                                          OAuth2AuthorizedClientService authorizedClients) {
+        return new AuthorizedClientServiceOAuth2AuthorizedClientManager(registrations, authorizedClients);
+    }
+
+    private static String accessToken(OAuth2AuthorizedClientManager authorizedClients, String registrationId) {
+        OAuth2AuthorizedClient client = authorizedClients.authorize(
+                OAuth2AuthorizeRequest.withClientRegistrationId(registrationId).principal("support-assistant").build());
+        Assert.state(client != null, () -> "No access token for MCP server " + registrationId);
+        return client.getAccessToken().getTokenValue();
+    }
+}
+```
+</CodeFile>
+
+With `initialized: false`, the app starts while the shipping server is down, but `ChatClient` asks the provider for its tools on
+every request, and the provider throws. Every chat would fail, including chats that don't need shipping. This wrapper answers
+without the MCP tools instead:
+
+<CodeFile title="src/main/java/com/example/support/mcp/BestEffortToolCallbacks.java">
+```java {29}
+package com.example.support.mcp;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.ToolCallbackProvider;
+
+/**
+ * ChatClient lists a provider's tools on every request, so an unreachable MCP server would fail every chat.
+ * This answers without the MCP tools instead, and tries again on the next request.
+ */
+public class BestEffortToolCallbacks implements ToolCallbackProvider {
+
+    private static final Logger log = LoggerFactory.getLogger(BestEffortToolCallbacks.class);
+
+    private final ToolCallbackProvider delegate;
+
+    public BestEffortToolCallbacks(ToolCallbackProvider delegate) {
+        this.delegate = delegate;
+    }
+
+    @Override
+    public ToolCallback[] getToolCallbacks() {
+        try {
+            return delegate.getToolCallbacks();
+        }
+        catch (RuntimeException unavailable) {
+            log.warn("MCP tools unavailable, answering without them: {}", unavailable.toString());
+            return new ToolCallback[0];
+        }
+    }
+}
+```
+</CodeFile>
+
+Register the MCP tools next to the order tools:
+
+<CodeFile title="src/main/java/com/example/support/chat/SupportChatConfig.java">
+```java {27,41}
+package com.example.support.chat;
+
+import java.time.Clock;
+import java.util.List;
+
+import com.example.support.mcp.BestEffortToolCallbacks;
+import com.example.support.order.OrderTools;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.SafeGuardAdvisor;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
+import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+
+@Configuration(proxyBeanMethods = false)
+class SupportChatConfig {
+
+    @Bean
+    ChatClient supportChatClient(ChatClient.Builder builder, ChatMemory chatMemory,
+                                RetrievalAugmentationAdvisor knowledgeRagAdvisor, OrderTools orderTools,
+                                SyncMcpToolCallbackProvider mcpTools) {
+        return builder
+                .defaultSystem("You are the support assistant for Acme Cloud.")
+                .defaultAdvisors(
+                        SafeGuardAdvisor.builder()
+                                .sensitiveWords(List.of("internal only", "api_key"))
+                                .order(Ordered.HIGHEST_PRECEDENCE + 25)
+                                .build(),
+                        new TokenBudgetAdvisor(200_000, Clock.systemUTC()),   // + 50
+                        new PiiRedactionAdvisor(),                            // + 100
+                        MessageChatMemoryAdvisor.builder(chatMemory).build(), // + 200
+                        knowledgeRagAdvisor,                                  // + 225
+                        new AnswerLanguageAdvisor(),                          // + 250
+                        new SimpleLoggerAdvisor())                            // 0
+                .defaultTools(orderTools, new BestEffortToolCallbacks(mcpTools))
+                .build();
+    }
+
+    @Bean
+    ChatClient faqChatClient(ChatClient.Builder builder, VectorStore vectorStore) {
+        return builder
+                .defaultSystem("Answer questions about Acme Cloud plans and billing.")
+                .defaultAdvisors(new PiiRedactionAdvisor(), new SemanticCacheAdvisor(vectorStore, 0.92))
+                .build();
+    }
+}
+```
+</CodeFile>
+
+A failed token request isn't something the model can fix, so `ModelSafeToolErrors` rethrows it, as Spring AI's default processor
+does:
+
+<CodeFile title="src/main/java/com/example/support/tools/ModelSafeToolErrors.java">
+```java {22}
+package com.example.support.tools;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.ai.tool.execution.ToolExecutionException;
+import org.springframework.ai.tool.execution.ToolExecutionExceptionProcessor;
+import org.springframework.security.oauth2.client.ClientAuthorizationException;
+import org.springframework.stereotype.Component;
+
+/** Decides what the model reads when a tool fails. Only refusals pass through; everything else is logged and replaced. */
+@Component
+class ModelSafeToolErrors implements ToolExecutionExceptionProcessor {
+
+    private static final Logger log = LoggerFactory.getLogger(ModelSafeToolErrors.class);
+
+    @Override
+    public String process(ToolExecutionException exception) {
+        String tool = exception.getToolDefinition().name();
+        return switch (exception.getCause()) {
+            case ToolRefusalException refusal -> refusal.getMessage();
+            // Spring AI's default processor rethrows these too: a failed token request is not the model's problem.
+            case ClientAuthorizationException authorization -> throw authorization;
+            case RuntimeException failure -> {
+                log.error("Tool {} failed", tool, failure);
+                yield "The " + tool + " tool is unavailable right now. Say so and do not guess the answer.";
+            }
+            default -> throw exception;
+        };
+    }
+}
+```
+</CodeFile>
+
+The support app's own API now checks the customer's JWT. The `Principal` the controller reads is the token's subject:
+
+<CodeFile title="src/main/java/com/example/support/security/SecurityConfig.java">
+```java {17,18}
+package com.example.support.security;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+
+@Configuration(proxyBeanMethods = false)
+public class SecurityConfig {
+
+    @Bean
+    SecurityFilterChain apiSecurity(HttpSecurity http) throws Exception {
+        return http
+                .authorizeHttpRequests(requests -> requests.anyRequest().authenticated())
+                .oauth2ResourceServer(server -> server.jwt(Customizer.withDefaults()))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .csrf(AbstractHttpConfigurer::disable) // bearer tokens only: no session cookie to forge
+                .build();
+    }
+}
+```
+</CodeFile>
+
+The Module 3 controller test now imports that configuration and sends a JWT instead of a plain principal:
+
+<CodeFile title="src/test/java/com/example/support/chat/SupportChatControllerTest.java">
+```java {24,40,53,68}
+package com.example.support.chat;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+
+import java.util.Locale;
+import java.util.UUID;
+
+import com.example.support.security.SecurityConfig;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.assertj.MockMvcTester;
+
+@WebMvcTest(SupportChatController.class)
+@Import(SecurityConfig.class)
+class SupportChatControllerTest {
+
+    private static final UUID CHAT_ID = UUID.fromString("0f8e2a4c-6b1d-4c3e-9a7f-5d2b8c1e4a60");
+
+    @Autowired
+    private MockMvcTester mvc;
+
+    @MockitoBean
+    private SupportChatService chatService;
+
+    @Test
+    void answersInTheCallersLanguage() {
+        given(chatService.ask("alice", CHAT_ID, "billing", "Wo ist Bestellung 1042?", Locale.GERMAN)).willReturn("Unterwegs.");
+
+        assertThat(mvc.post().uri("/api/chats/{chatId}/messages", CHAT_ID)
+                .with(jwt().jwt(token -> token.subject("alice")))
+                .header(HttpHeaders.ACCEPT_LANGUAGE, "de")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"product": "billing", "question": "Wo ist Bestellung 1042?"}
+                        """))
+                .hasStatusOk()
+                .bodyJson().extractingPath("$.answer").isEqualTo("Unterwegs.");
+    }
+
+    @Test
+    void rejectsABlankQuestion() {
+        assertThat(mvc.post().uri("/api/chats/{chatId}/messages", CHAT_ID)
+                .with(jwt().jwt(token -> token.subject("alice")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"product": "billing", "question": " "}
+                        """))
+                .hasStatus(HttpStatus.BAD_REQUEST);
+        then(chatService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void reportsAnExhaustedBudgetAs429() {
+        given(chatService.ask("alice", CHAT_ID, "billing", "Hi", Locale.ENGLISH))
+                .willThrow(new TokenBudgetExceededException("alice", 200_000));
+
+        assertThat(mvc.post().uri("/api/chats/{chatId}/messages", CHAT_ID)
+                .with(jwt().jwt(token -> token.subject("alice")))
+                .header(HttpHeaders.ACCEPT_LANGUAGE, "en")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"product": "billing", "question": "Hi"}
+                        """))
+                .hasStatus(HttpStatus.TOO_MANY_REQUESTS)
+                .bodyJson().extractingPath("$.detail").isEqualTo("You have reached today's assistant limit. It resets at midnight UTC.");
+    }
+
+    @Test
+    void forgetsAChat() {
+        assertThat(mvc.delete().uri("/api/chats/{chatId}", CHAT_ID).with(jwt().jwt(token -> token.subject("alice"))))
+                .hasStatus(HttpStatus.NO_CONTENT);
+        then(chatService).should().forget("alice", CHAT_ID);
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/test/java/com/example/support/mcp/BestEffortToolCallbacksTest.java">
+```java {28}
+package com.example.support.mcp;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.ToolCallbackProvider;
+
+class BestEffortToolCallbacksTest {
+
+    private final ToolCallbackProvider mcpTools = mock(ToolCallbackProvider.class);
+    private final BestEffortToolCallbacks tools = new BestEffortToolCallbacks(mcpTools);
+
+    @Test
+    void offersTheServersTools() {
+        ToolCallback trackShipment = mock(ToolCallback.class);
+        given(mcpTools.getToolCallbacks()).willReturn(new ToolCallback[] {trackShipment});
+
+        assertThat(tools.getToolCallbacks()).containsExactly(trackShipment);
+    }
+
+    @Test
+    void answersWithoutTheToolsWhileAServerIsDown() {
+        given(mcpTools.getToolCallbacks()).willThrow(new IllegalStateException("Connection refused"));
+
+        assertThat(tools.getToolCallbacks()).isEmpty();
+    }
+}
+```
+</CodeFile>
+
+## 4. Production gotchas & security
+
+<Gotcha kind="reliability" title="A WebMVC MCP server starts SSE unless you set the protocol">
+`McpServerProperties` declares `STREAMABLE`, but the WebMVC auto-configuration starts the SSE transport when
+`spring.ai.mcp.server.protocol` is missing. Streamable HTTP clients then get a `404` for `POST /mcp`. Set `protocol: STREAMABLE`
+on the server, and test it with a real client, as `ShippingMcpServerTest` does.
+</Gotcha>
+
+<Gotcha kind="security" title="The default converter sends your tool context to every MCP server">
+`ToolContext` holds what the model must not see, such as the customer id, and the default `ToolContextToMcpMetaConverter`
+copies all of it into `_meta` on every `tools/call`. In our test, a tenant API key in the tool context reached the server this
+way. Define `ToolContextToMcpMetaConverter.noOp()`, and pass a server what it needs as a tool argument it declares.
+</Gotcha>
+
+<Gotcha kind="security" title="A server can add tools without asking you">
+The client lists whatever the server offers, and the model may call all of it. A tool that the server team adds next week reaches
+your assistant on the next restart, with a description you never read. Keep an `McpToolFilter` allow-list of reviewed tools.
+Annotation hints such as `readOnlyHint` are claims made by the server, not checks.
+</Gotcha>
+
+<Gotcha kind="security" title="Give each server its own token">
+A global `McpSyncHttpClientRequestCustomizer` adds its header to every connection. In our test, one header reached two servers, so
+a token for one server would be sent to every other. Use an `McpClientCustomizer<HttpClientStreamableHttpTransport.Builder>`,
+which gets the connection name, and request a client-credentials token per server with only the scopes that server needs.
+</Gotcha>
+
+<Gotcha kind="reliability" title="A server that is down breaks startup, or every chat">
+With `initialized: true` (the default), the client app doesn't start while a server is down or rejects the token. With
+`initialized: false`, it starts, but every chat request fails, because `ChatClient` asks the tool provider for its tools on each
+request. Wrap the provider so that it answers without those tools, and let `ModelSafeToolErrors` handle a server that fails
+during a call.
+</Gotcha>
+
+<Gotcha kind="security" title="Tool descriptions and results are prompt text">
+The model reads every tool's description and every result. A server you don't control can put instructions into either. Connect
+only to servers you trust, keep the allow-list short, and treat what they return like retrieved documents: untrusted input.
+</Gotcha>
+
+<Gotcha kind="reliability" title="A STDIO server must keep its standard output clean">
+Over STDIO, every line the server prints is read as a protocol message. The Boot banner and console logs break the connection:
+the client logs "Error processing inbound message" and times out at startup. Set `spring.ai.mcp.server.stdio=true`,
+`spring.main.web-application-type=none`, `spring.main.banner-mode=off` and an empty `logging.pattern.console`.
+</Gotcha>
+
+<Gotcha kind="migration" title="Deprecated in 2.0">
+On the transport builder, `httpRequestCustomizer` is deprecated: use `addHttpRequestCustomizer`. The `ReadResourceRequest(String)`
+and `GetPromptRequest(String, Map)` constructors are deprecated: use their `builder(...)` methods. SSE is the older transport;
+new servers should use Streamable HTTP.
+</Gotcha>
+
+## Recap
+
+- An MCP server offers tools, resources and prompts. Spring AI builds them from `@McpTool`, `@McpResource` and `@McpPrompt`.
+- A WebMVC server needs `protocol: STREAMABLE`. Secure `/mcp` with a scope, and each tool with `@PreAuthorize`.
+- On the client, pass `SyncMcpToolCallbackProvider` to `defaultTools`, filter the tools, send no tool context, and give each server
+  its own token.
+- Plan for a server that is down: at startup with `initialized`, and on every request with a provider that answers without it.
