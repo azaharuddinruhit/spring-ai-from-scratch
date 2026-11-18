@@ -209,7 +209,8 @@ Small UI labels are Plex.
 - The course list is one vertical sequence, never a card grid. From the md breakpoint each module row is three columns:
   5rem numeral, up to 22rem title and summary, then the lessons.
 - Lesson pages: a sticky 18rem sidebar from lg (an off-canvas drawer below lg), an article column capped at 48rem, and an
-  "On this page" list from xl. Lesson h2s get 56px of space above, a top rule, and 32px below the rule.
+  "On this page" list from xl. Lesson h2s get 56px of space above, a top rule, and 32px below the rule. Each h2 has its reading
+  time under it ("3 min read", small Ink Quiet) and right-aligned in the "On this page" list ("3 min").
 - Wide tables and code scroll horizontally inside their column; the page itself never scrolls sideways. Table cells have a 9rem floor
   and the last (prose) column 17rem, so rows stay short and the clipped column signals that the table scrolls. These rules skip
   sandboxes (`.not-prose`): a sandbox table sizes its own columns and folds secondary columns into the main cell below `sm`.

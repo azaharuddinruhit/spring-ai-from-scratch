@@ -11,9 +11,11 @@ interface Props {
   title: string;
   description: string;
   headings: MarkdownHeading[];
+  /** Reading time of each h2 section, in order (see src/lib/section-reading-time.mjs). */
+  sectionMinutes: number[];
 }
 
-const { nav, id, title, description, headings } = Astro.props;
+const { nav, id, title, description, headings, sectionMinutes } = Astro.props;
 const module = nav.find((m) => m.navLessons.some((l) => l.id === id))!;
 const sequence = publishedSequence(nav);
 const index = sequence.findIndex((l) => l.id === id);
@@ -87,10 +89,14 @@ const toc = headings.filter((h) => h.depth === 2);
       <p class="mb-3 text-sm font-semibold text-slate-900 dark:text-white">On this page</p>
       <ul class="space-y-2 text-sm">
         {
-          toc.map((heading) => (
+          toc.map((heading, index) => (
             <li>
-              <a href={`#${heading.slug}`} class="text-slate-600 hover:text-brand-700 dark:text-slate-400 dark:hover:text-brand-400">
+              <a
+                href={`#${heading.slug}`}
+                class="flex items-baseline justify-between gap-3 text-slate-600 hover:text-brand-700 dark:text-slate-400 dark:hover:text-brand-400"
+              >
                 {heading.text}
+                <span class="shrink-0 text-xs text-slate-500 tabular-nums dark:text-slate-400">{sectionMinutes[index]} min</span>
               </a>
             </li>
           ))

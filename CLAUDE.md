@@ -28,6 +28,10 @@ There are no unit tests. `npm run build` is the gate.
   `buildGradle()` / `gradleDependencies()` from `src/data/snippets.ts` instead of hard-coding versions in MDX.
 - Lesson sections, in order: `## 1. Spring mental model`, `## 2. Interactive sandbox`, `## 3. Idiomatic Java 25 & Gradle 9 code`,
   `## 4. Production gotchas & security`, `## Recap`. The right-hand TOC lists the h2 headings.
+- Reading time: `src/lib/section-reading-time.mjs` is a Sätteri mdast plugin (Astro 7's default Markdown processor, set in
+  `astro.config.mjs`; remark plugins don't run without `@astrojs/markdown-remark`). It counts each h2 section at 200 words and
+  20 code lines a minute, rounds up, puts a `.section-time` label under the heading and passes `sectionMinutes` to `LessonLayout`
+  for the "On this page" list. Sandboxes count only their surrounding text.
 - MDX components: `Mermaid` (renders client-side and re-renders on `themechange`), `CodeFile` (the code viewer), `Gotcha`
   (`kind`: reliability | security | cost | migration).
 - Code viewer: every lesson code block goes inside `CodeFile`: the file name and an icon-only copy button (`.copy-btn`, shared with
