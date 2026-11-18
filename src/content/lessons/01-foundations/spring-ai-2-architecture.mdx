@@ -23,24 +23,32 @@ the rest of the course is mostly details.
 | `ChatOptions` | `@ConfigurationProperties` defaults | Defaults come from `application.yml`, and each request can override them. In 2.x, options are **immutable**. |
 
 <Mermaid
-  caption="Every ChatClient call passes through an ordered advisor chain before reaching the vendor-neutral ChatModel interface."
+  caption="One ChatClient call. Each advisor passes the request on and sees the reply on the way back. ChatModel is OpenAiChatModel, AnthropicChatModel or whichever starter you added, and the last advisor, ChatModelCallAdvisor, calls it."
   code={`
-flowchart TB
-  subgraph app["Your application"]
-    S["@Service"] --> CC["ChatClient"]
+sequenceDiagram
+  autonumber
+  participant S as Your service
+  participant CC as ChatClient
+  participant MEM as Memory<br/>+200
+  participant T as ToolCalling<br/>+300
+  participant Y as RAG, logging<br/>order 0
+  participant M as ChatModel
+  Note over CC,M: Built at startup from spring.ai.* properties
+  S->>CC: user(q).call()
+  CC->>MEM: request
+  MEM->>T: + history
+  loop while the model asks for tools
+    T->>Y: request
+    Y->>M: + context
+    M-->>Y: reply
+    Y-->>T: reply
+    opt reply asks for a tool
+      T->>T: run @Tool method
+    end
   end
-  subgraph chain["Advisor chain (ordered)"]
-    direction LR
-    MA["Memory advisors<br/>order +200"] --> TA["ToolCallingAdvisor<br/>auto-registered, +300"] --> YA["RAG, logging and<br/>your advisors, order 0"] --> LAST["ChatModelCallAdvisor"]
-  end
-  CC --> MA
-  LAST --> CM{{"ChatModel"}}
-  CM --> A["AnthropicChatModel"]
-  CM --> O["OpenAiChatModel"]
-  CM --> L["OllamaChatModel"]
-  BOOT["Boot 4 auto-configuration<br/>spring.ai.* properties"] -. creates .-> CM
-  BOOT -. creates .-> CB["ChatClient.Builder"]
-  CB -. builds .-> CC
+  T-->>MEM: final reply
+  MEM-->>CC: saves the exchange
+  CC-->>S: content()
 `}
 />
 
