@@ -305,7 +305,7 @@ class KnowledgeSearchServiceTest {
 </CodeFile>
 
 <CodeFile title="src/test/java/com/example/support/knowledge/KnowledgeSearchControllerTest.java">
-```java {17,41}
+```java {17,48}
 package com.example.support.knowledge;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -340,7 +340,14 @@ class KnowledgeSearchControllerTest {
                 .hasStatusOk()
                 .bodyJson()
                 .isLenientlyEqualTo("""
-                        [{"source": "billing-handbook.pdf", "page": 4, "score": 0.82, "text": "Refunds take 5 business days."}]
+                        [
+                          {
+                            "source": "billing-handbook.pdf",
+                            "page": 4,
+                            "score": 0.82,
+                            "text": "Refunds take 5 business days."
+                          }
+                        ]
                         """);
     }
 

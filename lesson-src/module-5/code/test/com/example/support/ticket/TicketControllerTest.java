@@ -41,12 +41,22 @@ class TicketControllerTest {
                 .with(AGENT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"subject": "Charged twice", "body": "My card was charged twice."}
+                        {
+                          "subject": "Charged twice",
+                          "body": "My card was charged twice."
+                        }
                         """))
                 .hasStatusOk()
                 .bodyJson()
                 .isLenientlyEqualTo("""
-                        {"departments": ["BILLING"], "reply": "A refund is waiting in the app.", "rounds": 2, "needsAgent": false}
+                        {
+                          "departments": [
+                            "BILLING"
+                          ],
+                          "reply": "A refund is waiting in the app.",
+                          "rounds": 2,
+                          "needsAgent": false
+                        }
                         """);
     }
 
@@ -56,7 +66,10 @@ class TicketControllerTest {
                 .with(AGENT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"subject": "Help", "body": ""}
+                        {
+                          "subject": "Help",
+                          "body": ""
+                        }
                         """))
                 .hasStatus(HttpStatus.BAD_REQUEST);
         then(replies).shouldHaveNoInteractions();
@@ -68,7 +81,10 @@ class TicketControllerTest {
                 .with(jwt().jwt(token -> token.subject("alice")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"subject": "Charged twice", "body": "My card was charged twice."}
+                        {
+                          "subject": "Charged twice",
+                          "body": "My card was charged twice."
+                        }
                         """))
                 .hasStatus(HttpStatus.FORBIDDEN);
         then(replies).shouldHaveNoInteractions();

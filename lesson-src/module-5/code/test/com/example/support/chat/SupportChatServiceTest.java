@@ -95,7 +95,10 @@ class SupportChatServiceTest {
         var model = new ScriptedChatModel(prompt -> prompt.getInstructions().getLast() instanceof ToolResponseMessage
                 ? new AssistantMessage("Order 1042 has shipped.")
                 : toolCall("findOrder", """
-                        {"orderNumber": "1042", "customerId": "bob"}"""));
+                        {
+                          "orderNumber": "1042",
+                          "customerId": "bob"
+                        }"""));
         var service = new SupportChatService(ChatClient.builder(model).defaultTools(new OrderTools(orders)).build(), chatMemory);
 
         assertThat(service.ask("alice", chatId, "billing", "Where is order 1042?", Locale.ENGLISH))
@@ -106,7 +109,9 @@ class SupportChatServiceTest {
     @Test
     void stopsARunawayToolLoop() {
         var model = new ScriptedChatModel(prompt -> toolCall("recentOrders", """
-                {"count": 5}"""));
+                {
+                  "count": 5
+                }"""));
         var limited = ToolCallingAdvisor.builder()
                 .toolCallingManager(DefaultToolCallingManager.builder().maxCallsPerTool(3).build())
                 .build();

@@ -70,6 +70,8 @@ type Role = 'system' | 'user' | 'assistant' | 'tool';
 interface Msg {
   role: Role;
   text: string;
+  /** Tool arguments or a tool result, shown indented under the text. */
+  json?: string;
   docs?: boolean;
 }
 
@@ -79,8 +81,8 @@ const HISTORY: Msg[] = [
   { role: 'assistant', text: 'Thanks. How can I help with it?' },
 ];
 const QUESTION: Msg = { role: 'user', text: 'Where is order 1042?' };
-const TOOL_CALL: Msg = { role: 'assistant', text: 'tool call: findOrder({"id":"1042"})' };
-const TOOL_RESULT: Msg = { role: 'tool', text: '{"id":"1042","status":"SHIPPED","carrier":"DHL"}' };
+const TOOL_CALL: Msg = { role: 'assistant', text: 'tool call: findOrder', json: '{"id":"1042"}' };
+const TOOL_RESULT: Msg = { role: 'tool', text: 'findOrder result', json: '{"id":"1042","status":"SHIPPED","carrier":"DHL"}' };
 const ANSWER: Msg = { role: 'assistant', text: 'Order 1042 shipped with DHL yesterday.' };
 const ANSWER_DIRECT: Msg = { role: 'assistant', text: 'Orders usually ship within 2 business days. Check Orders for tracking.' };
 
@@ -128,7 +130,7 @@ function simulate(chain: ChainNode[], toolLoop: boolean): Step[] {
           prompt,
         );
         const reply = run(i + 1, prompt);
-        log.push(`response: ${reply.text}`);
+        log.push(`response: ${reply.text}${reply.json ? ' ' + reply.json : ''}`); // a log line stays on one line
         snap('logger', 'up', 'SimpleLoggerAdvisor logs the response', `It logs what came back from below: ${reply === TOOL_CALL ? 'a tool call' : 'the answer'}.`, prompt);
         return reply;
       }
@@ -271,14 +273,15 @@ function Messages({ messages }: { messages: Msg[] }) {
       {messages.map((m, i) => (
         <li key={i} className="flex gap-2 text-sm leading-snug">
           <span className={'code-mono w-16 shrink-0 text-[0.75rem] uppercase ' + ROLE_STYLE[m.role]}>{m.role}</span>
-          <span className="min-w-0 [overflow-wrap:anywhere] text-slate-700 dark:text-slate-300">
+          <div className="min-w-0 [overflow-wrap:anywhere] text-slate-700 dark:text-slate-300">
             {m.text}
+            {m.json && <CodeView code={m.json} lang="json" className="mt-1" />}
             {m.docs && (
               <span className="ml-1.5 inline-block rounded border border-brand-600/30 bg-brand-50 px-1.5 text-xs text-brand-800 dark:border-brand-400/30 dark:bg-brand-500/10 dark:text-brand-200">
                 + 2 documents
               </span>
             )}
-          </span>
+          </div>
         </li>
       ))}
     </ol>

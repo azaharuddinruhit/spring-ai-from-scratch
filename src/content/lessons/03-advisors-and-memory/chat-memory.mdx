@@ -326,7 +326,7 @@ class SupportChatServiceTest {
 And the web layer with `@WebMvcTest`, including the `429` from the budget advisor:
 
 <CodeFile title="src/test/java/com/example/support/chat/SupportChatControllerTest.java">
-```java {19,69}
+```java {19,75}
 package com.example.support.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -365,7 +365,9 @@ class SupportChatControllerTest {
                 .header(HttpHeaders.ACCEPT_LANGUAGE, "de")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"question": "Wo ist Bestellung 1042?"}
+                        {
+                          "question": "Wo ist Bestellung 1042?"
+                        }
                         """))
                 .hasStatusOk()
                 .bodyJson().extractingPath("$.answer").isEqualTo("Unterwegs.");
@@ -377,7 +379,9 @@ class SupportChatControllerTest {
                 .principal(() -> "alice")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"question": " "}
+                        {
+                          "question": " "
+                        }
                         """))
                 .hasStatus(HttpStatus.BAD_REQUEST);
         then(chatService).shouldHaveNoInteractions();
@@ -393,7 +397,9 @@ class SupportChatControllerTest {
                 .header(HttpHeaders.ACCEPT_LANGUAGE, "en")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"question": "Hi"}
+                        {
+                          "question": "Hi"
+                        }
                         """))
                 .hasStatus(HttpStatus.TOO_MANY_REQUESTS)
                 .bodyJson().extractingPath("$.detail").isEqualTo("You have reached today's assistant limit. It resets at midnight UTC.");

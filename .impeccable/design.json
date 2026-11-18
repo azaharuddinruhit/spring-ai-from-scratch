@@ -296,6 +296,7 @@
       "Do set numbers in Plex with tabular figures, and only for real sequences.",
       "Do write every label in sentence case and every link as the thing it opens.",
       "Do let tables and code scroll inside their column on phones.",
+      "Do show JSON indented, two spaces and one key per line, everywhere; keep Jackson's own output and log lines as they are.",
       "Do let inline code break anywhere, with its background cloned on each line, so a long API name never widens the page."
     ],
     "donts": [

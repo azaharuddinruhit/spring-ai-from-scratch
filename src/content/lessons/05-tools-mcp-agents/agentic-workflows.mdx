@@ -631,7 +631,7 @@ class RefundServiceTest {
 </CodeFile>
 
 <CodeFile title="src/test/java/com/example/support/refund/RefundControllerTest.java">
-```java {59}
+```java {63}
 package com.example.support.refund;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -673,7 +673,11 @@ class RefundControllerTest {
                 .hasStatusOk()
                 .bodyJson()
                 .isLenientlyEqualTo("""
-                        {"orderNumber": "1042", "amount": 59.90, "status": "CONFIRMED"}
+                        {
+                          "orderNumber": "1042",
+                          "amount": 59.90,
+                          "status": "CONFIRMED"
+                        }
                         """);
     }
 
@@ -1005,7 +1009,7 @@ public class SecurityConfig {
 The test gives every role its own scripted model, so it can check which roles were called, and how often:
 
 <CodeFile title="src/test/java/com/example/support/ticket/TicketReplyServiceTest.java">
-```java {61,88}
+```java {64,101}
 package com.example.support.ticket;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -1025,7 +1029,10 @@ import org.springframework.ai.chat.messages.AssistantMessage;
 class TicketReplyServiceTest {
 
     private static final String APPROVED = """
-            {"approved": true, "problems": []}""";
+            {
+              "approved": true,
+              "problems": []
+            }""";
 
     private final ScriptedChatModel billing = replies("You were charged twice; a refund is waiting in the app.");
     private final ScriptedChatModel technical = replies("Please send the request id of a failing call.");
@@ -1072,7 +1079,12 @@ class TicketReplyServiceTest {
     @Test
     void revisesTheReplyWithTheReviewersProblems() {
         var service = service(plan("BILLING", "ACCOUNT"), replies("""
-                {"approved": false, "problems": ["It promises the refund by Friday."]}""", APPROVED));
+                {
+                  "approved": false,
+                  "problems": [
+                    "It promises the refund by Friday."
+                  ]
+                }""", APPROVED));
 
         ReplyDraft draft = service.draftReply("Two things", "Charged twice; add a colleague?");
 
@@ -1088,7 +1100,12 @@ class TicketReplyServiceTest {
                 Map.of(Department.BILLING, client(billing), Department.TECHNICAL, client(technical), Department.ACCOUNT, client(account)),
                 client(stubbornEditor),
                 client(new ScriptedChatModel(prompt -> new AssistantMessage("""
-                        {"approved": false, "problems": ["Promises a date."]}"""))));
+                        {
+                          "approved": false,
+                          "problems": [
+                            "Promises a date."
+                          ]
+                        }"""))));
 
         ReplyDraft draft = service.draftReply("Locked out", "I can't sign in.");
 
@@ -1130,7 +1147,7 @@ class TicketReplyServiceTest {
 </CodeFile>
 
 <CodeFile title="src/test/java/com/example/support/ticket/TicketControllerTest.java">
-```java {27,73}
+```java {27,89}
 package com.example.support.ticket;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -1174,12 +1191,22 @@ class TicketControllerTest {
                 .with(AGENT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"subject": "Charged twice", "body": "My card was charged twice."}
+                        {
+                          "subject": "Charged twice",
+                          "body": "My card was charged twice."
+                        }
                         """))
                 .hasStatusOk()
                 .bodyJson()
                 .isLenientlyEqualTo("""
-                        {"departments": ["BILLING"], "reply": "A refund is waiting in the app.", "rounds": 2, "needsAgent": false}
+                        {
+                          "departments": [
+                            "BILLING"
+                          ],
+                          "reply": "A refund is waiting in the app.",
+                          "rounds": 2,
+                          "needsAgent": false
+                        }
                         """);
     }
 
@@ -1189,7 +1216,10 @@ class TicketControllerTest {
                 .with(AGENT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"subject": "Help", "body": ""}
+                        {
+                          "subject": "Help",
+                          "body": ""
+                        }
                         """))
                 .hasStatus(HttpStatus.BAD_REQUEST);
         then(replies).shouldHaveNoInteractions();
@@ -1201,7 +1231,10 @@ class TicketControllerTest {
                 .with(jwt().jwt(token -> token.subject("alice")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"subject": "Charged twice", "body": "My card was charged twice."}
+                        {
+                          "subject": "Charged twice",
+                          "body": "My card was charged twice."
+                        }
                         """))
                 .hasStatus(HttpStatus.FORBIDDEN);
         then(replies).shouldHaveNoInteractions();

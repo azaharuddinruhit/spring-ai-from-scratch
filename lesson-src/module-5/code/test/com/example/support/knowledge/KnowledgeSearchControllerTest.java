@@ -37,7 +37,14 @@ class KnowledgeSearchControllerTest {
                 .hasStatusOk()
                 .bodyJson()
                 .isLenientlyEqualTo("""
-                        [{"source": "billing-handbook.pdf", "page": 4, "score": 0.82, "text": "Refunds take 5 business days."}]
+                        [
+                          {
+                            "source": "billing-handbook.pdf",
+                            "page": 4,
+                            "score": 0.82,
+                            "text": "Refunds take 5 business days."
+                          }
+                        ]
                         """);
     }
 

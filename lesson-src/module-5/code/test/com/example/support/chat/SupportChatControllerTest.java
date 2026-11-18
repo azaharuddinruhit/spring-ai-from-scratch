@@ -41,7 +41,10 @@ class SupportChatControllerTest {
                 .header(HttpHeaders.ACCEPT_LANGUAGE, "de")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"product": "billing", "question": "Wo ist Bestellung 1042?"}
+                        {
+                          "product": "billing",
+                          "question": "Wo ist Bestellung 1042?"
+                        }
                         """))
                 .hasStatusOk()
                 .bodyJson().extractingPath("$.answer").isEqualTo("Unterwegs.");
@@ -53,7 +56,10 @@ class SupportChatControllerTest {
                 .with(jwt().jwt(token -> token.subject("alice")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"product": "billing", "question": " "}
+                        {
+                          "product": "billing",
+                          "question": " "
+                        }
                         """))
                 .hasStatus(HttpStatus.BAD_REQUEST);
         then(chatService).shouldHaveNoInteractions();
@@ -69,7 +75,10 @@ class SupportChatControllerTest {
                 .header(HttpHeaders.ACCEPT_LANGUAGE, "en")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"product": "billing", "question": "Hi"}
+                        {
+                          "product": "billing",
+                          "question": "Hi"
+                        }
                         """))
                 .hasStatus(HttpStatus.TOO_MANY_REQUESTS)
                 .bodyJson().extractingPath("$.detail").isEqualTo("You have reached today's assistant limit. It resets at midnight UTC.");

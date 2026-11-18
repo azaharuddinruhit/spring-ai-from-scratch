@@ -203,10 +203,17 @@ class TicketTriageSchemaTest {
     void readsAReplyWrappedInMarkdown() {
         TicketTriage triage = converter.convert("""
                 ```json
-                {"summary": "Card charged twice for order 1042",
-                 "priority": "HIGH",
-                 "customer": {"name": "Ada Lovelace", "account_id": "A-17"},
-                 "tags": ["billing"]}
+                {
+                  "summary": "Card charged twice for order 1042",
+                  "priority": "HIGH",
+                  "customer": {
+                    "name": "Ada Lovelace",
+                    "account_id": "A-17"
+                  },
+                  "tags": [
+                    "billing"
+                  ]
+                }
                 ```""");
 
         assertThat(triage.priority()).isEqualTo(TicketTriage.Priority.HIGH);

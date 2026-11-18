@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { CodeView, LabFrame, Pill } from './LabFrame';
+import { prettyJson } from '../../lib/json-format';
 
 /*
  * Simulates .entity(Answer.class, spec -> …) in Spring AI 2.0.2 against OpenAI. The behaviour and every message come from the
@@ -16,7 +17,8 @@ type Outcome = { tone: 'ok' | 'warn' | 'error'; title: string; detail: string };
 
 const QUESTION = 'Where is my refund for order 1042?';
 const TEXT = 'Your refund for order 1042 was issued on 3 March. Banks take 5 to 7 business days to show it.';
-const VALID = `{"text":"${TEXT}","sources":["refund-policy.md"]}`;
+// The replies are shown indented, as a model often writes them; whitespace changes nothing that is checked.
+const VALID = prettyJson(`{"text":"${TEXT}","sources":["refund-policy.md"]}`);
 
 const REPLIES: Record<Reply, { label: string; text: string; validation: string }> = {
   valid: { label: 'Valid JSON', text: VALID, validation: '' },
@@ -26,7 +28,7 @@ const REPLIES: Record<Reply, { label: string; text: string; validation: string }
     validation:
       "Invalid JSON: Unexpected character ('`' (code 96)): expected a valid value (JSON String, Number, Array, Object or token 'null', 'true' or 'false')",
   },
-  missing: { label: 'Missing "sources"', text: `{"text":"${TEXT}"}`, validation: "required property 'sources' not found" },
+  missing: { label: 'Missing "sources"', text: prettyJson(`{"text":"${TEXT}"}`), validation: "required property 'sources' not found" },
   prose: {
     label: 'Prose before the JSON',
     text: `Sure! Here is the answer:\n${VALID}`,

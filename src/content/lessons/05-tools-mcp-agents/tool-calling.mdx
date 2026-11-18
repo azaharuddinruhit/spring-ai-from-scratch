@@ -607,7 +607,7 @@ class ModelSafeToolErrorsTest {
 The first four tests come from Module 3. The last two script a model that asks for Bob's order, and one that never stops asking:
 
 <CodeFile title="src/test/java/com/example/support/chat/SupportChatServiceTest.java">
-```java {98,103,111,119}
+```java {100,106,116,124}
 package com.example.support.chat;
 
 import static com.example.support.ScriptedChatModel.toolCall;
@@ -705,7 +705,10 @@ class SupportChatServiceTest {
         var model = new ScriptedChatModel(prompt -> prompt.getInstructions().getLast() instanceof ToolResponseMessage
                 ? new AssistantMessage("Order 1042 has shipped.")
                 : toolCall("findOrder", """
-                        {"orderNumber": "1042", "customerId": "bob"}"""));
+                        {
+                          "orderNumber": "1042",
+                          "customerId": "bob"
+                        }"""));
         var service = new SupportChatService(ChatClient.builder(model).defaultTools(new OrderTools(orders)).build(), chatMemory);
 
         assertThat(service.ask("alice", chatId, "billing", "Where is order 1042?", Locale.ENGLISH))
@@ -716,7 +719,9 @@ class SupportChatServiceTest {
     @Test
     void stopsARunawayToolLoop() {
         var model = new ScriptedChatModel(prompt -> toolCall("recentOrders", """
-                {"count": 5}"""));
+                {
+                  "count": 5
+                }"""));
         var limited = ToolCallingAdvisor.builder()
                 .toolCallingManager(DefaultToolCallingManager.builder().maxCallsPerTool(3).build())
                 .build();

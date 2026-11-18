@@ -249,8 +249,8 @@ export default function TextSplitterLab() {
                       <Visible text={step.text} />
                     </pre>
                     {!step.dropped && (
-                      <p className="code-mono mt-2 text-[0.75rem] text-slate-500 [overflow-wrap:anywhere] dark:text-slate-400">
-                        metadata {JSON.stringify(metadata)}
+                      <p className="code-mono mt-2 whitespace-pre-wrap text-[0.75rem] text-slate-500 [overflow-wrap:anywhere] dark:text-slate-400">
+                        metadata {JSON.stringify(metadata, null, 2)}
                       </p>
                     )}
                   </li>

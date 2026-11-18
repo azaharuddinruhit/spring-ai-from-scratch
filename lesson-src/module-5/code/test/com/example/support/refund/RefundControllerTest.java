@@ -39,7 +39,11 @@ class RefundControllerTest {
                 .hasStatusOk()
                 .bodyJson()
                 .isLenientlyEqualTo("""
-                        {"orderNumber": "1042", "amount": 59.90, "status": "CONFIRMED"}
+                        {
+                          "orderNumber": "1042",
+                          "amount": 59.90,
+                          "status": "CONFIRMED"
+                        }
                         """);
     }
 

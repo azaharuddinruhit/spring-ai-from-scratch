@@ -17,7 +17,10 @@ import org.springframework.ai.chat.messages.AssistantMessage;
 class TicketReplyServiceTest {
 
     private static final String APPROVED = """
-            {"approved": true, "problems": []}""";
+            {
+              "approved": true,
+              "problems": []
+            }""";
 
     private final ScriptedChatModel billing = replies("You were charged twice; a refund is waiting in the app.");
     private final ScriptedChatModel technical = replies("Please send the request id of a failing call.");
@@ -64,7 +67,12 @@ class TicketReplyServiceTest {
     @Test
     void revisesTheReplyWithTheReviewersProblems() {
         var service = service(plan("BILLING", "ACCOUNT"), replies("""
-                {"approved": false, "problems": ["It promises the refund by Friday."]}""", APPROVED));
+                {
+                  "approved": false,
+                  "problems": [
+                    "It promises the refund by Friday."
+                  ]
+                }""", APPROVED));
 
         ReplyDraft draft = service.draftReply("Two things", "Charged twice; add a colleague?");
 
@@ -80,7 +88,12 @@ class TicketReplyServiceTest {
                 Map.of(Department.BILLING, client(billing), Department.TECHNICAL, client(technical), Department.ACCOUNT, client(account)),
                 client(stubbornEditor),
                 client(new ScriptedChatModel(prompt -> new AssistantMessage("""
-                        {"approved": false, "problems": ["Promises a date."]}"""))));
+                        {
+                          "approved": false,
+                          "problems": [
+                            "Promises a date."
+                          ]
+                        }"""))));
 
         ReplyDraft draft = service.draftReply("Locked out", "I can't sign in.");
 

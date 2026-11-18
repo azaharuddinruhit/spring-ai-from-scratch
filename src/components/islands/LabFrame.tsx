@@ -1,5 +1,6 @@
 import { useRef, type CSSProperties, type ReactNode } from 'react';
 import { tokenize, type CodeLang } from '../../lib/code-tokens';
+import { prettyJson } from '../../lib/json-format';
 
 interface LabFrameProps {
   title: string;
@@ -68,8 +69,25 @@ function highlighted(code: string, lang: CodeLang): ReactNode[] {
   );
 }
 
+/**
+ * JSON one line per block, so a long value that wraps continues two columns in from its own line instead of at the left edge.
+ * The leading spaces stay in the text (copying keeps the indentation); the negative text-indent pulls them back into place.
+ */
+function jsonLines(code: string): ReactNode[] {
+  return code.split('\n').map((line, i) => {
+    const hang = `${line.length - line.trimStart().length + 2}ch`;
+    return (
+      <span key={i} className="block" style={{ paddingLeft: hang, textIndent: `-${hang}` }}>
+        {highlighted(line, 'json')}
+      </span>
+    );
+  });
+}
+
 /** Code in the code palette; with `lang`, coloured like the lesson code (see src/lib/code-tokens.ts). */
 export function CodeView({ code, lang, className = '' }: { code: string; lang?: CodeLang; className?: string }) {
+  // Every JSON box is indented the same way, whatever the sandbox built.
+  const shown = lang === 'json' ? prettyJson(code) : code;
   return (
     <pre
       className={
@@ -77,7 +95,7 @@ export function CodeView({ code, lang, className = '' }: { code: string; lang?: 
         className
       }
     >
-      <code>{lang ? highlighted(code, lang) : code}</code>
+      <code>{lang === 'json' ? jsonLines(shown) : lang ? highlighted(shown, lang) : shown}</code>
     </pre>
   );
 }
