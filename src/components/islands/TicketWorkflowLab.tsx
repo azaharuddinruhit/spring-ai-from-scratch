@@ -179,7 +179,7 @@ export default function TicketWorkflowLab() {
 
       <ol className="mt-4 space-y-4 border-l-2 border-slate-200 pl-4 dark:border-slate-700/70">
         <Stage title="Planner: entity(Plan.class)" note="Orchestrator. Splits the ticket and names a department for each issue.">
-          <CodeView code={plan} lang="json" className="whitespace-pre-wrap [overflow-wrap:anywhere]" />
+          <CodeView code={plan} lang="json" />
         </Stage>
 
         <Stage
@@ -215,7 +215,6 @@ export default function TicketWorkflowLab() {
             <CodeView
               code={JSON.stringify(round.problem === null ? { approved: true, problems: [] } : { approved: false, problems: [round.problem] })}
               lang="json"
-              className="whitespace-pre-wrap [overflow-wrap:anywhere]"
             />
             {round.problem !== null && i < result.rounds.length - 1 && (
               <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
@@ -230,7 +229,7 @@ export default function TicketWorkflowLab() {
         ))}
 
         <Stage title="ReplyDraft" note={`${result.modelCalls} model calls. An agent reviews every draft before it is sent.`}>
-          <CodeView code={JSON.stringify(draft, null, 2)} lang="json" className="whitespace-pre-wrap [overflow-wrap:anywhere]" />
+          <CodeView code={JSON.stringify(draft, null, 2)} lang="json" />
         </Stage>
       </ol>
     </LabFrame>

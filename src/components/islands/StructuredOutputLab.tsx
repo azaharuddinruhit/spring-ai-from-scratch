@@ -287,7 +287,7 @@ export default function StructuredOutputLab() {
                 {a.same ? (
                   <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-400">The same reply again.</p>
                 ) : (
-                  <CodeView code={a.reply} className="mt-1.5 whitespace-pre-wrap [overflow-wrap:anywhere]" />
+                  <CodeView code={a.reply} className="mt-1.5" />
                 )}
                 {a.validation !== undefined && (
                   <p className={'mt-2 text-sm ' + (a.validation ? 'text-rose-700 dark:text-rose-300' : 'text-brand-700 dark:text-brand-300')}>

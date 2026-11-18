@@ -260,7 +260,7 @@ export default function ToolLoopLab() {
                 <span className="font-medium text-slate-900 dark:text-slate-100">{step.title}</span>
               </p>
               <p className="mt-1 text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">{step.text}</p>
-              {step.json && <CodeView code={step.json} lang="json" className="mt-2 whitespace-pre-wrap [overflow-wrap:anywhere]" />}
+              {step.json && <CodeView code={step.json} lang="json" className="mt-2" />}
               {step.alarm && (
                 <p className="mt-2 text-xs font-medium text-rose-700 dark:text-rose-300">
                   {scenario === 'other' ? 'The model chose whose data to read.' : 'Internal details reached the model, and then the customer.'}

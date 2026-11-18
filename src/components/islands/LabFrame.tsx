@@ -69,33 +69,18 @@ function highlighted(code: string, lang: CodeLang): ReactNode[] {
   );
 }
 
-/**
- * JSON one line per block, so a long value that wraps continues two columns in from its own line instead of at the left edge.
- * The leading spaces stay in the text (copying keeps the indentation); the negative text-indent pulls them back into place.
- */
-function jsonLines(code: string): ReactNode[] {
-  return code.split('\n').map((line, i) => {
-    const hang = `${line.length - line.trimStart().length + 2}ch`;
-    return (
-      <span key={i} className="block" style={{ paddingLeft: hang, textIndent: `-${hang}` }}>
-        {highlighted(line, 'json')}
-      </span>
-    );
-  });
-}
-
 /** Code in the code palette; with `lang`, coloured like the lesson code (see src/lib/code-tokens.ts). */
 export function CodeView({ code, lang, className = '' }: { code: string; lang?: CodeLang; className?: string }) {
-  // Every JSON box is indented the same way, whatever the sandbox built.
+  // Every JSON box is indented the same way, whatever the sandbox built. Lines never wrap; the box scrolls sideways.
   const shown = lang === 'json' ? prettyJson(code) : code;
   return (
     <pre
       className={
-        'code-mono overflow-x-auto rounded-md border border-(--code-border) bg-(--code-bg) px-3.5 py-3 text-[0.8rem] leading-[1.65] text-(--code-fg) ' +
+        'code-mono overflow-x-auto whitespace-pre rounded-md border border-(--code-border) bg-(--code-bg) px-3.5 py-3 text-[0.8rem] leading-[1.65] text-(--code-fg) ' +
         className
       }
     >
-      <code>{lang === 'json' ? jsonLines(shown) : lang ? highlighted(shown, lang) : shown}</code>
+      <code>{lang ? highlighted(shown, lang) : shown}</code>
     </pre>
   );
 }

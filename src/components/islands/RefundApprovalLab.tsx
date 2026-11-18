@@ -173,7 +173,7 @@ export default function RefundApprovalLab() {
               <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{e.who} </span>
               <span className="text-slate-800 dark:text-slate-200">{e.title}</span>
             </p>
-            {e.json && <CodeView code={e.json} lang="json" className="mt-2 whitespace-pre-wrap [overflow-wrap:anywhere]" />}
+            {e.json && <CodeView code={e.json} lang="json" className="mt-2" />}
           </li>
         ))}
       </ol>

@@ -298,7 +298,7 @@ back as `Answer` at the far end of the return rail.
 - Zoom is off on phones by the owner's decision (viewport `user-scalable=no`, `touch-action: pan-x pan-y`, Safari `gesturestart`
   cancelled), although it fails WCAG 1.4.4 for readers who enlarge text. Keep body text at 1rem or more for that reason.
 - **Do** show JSON indented, two spaces, one key per line, everywhere: sandboxes format it through `prettyJson`
-  (`src/lib/json-format.ts`, which keeps number text such as `59.90`), and wrapped values hang under their key. JSON that
+  (`src/lib/json-format.ts`, which keeps number text such as `59.90`), and lines never wrap (each field keeps its own line; the box scrolls sideways). JSON that
   Jackson writes (`"key" : value`) stays as Jackson writes it, and log lines stay on one line.
 - **Do** let inline code break anywhere (`overflow-wrap: anywhere`, background cloned per line): a long API name in prose must
   never widen the page.

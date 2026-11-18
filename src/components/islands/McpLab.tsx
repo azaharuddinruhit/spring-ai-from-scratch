@@ -211,7 +211,7 @@ export default function McpLab() {
               <span className="font-medium text-slate-900 [overflow-wrap:anywhere] dark:text-slate-100">{step.title}</span>
             </p>
             {step.note && <p className="mt-1 text-slate-700 dark:text-slate-300">{step.note}</p>}
-            {step.json && <CodeView code={step.json} lang="json" className="mt-2 whitespace-pre-wrap [overflow-wrap:anywhere]" />}
+            {step.json && <CodeView code={step.json} lang="json" className="mt-2" />}
           </li>
         ))}
       </ol>
