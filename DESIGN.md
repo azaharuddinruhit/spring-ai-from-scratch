@@ -213,6 +213,9 @@ Small UI labels are Plex.
 - Wide tables and code scroll horizontally inside their column; the page itself never scrolls sideways. Table cells have a 9rem floor
   and the last (prose) column 17rem, so rows stay short and the clipped column signals that the table scrolls. These rules skip
   sandboxes (`.not-prose`): a sandbox table sizes its own columns and folds secondary columns into the main cell below `sm`.
+- Diagrams run left to right: sequence diagrams for a call moving between components, horizontal flowcharts (`flowchart LR`)
+  for pipelines, with labelled edges instead of decision diamonds. On desktop a diagram shrinks to fit the column; below 40rem
+  it stops at 55% and scrolls inside its box.
 - Every page starts with a "Skip to content" link that targets `#content` on the page's `main`.
 
 ## Elevation & Depth
