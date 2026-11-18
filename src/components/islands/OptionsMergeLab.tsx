@@ -189,7 +189,7 @@ export default function OptionsMergeLab() {
         </p>
       )}
 
-      <CodeView className="mt-4" code={javaFor(mode, client, request)} />
+      <CodeView className="mt-4" code={javaFor(mode, client, request)} lang="java" />
 
       <div className="mt-4 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
         <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">Try to change an options object</p>

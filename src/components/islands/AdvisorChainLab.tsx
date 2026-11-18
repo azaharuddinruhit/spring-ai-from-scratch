@@ -362,7 +362,7 @@ export default function AdvisorChainLab() {
 
       <div className="mt-4">
         <h4 className="text-xs font-medium text-slate-600 dark:text-slate-400">Your configuration</h4>
-        <CodeView code={javaFor(orders)} className="mt-1.5" />
+        <CodeView code={javaFor(orders)} lang="java" className="mt-1.5" />
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)]">

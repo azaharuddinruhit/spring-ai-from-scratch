@@ -265,7 +265,7 @@ export default function StructuredOutputLab() {
         <div className="min-w-0 space-y-4">
           <div>
             <h4 className="text-xs font-medium text-slate-600 dark:text-slate-400">Your code</h4>
-            <CodeView code={javaFor(mode, validate, nullable)} className="mt-1.5" />
+            <CodeView code={javaFor(mode, validate, nullable)} lang="java" className="mt-1.5" />
           </div>
           <div>
             <h4 className="text-xs font-medium text-slate-600 dark:text-slate-400">{request.title}</h4>

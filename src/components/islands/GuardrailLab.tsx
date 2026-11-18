@@ -280,7 +280,7 @@ export default function GuardrailLab() {
 
       <div className="mt-4">
         <h4 className="text-xs font-medium text-slate-600 dark:text-slate-400">Your configuration</h4>
-        <CodeView code={javaFor(config)} className="mt-1.5" />
+        <CodeView code={javaFor(config)} lang="java" className="mt-1.5" />
       </div>
 
       <div className="mt-5 space-y-3">

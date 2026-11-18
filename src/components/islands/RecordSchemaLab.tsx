@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { CodeView, LabFrame, Pill } from './LabFrame';
+import { CodeEditor, CodeView, LabFrame, Pill } from './LabFrame';
 
 /*
  * A browser-side copy of the rules BeanOutputConverter (Spring AI 2.0.2) uses to turn a record into JSON Schema, checked
@@ -398,17 +398,7 @@ export default function RecordSchemaLab() {
           <label htmlFor="record-source" className="text-xs font-medium text-slate-600 dark:text-slate-400">
             Records
           </label>
-          <textarea
-            id="record-source"
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-            spellCheck={false}
-            autoCapitalize="off"
-            autoCorrect="off"
-            rows={12}
-            aria-describedby="record-status"
-            className="code-mono mt-1.5 block w-full resize-y rounded-md border border-(--code-border) bg-(--code-bg) px-3.5 py-3 text-[0.8rem] leading-[1.65] text-(--code-fg) whitespace-pre"
-          />
+          <CodeEditor id="record-source" value={source} onChange={setSource} lang="java" rows={12} describedBy="record-status" />
           <p id="record-status" role="status" className={'mt-2 text-sm ' + (result.error ? 'text-rose-700 dark:text-rose-300' : 'text-slate-500 dark:text-slate-400')}>
             {result.error ?? `Generating for ${result.model!.root.name}.`}
           </p>
@@ -428,7 +418,7 @@ export default function RecordSchemaLab() {
               ? 'The schema native structured output sends to the provider.'
               : 'The text appended to your last user message when the provider is not used natively.'}
           </p>
-          {shown && <CodeView code={view === 'schema' ? shown.schema! : formatInstructions(shown.schema!)} className="mt-2 max-h-[26rem] overflow-y-auto" />}
+          {shown && <CodeView code={view === 'schema' ? shown.schema! : formatInstructions(shown.schema!)} lang={view === 'schema' ? 'json' : undefined} className="mt-2 max-h-[26rem] overflow-y-auto" />}
         </div>
       </div>
 

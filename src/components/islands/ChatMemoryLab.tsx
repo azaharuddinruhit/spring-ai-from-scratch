@@ -193,7 +193,7 @@ export default function ChatMemoryLab() {
 
       <div className="mt-4">
         <h4 className="text-xs font-medium text-slate-600 dark:text-slate-400">Your code</h4>
-        <CodeView code={javaFor(strategy, maxMessages)} className="mt-1.5" />
+        <CodeView code={javaFor(strategy, maxMessages)} lang="java" className="mt-1.5" />
         <p className="mt-2 text-sm text-slate-600 [overflow-wrap:anywhere] dark:text-slate-400">
           {NAMES[user]}'s conversation id:{' '}
           <span className="code-mono text-[0.8rem] text-slate-800 dark:text-slate-200">{conversationId ?? 'none'}</span>

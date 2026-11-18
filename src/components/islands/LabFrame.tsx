@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { useRef, type CSSProperties, type ReactNode } from 'react';
+import { tokenize, type CodeLang } from '../../lib/code-tokens';
 
 interface LabFrameProps {
   title: string;
@@ -55,7 +56,20 @@ export function CopyButton({ label, done, onClick }: { label: string; done: bool
   );
 }
 
-export function CodeView({ code, className = '' }: { code: string; className?: string }) {
+function highlighted(code: string, lang: CodeLang): ReactNode[] {
+  return tokenize(code, lang).map(({ text, color }, i) =>
+    color ? (
+      <span key={i} className="tok" style={{ '--tok-light': color[0], '--tok-dark': color[1] } as CSSProperties}>
+        {text}
+      </span>
+    ) : (
+      text
+    ),
+  );
+}
+
+/** Code in the code palette; with `lang`, coloured like the lesson code (see src/lib/code-tokens.ts). */
+export function CodeView({ code, lang, className = '' }: { code: string; lang?: CodeLang; className?: string }) {
   return (
     <pre
       className={
@@ -63,7 +77,50 @@ export function CodeView({ code, className = '' }: { code: string; className?: s
         className
       }
     >
-      <code>{code}</code>
+      <code>{lang ? highlighted(code, lang) : code}</code>
     </pre>
+  );
+}
+
+/** An editable code box: a transparent textarea over the same code, highlighted, scrolled in step with it. */
+export function CodeEditor({
+  id,
+  value,
+  onChange,
+  lang,
+  rows,
+  describedBy,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  lang: CodeLang;
+  rows: number;
+  describedBy?: string;
+}) {
+  const layer = useRef<HTMLPreElement>(null);
+  const box = 'code-mono m-0 px-3.5 py-3 text-[0.8rem] leading-[1.65] whitespace-pre';
+  return (
+    <div className="relative mt-1.5 overflow-hidden rounded-md border border-(--code-border) bg-(--code-bg)">
+      <pre ref={layer} aria-hidden="true" className={'pointer-events-none absolute inset-0 overflow-hidden text-(--code-fg) ' + box}>
+        {highlighted(value, lang)}
+        {/* A trailing line, so the layer is as tall as the textarea when the text ends with a newline. */}
+        {'\n'}
+      </pre>
+      <textarea
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onScroll={(e) => {
+          layer.current?.scrollTo(e.currentTarget.scrollLeft, e.currentTarget.scrollTop);
+        }}
+        spellCheck={false}
+        autoCapitalize="off"
+        autoCorrect="off"
+        rows={rows}
+        aria-describedby={describedBy}
+        className={'relative block w-full resize-y bg-transparent text-transparent caret-(--code-fg) selection:bg-brand-500/25 ' + box}
+      />
+    </div>
   );
 }

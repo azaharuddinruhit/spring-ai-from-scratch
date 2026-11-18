@@ -176,7 +176,7 @@ ${TERMINALS[terminal].returns} result = chatClient.prompt()
         </ol>
 
         <div className="space-y-3">
-          <CodeView code={java} />
+          <CodeView code={java} lang="java" />
           <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
             <p className="font-mono text-[0.7rem] font-semibold text-slate-500 uppercase">
               result : {TERMINALS[terminal].returns}

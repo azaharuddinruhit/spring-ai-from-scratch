@@ -214,7 +214,7 @@ export default function TextSplitterLab() {
         </fieldset>
       </div>
 
-      <CodeView code={javaFor(chunkSize, minChunkSizeChars, keepSeparator)} className="mt-4" />
+      <CodeView code={javaFor(chunkSize, minChunkSizeChars, keepSeparator)} lang="java" className="mt-4" />
 
       <div className="mt-5" aria-live="polite">
         {!result && !loadError && <p className="text-sm text-slate-500 dark:text-slate-400">Loading the cl100k_base tokenizer (about 1 MB)…</p>}

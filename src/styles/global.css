@@ -99,6 +99,14 @@ pre:is(.shiki, .astro-code) span {
   font-weight: var(--shiki-dark-font-weight);
 }
 
+/* Sandbox code coloured at runtime by src/lib/code-tokens.ts, in the same colours as Shiki. */
+.tok {
+  color: var(--tok-light);
+}
+.dark .tok {
+  color: var(--tok-dark);
+}
+
 /* Code font: JetBrains Mono without ligatures, so != and -> show exactly as typed, inline code included. */
 pre:is(.shiki, .astro-code),
 .code-mono,

@@ -167,7 +167,7 @@ export default function PromptTemplateLab() {
               </ol>
             )}
           </div>
-          <CodeView code={java} />
+          <CodeView code={java} lang="java" />
         </div>
       </div>
     </LabFrame>

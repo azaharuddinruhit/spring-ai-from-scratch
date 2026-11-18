@@ -338,7 +338,7 @@ export default function RagPipelineLab() {
         </fieldset>
       </div>
 
-      <CodeView code={java} className="mt-4" />
+      <CodeView code={java} lang="java" className="mt-4" />
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <span className="text-xs text-slate-500 dark:text-slate-400">Ask:</span>

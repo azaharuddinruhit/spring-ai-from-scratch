@@ -279,8 +279,8 @@ ORDER BY distance LIMIT ?
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        <CodeView code={java} />
-        <CodeView code={failed ? '-- The request fails before any SQL is sent.' : sqlText} />
+        <CodeView code={java} lang="java" />
+        <CodeView code={failed ? '-- The request fails before any SQL is sent.' : sqlText} lang="sql" />
       </div>
 
       <div className="mt-3 space-y-1 text-sm" aria-live="polite">

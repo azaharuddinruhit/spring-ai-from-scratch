@@ -39,7 +39,9 @@ There are no unit tests. `npm run build` is the gate.
   JetBrains Mono with ligatures off, so code shows exactly as typed. All scrollbars are thin and themed (`--scrollbar`; code boxes use
   the code palette).
 - Islands live in `src/components/islands/` and share `LabFrame`, `Pill` and `CodeView`. Code an island shows that is static per variant is
-  highlighted at build time in an Astro wrapper (see `ProviderSwitcherLab.astro`), so islands don't ship Shiki.
+  highlighted at build time in an Astro wrapper (see `ProviderSwitcherLab.astro`), so islands don't ship Shiki. Code an island builds
+  at runtime goes through `CodeView` with `lang` (`java`, `sql` or `json`), or `CodeEditor` for editable code: `src/lib/code-tokens.ts`
+  colours it with Shiki's theme colours (99.5% of characters agree with Shiki on the lesson Java). Never show Java uncoloured.
 - `src/lib/` holds exact TypeScript ports used by the Module 4 labs: `token-text-splitter.ts` (`TokenTextSplitter.doSplit`, with
   `js-tiktoken` cl100k_base loaded by dynamic import so only that lab fetches the 1 MB rank table) and `vector-filter.ts` (the
   `Filter.Expression` text parser, `PgVectorFilterExpressionConverter` and a jsonpath evaluator with PostgreSQL semantics). Both
