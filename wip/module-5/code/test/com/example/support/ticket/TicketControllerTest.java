@@ -15,12 +15,16 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @WebMvcTest(TicketController.class)
 @Import(SecurityConfig.class)
 class TicketControllerTest {
+
+    private static final RequestPostProcessor AGENT = jwt().authorities(new SimpleGrantedAuthority("SCOPE_support.agent"));
 
     @Autowired
     private MockMvcTester mvc;
@@ -34,7 +38,7 @@ class TicketControllerTest {
                 .willReturn(new ReplyDraft(List.of(Department.BILLING), "A refund is waiting in the app.", 2, false));
 
         assertThat(mvc.post().uri("/api/tickets/reply-drafts")
-                .with(jwt())
+                .with(AGENT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {"subject": "Charged twice", "body": "My card was charged twice."}
@@ -49,12 +53,24 @@ class TicketControllerTest {
     @Test
     void rejectsAnEmptyTicket() {
         assertThat(mvc.post().uri("/api/tickets/reply-drafts")
-                .with(jwt())
+                .with(AGENT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {"subject": "Help", "body": ""}
                         """))
                 .hasStatus(HttpStatus.BAD_REQUEST);
+        then(replies).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void isNotOpenToCustomers() {
+        assertThat(mvc.post().uri("/api/tickets/reply-drafts")
+                .with(jwt().jwt(token -> token.subject("alice")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"subject": "Charged twice", "body": "My card was charged twice."}
+                        """))
+                .hasStatus(HttpStatus.FORBIDDEN);
         then(replies).shouldHaveNoInteractions();
     }
 }

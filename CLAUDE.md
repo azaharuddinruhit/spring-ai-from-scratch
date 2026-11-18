@@ -100,6 +100,26 @@ with a refusal instruction when no documents come back unless `allowEmptyContext
 original query when the line count is wrong, and a duplicate query throws `IllegalStateException: Duplicate key`; the semantic cache
 from Module 3 tags its entries `kind: semantic-cache` and filters on it because it shares the knowledge base's store.
 `TextSplitterLab`, `VectorSearchLab` and `RagPipelineLab` simulate these rules (their scores and model replies are invented).
+Tools, MCP and workflows (verified by running the 2.0.2 classes; repositories also on PostgreSQL 17): a `ToolContext` parameter is
+left out of the tool schema; `DefaultToolExecutionExceptionProcessor` sends the exception message to the model and rethrows
+`ClientAuthorizationException`; `spring.ai.tools.limits` defaults are 40 per tool and 150 in total, `-1` disables, YAML map keys keep
+their case; `on-limit-exceeded: THROW` (default) returns one generation with finish reason `toolCallLimitExceeded`
+(`ToolCallLimitExceededException.FINISH_REASON`) and the limit message as text, so the service must check it (limit N means N + 1 model
+calls); `defaultToolCallbacks`/`toolCallbacks` are deprecated for removal, `defaultTools(Object...)` takes `@Tool` objects, callbacks
+and providers; `ToolSearchToolCallingAdvisor` (`spring-ai-starter-tool-search-advisor`,
+`spring.ai.chat.client.tool-search-advisor.enabled`) needs `CONVERSATION_ID`; `toolExecutionEligibilityChecker` leaves an unanswered
+tool call in memory. MCP: a WebMVC server without `spring.ai.mcp.server.protocol: STREAMABLE` starts SSE (client gets 404 on
+`POST /mcp`); `@McpTool` hints default to readOnly false, destructive true, idempotent false, openWorld true; `@PreAuthorize` on a tool
+gives `isError` "Access Denied"; a bad token fails `initialize` with `McpHttpClientTransportAuthorizationException`; MCP tools are not
+added to `ChatClient` automatically; the default `ToolContextToMcpMetaConverter` copies the whole tool context into `_meta` (`noOp()`);
+`initialized: false` starts without the server but then every chat fails, because `ChatClient` lists provider tools per request
+(the lesson wraps the provider in `BestEffortToolCallbacks`); duplicate tool names get `alt_1_`; `@McpPrompt` returning `String` gives
+an ASSISTANT message; STDIO servers need `stdio=true`, no web app, no banner and an empty console log pattern. JDBC: the PostgreSQL
+driver can't bind an enum or an `Instant`, so `JdbcClient.paramSource(record)` fails; bind `.name()` and `OffsetDateTime`.
+`ToolLoopLab`, `McpLab`, `RefundApprovalLab` and `TicketWorkflowLab` simulate these rules (model replies invented).
+Module 5 lesson code lives in `wip/module-5/code` (63 tests; `lesson1/`, `lesson2/` hold the earlier versions of files the later
+lessons change). Lessons are generated from `wip/module-5/templates/*.mdx` with `python wip/module-5/assemble.py <template> <out> wip/module-5/code`,
+which turns `@@CODE file | regex; regex@@` lines into fenced code with those lines highlighted. Edit the template, not the MDX.
 
 MDX pitfall: `{` and `<` in prose are parsed as JSX. Put generics and braces inside backticks.
 

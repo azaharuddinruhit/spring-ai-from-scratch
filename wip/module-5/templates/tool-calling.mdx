@@ -1,0 +1,236 @@
+---
+description: Give the support assistant tools with @Tool and ToolContext, see how ToolCallingAdvisor runs the loop, control what the model reads when a tool fails, and cap runaway loops with spring.ai.tools.limits.
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import ToolLoopLab from '@/components/islands/ToolLoopLab';
+
+The support assistant answers from the knowledge base, but it can't see a customer's orders. "Where is my order 1042?" needs
+data that lives in your database. With tool calling, the model asks your application to run a method, reads the result and then
+answers. The model only asks. Your code decides which tools exist, whose data they read and when the loop stops.
+
+## 1. Spring mental model
+
+A tool works like a controller method that the model calls instead of a browser. `@Tool` marks the method. Its description is the
+documentation the model reads. Spring AI turns the parameters into a JSON schema, much as springdoc does for a `@RequestBody`.
+`ToolCallingAdvisor` plays the `DispatcherServlet` part: it receives the model's tool calls, runs the matching methods and sends
+the results back.
+
+<Mermaid
+  caption="ToolCallingAdvisor at HIGHEST_PRECEDENCE + 300. It loops until the model answers in text or a limit is reached."
+  code={`
+flowchart LR
+  P["Prompt<br/>messages + tool definitions"] --> M["ChatModel<br/>call"]
+  M -->|"tool calls"| X["ToolCallingManager<br/>runs each tool"]
+  X -->|"results appended<br/>as tool messages"| M
+  M -->|"text"| A["Answer"]
+  X -->|"limit reached"| L["finish reason<br/>toolCallLimitExceeded"]
+`}
+/>
+
+These rules come from the 2.0.2 classes and from tests we ran against them:
+
+- `ChatClient` registers `ToolCallingAdvisor` itself, at `HIGHEST_PRECEDENCE + 300`. Every model call in the loop sends the whole
+  exchange so far, including earlier tool calls and their results. Advisors ordered after it run once per model call (Module 3).
+- A `ToolContext` parameter is left out of the schema, so the model can't see it or set it. A parameter with `@ToolParam` is
+  part of the schema, and the model fills it with whatever it reads in the conversation.
+- The return value goes back to the model as JSON. A record becomes a JSON object.
+- When a tool throws, a `ToolExecutionExceptionProcessor` decides what the model reads. The default one sends the exception
+  message. A bean of your own replaces it.
+- `spring.ai.tools.limits` caps the loop: `max-calls-per-tool-default` (40), `max-calls-per-tool` per tool name,
+  `max-total-tool-calls` (150) and `excluded-tools`. `-1` turns a limit off.
+- With `on-limit-exceeded: THROW` (the default), the call that would go over the limit doesn't run. The advisor stops the loop and
+  returns one generation, with finish reason `toolCallLimitExceeded` and the limit message as its text, such as "Tool call limit
+  (3) exceeded for tool 'findOrder'. No further calls to this tool are allowed in this turn." With a limit of 3, the model is
+  called four times. `RETURN_ERROR_RESPONSE` sends that message to the model as the tool's result instead, and the loop goes on.
+- `defaultTools(Object...)` and `tools(Object...)` take `@Tool` objects, `ToolCallback`s and `ToolCallbackProvider`s.
+  `defaultToolCallbacks` and `toolCallbacks` are deprecated for removal in 2.0.
+
+Who decides what:
+
+| Decision | Made by |
+| --- | --- |
+| Whether to call a tool, which one, and with which arguments | The model |
+| Which tools exist and what each description says | Your `@Tool` methods |
+| Whose data a tool reads | `ToolContext`, set by your service from the signed-in user |
+| What the model reads when a tool fails | Your `ToolExecutionExceptionProcessor` |
+| When the loop stops | `spring.ai.tools.limits`, then your service reads the finish reason |
+
+## 2. Interactive sandbox
+
+<ToolLoopLab client:visible />
+
+Things to try:
+
+- Step through **Where is my order?** It takes three model calls: one per tool, and one for the answer.
+- Pick **Someone else's order** and set the customer id to come from **@ToolParam**. The model copies "bob" from the question,
+  and Alice reads Bob's order. Switch back to **ToolContext**: the schema has no customer id, so the lookup can only use Alice's.
+- Pick **The database times out** with the **Default processor**. The model reads your SQL and the database error, and repeats
+  them to the customer. With **ModelSafeToolErrors**, it reads one sentence it can act on.
+- Pick **Keep checking** and change the limit. The tool runs N times, the model is called N + 1 times, and the service answers with
+  its own fallback instead of the limit message.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+Tool calling is part of `spring-ai-model`, which every model starter already brings, so `build.gradle` doesn't change. The order
+lookup lives in its own package. An order is a record, and the repository always filters by customer:
+
+<CodeFile title="src/main/java/com/example/support/order/OrderStatus.java">
+@@CODE main/com/example/support/order/OrderStatus.java@@
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/order/Order.java">
+@@CODE main/com/example/support/order/Order.java@@
+</CodeFile>
+
+The table, for your migration tool. Every query filters by `customer_id`:
+
+<CodeFile
+  title="orders.sql"
+  lang="sql"
+  lines="3"
+  code={`CREATE TABLE orders (
+    number          VARCHAR(20)    PRIMARY KEY,
+    customer_id     VARCHAR(100)   NOT NULL,
+    status          VARCHAR(20)    NOT NULL,
+    total           NUMERIC(12, 2) NOT NULL,
+    placed_on       DATE           NOT NULL,
+    tracking_number VARCHAR(40)
+);
+
+CREATE INDEX orders_customer_placed_on ON orders (customer_id, placed_on DESC);`}
+/>
+
+<CodeFile title="src/main/java/com/example/support/order/OrderRepository.java">
+@@CODE main/com/example/support/order/OrderRepository.java | WHERE customer_id@@
+</CodeFile>
+
+The service puts the signed-in customer into the tool context, and the tools read it from there. One small class owns the key:
+
+<CodeFile title="src/main/java/com/example/support/tools/CustomerToolContext.java">
+@@CODE main/com/example/support/tools/CustomerToolContext.java | instanceof String@@
+</CodeFile>
+
+A refusal is an exception whose message the model may read, such as an unknown order number:
+
+<CodeFile title="src/main/java/com/example/support/tools/ToolRefusalException.java">
+@@CODE main/com/example/support/tools/ToolRefusalException.java@@
+</CodeFile>
+
+The tools are two methods on a component. The model sees `orderNumber` and `count`; the customer comes from the context:
+
+<CodeFile title="src/main/java/com/example/support/order/OrderTools.java">
+@@CODE main/com/example/support/order/OrderTools.java | @Tool\(; customerId\(context\)@@
+</CodeFile>
+
+This processor replaces the default one. It passes refusals through and replaces every other failure with a sentence that leaks
+nothing:
+
+<CodeFile title="src/main/java/com/example/support/tools/ModelSafeToolErrors.java">
+@@CODE lesson1/ModelSafeToolErrors.java | case ToolRefusalException; yield@@
+</CodeFile>
+
+Register the tools on the support client from Module 4:
+
+<CodeFile title="src/main/java/com/example/support/chat/SupportChatConfig.java">
+@@CODE lesson1/SupportChatConfig.java | OrderTools orderTools\); defaultTools@@
+</CodeFile>
+
+The service sets the tool context and reads the finish reason. Without that check, a customer whose question hit the limit reads
+"Tool call limit (5) exceeded for tool 'findOrder'" as the answer:
+
+<CodeFile title="src/main/java/com/example/support/chat/SupportChatService.java">
+@@CODE main/com/example/support/chat/SupportChatService.java | toolContext; FINISH_REASON@@
+</CodeFile>
+
+Set limits that fit your tools. The defaults allow 40 calls per tool and 150 per question, each one followed by a model call:
+
+<CodeFile
+  title="src/main/resources/application.yaml"
+  lang="yaml"
+  lines="5-8"
+  code={`spring:
+  ai:
+    tools:
+      limits:
+        max-calls-per-tool-default: 5
+        max-calls-per-tool:
+          recentOrders: 2
+        max-total-tool-calls: 12
+        # on-limit-exceeded: THROW is the default; SupportChatService checks the finish reason`}
+/>
+
+The tests call the tool methods directly, then run the real advisor against a scripted model. The model in the tests is a small
+`ChatModel` that answers from a function and records every prompt:
+
+<CodeFile title="src/test/java/com/example/support/ScriptedChatModel.java">
+@@CODE test/com/example/support/ScriptedChatModel.java | toolCalls\(@@
+</CodeFile>
+
+<CodeFile title="src/test/java/com/example/support/order/OrderToolsTest.java">
+@@CODE test/com/example/support/order/OrderToolsTest.java | void theModelCannotChooseTheCustomer; doesNotContain\("customer"@@
+</CodeFile>
+
+<CodeFile title="src/test/java/com/example/support/tools/ModelSafeToolErrorsTest.java">
+@@CODE test/com/example/support/tools/ModelSafeToolErrorsTest.java | doesNotContain\("db-prod-3"\)@@
+</CodeFile>
+
+The first four tests come from Module 3. The last two script a model that asks for Bob's order, and one that never stops asking:
+
+<CodeFile title="src/test/java/com/example/support/chat/SupportChatServiceTest.java">
+@@CODE test/com/example/support/chat/SupportChatServiceTest.java | "customerId": "bob"; should\(\)\.findForCustomer\("alice"; maxCallsPerTool\(3\); hasSize\(4\)@@
+</CodeFile>
+
+## 4. Production gotchas & security
+
+<Gotcha kind="security" title="Never let the model choose whose data a tool reads">
+A `@ToolParam String customerId` is filled by the model, from anything in the conversation, including "my husband's id is bob" or
+text in a retrieved document. Take identity from the signed-in user, pass it with `.toolContext(...)`, and filter every query by
+it. A test that checks the tool's input schema for `customer` keeps it that way.
+</Gotcha>
+
+<Gotcha kind="security" title="The default processor sends exception messages to the model">
+`DefaultToolExecutionExceptionProcessor` returns the exception message as the tool result. For a JDBC failure that is your SQL,
+table and column names, and host names, and the model may repeat them to the customer. Define one
+`ToolExecutionExceptionProcessor` bean that passes only messages written for the model and logs the rest.
+</Gotcha>
+
+<Gotcha kind="reliability" title="A limit ends the loop with a technical message as the answer">
+With the default `THROW`, `.content()` returns "Tool call limit (3) exceeded for tool 'findOrder'. No further calls to this tool
+are allowed in this turn." No exception is thrown. Read the finish reason and compare it with
+`ToolCallLimitExceededException.FINISH_REASON`, as `SupportChatService` does, or the customer reads the limit message.
+</Gotcha>
+
+<Gotcha kind="cost" title="Every tool round is another full model call">
+Each round sends the whole exchange again: system prompt, memory, retrieved documents, every tool definition and every earlier
+result. The defaults of 40 calls per tool and 150 per question are far more than a support question needs. Set limits near
+what a real question takes, and keep tool results small: return a record with the fields the model needs, not the whole entity.
+</Gotcha>
+
+<Gotcha kind="cost" title="Many tools mean a long prompt on every call">
+Every tool definition goes with every model call. With dozens of tools, consider `ToolSearchToolCallingAdvisor`
+(`spring-ai-starter-tool-search-advisor`, enabled with `spring.ai.chat.client.tool-search-advisor.enabled=true`). It sends only a
+`toolSearchTool` at first, then adds the tools the model's searches find. In our test, a scripted model searched for "order" and the next
+call carried `findOrder` and `toolSearchTool`. It needs `ChatMemory.CONVERSATION_ID` on the request, and fails without it.
+</Gotcha>
+
+<Gotcha kind="security" title="Keep tools that change things out of the model's reach">
+The model calls a tool whenever the conversation makes it seem right, and the conversation can include a customer's
+instructions or a poisoned document. Read-only tools scoped to the signed-in customer are safe to expose. A tool that refunds,
+cancels or deletes should only prepare the action for the customer to confirm. Lesson 3 builds that.
+</Gotcha>
+
+<Gotcha kind="migration" title="defaultToolCallbacks is deprecated for removal">
+In 2.0, `defaultToolCallbacks(...)` and `toolCallbacks(...)` are deprecated for removal. `defaultTools(...)` and `tools(...)`
+accept `@Tool` objects, `ToolCallback`s and `ToolCallbackProvider`s, so one call registers all of them.
+</Gotcha>
+
+## Recap
+
+- `@Tool` methods are what the model may call. `ToolCallingAdvisor` (`+ 300`) runs the loop, and each round is a full model call.
+- A `ToolContext` parameter is invisible to the model. Use it for identity, and filter every query by it.
+- A `ToolExecutionExceptionProcessor` bean decides what the model reads when a tool fails. Pass only messages written for it.
+- `spring.ai.tools.limits` caps the loop. With the default `THROW`, check the finish reason `toolCallLimitExceeded` and answer with
+  your own text.

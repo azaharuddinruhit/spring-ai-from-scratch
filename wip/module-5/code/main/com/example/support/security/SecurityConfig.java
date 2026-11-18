@@ -14,7 +14,9 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain apiSecurity(HttpSecurity http) throws Exception {
         return http
-                .authorizeHttpRequests(requests -> requests.anyRequest().authenticated())
+                .authorizeHttpRequests(requests -> requests
+                        .requestMatchers("/api/tickets/**").hasAuthority("SCOPE_support.agent") // agents, not customers
+                        .anyRequest().authenticated())
                 .oauth2ResourceServer(server -> server.jwt(Customizer.withDefaults()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .csrf(AbstractHttpConfigurer::disable) // bearer tokens only: no session cookie to forge
