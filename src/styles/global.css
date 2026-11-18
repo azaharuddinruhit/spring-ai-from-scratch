@@ -217,3 +217,8 @@ pre:is(.shiki, .astro-code) .line.diff-changed::before {
   height: auto;
   margin: 0 auto;
 }
+@media (max-width: 40rem) {
+  .mermaid-diagram svg {
+    min-width: var(--diagram-min-width, 0);
+  }
+}

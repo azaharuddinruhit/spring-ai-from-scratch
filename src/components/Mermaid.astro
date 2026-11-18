@@ -28,6 +28,7 @@ const { code, caption } = Astro.props;
       theme: 'base',
       // Narrower participants than Mermaid's 150px boxes with 50px gaps, so a six-participant diagram fits the article column.
       sequence: { width: 112, actorMargin: 28, boxMargin: 8 },
+      flowchart: { nodeSpacing: 28, rankSpacing: 36, padding: 10 },
       themeVariables: dark
         ? {
             background: '#0f172a',
@@ -80,9 +81,9 @@ const { code, caption } = Astro.props;
         const rendered = el.querySelector('svg');
         rendered?.setAttribute('role', 'img');
         rendered?.setAttribute('aria-label', el.dataset.label ?? 'Diagram');
-        // Wide diagrams scroll inside their box instead of shrinking past 55%, where labels become unreadable on phones.
+        // On phones, wide diagrams scroll inside their box instead of shrinking past 55%, where labels become unreadable.
         const width = rendered?.viewBox.baseVal.width;
-        if (rendered && width) rendered.style.minWidth = `${Math.round(width * 0.55)}px`;
+        if (rendered && width) rendered.style.setProperty('--diagram-min-width', `${Math.round(width * 0.55)}px`);
       } catch (error) {
         console.error('Mermaid render failed', error);
         // Fall back to the diagram source, which still reads as a description of the flow.

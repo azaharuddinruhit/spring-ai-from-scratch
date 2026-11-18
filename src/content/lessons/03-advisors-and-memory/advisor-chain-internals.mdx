@@ -46,15 +46,16 @@ the finished answer, with the token usage of every round added up.
 <Mermaid
   caption="One call with a tool. Memory runs once; the logger runs once per model call, inside the tool loop."
   code={`
-flowchart TD
-  C["ChatClient.call()"] --> M["MessageChatMemoryAdvisor<br/>HIGHEST_PRECEDENCE + 200"]
-  M --> T["ToolCallingAdvisor<br/>HIGHEST_PRECEDENCE + 300"]
+flowchart LR
+  C["ChatClient<br/>.call()"] --> M["MessageChat<br/>MemoryAdvisor<br/>+200"]
+  M --> T["ToolCalling<br/>Advisor<br/>+300"]
   subgraph L["Once per model call"]
-    G["SimpleLoggerAdvisor<br/>0"] --> X["ChatModelCallAdvisor<br/>LOWEST_PRECEDENCE"]
+    direction LR
+    G["SimpleLogger<br/>Advisor<br/>0"] --> X["ChatModel<br/>CallAdvisor<br/>LOWEST"]
   end
   T --> G
   X --> P["ChatModel"]
-  P -.->|"tool call: run it, call again"| T
+  P -.->|"tool call: run it,<br/>call again"| T
 `}
 />
 

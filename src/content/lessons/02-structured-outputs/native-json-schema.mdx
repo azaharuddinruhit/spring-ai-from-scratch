@@ -25,18 +25,15 @@ Both switches live on `ChatClient.EntityParamSpec`, the lambda you pass as the s
 <Mermaid
   caption="What the two switches change. Native options are those implementing StructuredOutputChatOptions. Without validateSchema() there is no validation advisor, and the reply goes straight to the converter."
   code={`
-flowchart TD
-  E["entity(Answer.class, spec)"] --> V["Validation advisor"]
-  V --> X["ChatModelCallAdvisor"]
-  X --> Q{"Native<br/>options?"}
-  Q -- yes --> N["outputSchema(schema)<br/>on the options"]
-  Q -- no --> F["Format text in<br/>the user message"]
+flowchart LR
+  E["entity(Answer.class,<br/>spec)"] --> V["Validation<br/>advisor"]
+  V --> X["ChatModel<br/>CallAdvisor"]
+  X -- "native options" --> N["outputSchema<br/>on the options"]
+  X -- "other options" --> F["Format text in<br/>the user message"]
   N --> M["Model call"]
   F --> M
-  M --> R{"Valid?"}
-  R -- "yes, or no retries left" --> C["Converter reads Answer"]
-  R -- "no, retries left" --> A["Errors appended to<br/>the user message"]
-  A --> X
+  M -- "valid, or no<br/>retries left" --> C["Converter<br/>reads Answer"]
+  M -. "invalid: retry with<br/>the errors appended" .-> X
 `}
 />
 
