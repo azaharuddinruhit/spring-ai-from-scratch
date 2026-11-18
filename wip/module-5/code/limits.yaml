@@ -1,0 +1,10 @@
+spring:
+  ai:
+    tools:
+      limits:
+        max-calls-per-tool-default: 5
+        max-calls-per-tool:
+          findOrder: 3
+          "[recentOrders]": 2
+        max-total-tool-calls: 12
+        on-limit-exceeded: throw
