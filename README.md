@@ -56,10 +56,12 @@ src/
   components/               Astro components: HeroTrace (home), Mermaid, CodeFile, Gotcha, layout pieces
   layouts/                  base and lesson layouts
 lesson-src/module-5/        Module 5 lesson sources: the verified Java code and tests, MDX templates, findings and probes
+lesson-src/module-6/        Module 6 lesson sources: the support app with the production changes, templates, findings and probes
 ```
 
-The Module 5 lessons are generated from `lesson-src/module-5/templates/` so their code is exactly the code that compiled and
-passed its tests; see [`lesson-src/module-5/README.md`](lesson-src/module-5/README.md).
+The Module 5 and 6 lessons are generated from `lesson-src/module-<n>/templates/` so their code is exactly the code that compiled
+and passed its tests; see [`lesson-src/module-5/README.md`](lesson-src/module-5/README.md) and
+[`lesson-src/module-6/README.md`](lesson-src/module-6/README.md).
 
 A lesson goes live when its MDX file exists at the path that matches its entry in `curriculum.ts`. Until then it appears as "soon" in the navigation.
 

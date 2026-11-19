@@ -7,6 +7,7 @@ import { STACK } from '@/data/versions';
 
 const nav = await getNavigation();
 const first = publishedSequence(nav)[0];
+const hasUnwritten = nav.some((m) => m.navLessons.some((l) => !l.href));
 
 const anatomy = [
   { title: 'The Spring mental model', body: 'Each abstraction is mapped to a Spring primitive you already know, with a diagram of the request lifecycle.' },
@@ -76,7 +77,8 @@ const anatomy = [
       <div class="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <h2 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">The course</h2>
         <p class="mt-2 max-w-[60ch] text-slate-600 dark:text-slate-400">
-          Six modules, meant to be taken in order. Lessons not yet written are listed so you can see where the course is going.
+          Six modules, meant to be taken in order.
+          {hasUnwritten && 'Lessons not yet written are listed so you can see where the course is going.'}
         </p>
         <ol class="mt-10 divide-y divide-slate-200 border-y border-slate-200 dark:divide-slate-800 dark:border-slate-800">
           {

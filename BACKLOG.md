@@ -36,6 +36,4 @@ Tasks, biggest gain first:
   client–server run, and the repositories on PostgreSQL 17.
 - Build the Gradle dependency blocks shown in Module 5 with Gradle. The artifacts resolved with Maven; `spring-boot-starter-jdbc`
   on the shipping server was not in that build.
-- Four merged branches remain on GitHub: `add-claude-md`, `feature-section-reading-time`, `fix-diagram-and-highlighting` and
-  `fix-horizontal-diagrams`. Delete them only if the owner says so.
 - Optional, not planned: publish the finished support app as a runnable project.
