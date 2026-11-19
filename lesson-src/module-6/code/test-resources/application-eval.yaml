@@ -1,0 +1,9 @@
+spring:
+  ai:
+    ollama:
+      init:
+        chat:
+          additional-models: llama3.1:8b
+support:
+  eval:
+    judge-model: llama3.1:8b   # a stronger model than the one it grades

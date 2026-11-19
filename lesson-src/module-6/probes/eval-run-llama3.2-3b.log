@@ -1,0 +1,35 @@
+08:53:33.945 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.example.support.chat.SupportAnswerEvalTest]: SupportAnswerEvalTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+08:53:34.123 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.example.support.SupportApplication for test class com.example.support.chat.SupportAnswerEvalTest
+08:53:34.179 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.example.support.chat.SupportAnswerEvalTest]: SupportAnswerEvalTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+08:53:34.184 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.example.support.SupportApplication for test class com.example.support.chat.SupportAnswerEvalTest
+2026-11-19T08:53:34.492+06:00  INFO 19708 --- [           main] c.e.support.chat.SupportAnswerEvalTest   : Starting SupportAnswerEvalTest using Java 25.0.1 with PID 19708 (started by Ruhit in D:\Projects\zombie\spring-ai-from-scratch\lesson-src\module-6)
+2026-11-19T08:53:34.495+06:00  INFO 19708 --- [           main] c.e.support.chat.SupportAnswerEvalTest   : The following 2 profiles are active: "it", "eval"
+2026-11-19T08:53:42.930+06:00  INFO 19708 --- [           main] c.e.support.chat.SupportAnswerEvalTest   : Started SupportAnswerEvalTest in 8.697 seconds (process running for 11.223)
+        "name" : "findOrder",
+        "name" : "findOrder",
+        "name" : "findOrder",
+        "name" : "proposeRefund",
+        "name" : "findOrder",
+        "name" : "proposeRefund",
+        "name" : "proposeRefund",
+        "name" : "proposeRefund",
+        "name" : "findOrder",
+        "name" : "findOrder",
+        "name" : "recentOrders",
+        "name" : "recentOrders",
+        "name" : "findOrder",
+        "name" : "findOrder",
+2026-11-19T08:54:26.086+06:00  WARN 19708 --- [           main] c.e.support.chat.SupportAnswerEvalTest   : RelevancyEvaluator failed: How long does a refund take to reach my card? (2 sources) -> I don't know. I'll pass this question to a support agent.
+2026-11-19T08:54:27.312+06:00  WARN 19708 --- [           main] c.e.support.chat.SupportAnswerEvalTest   : RelevancyEvaluator failed: How many days do I have to ask for a refund? (1 sources) -> You don't know the answer to that question. I can try to find the order number for you or help with something else.
+2026-11-19T08:54:28.489+06:00  WARN 19708 --- [           main] c.e.support.chat.SupportAnswerEvalTest   : RelevancyEvaluator failed: Which card do you send my refund to? (1 sources) -> I don't know. I don't have enough information to answer that question. I can try to pass the question to a support agent or provide general information about our refund policy. Would you like me to do that?
+2026-11-19T08:54:29.877+06:00  WARN 19708 --- [           main] c.e.support.chat.SupportAnswerEvalTest   : RelevancyEvaluator failed: How soon do you ship an order? (2 sources) -> We ship every order within two business days.
+2026-11-19T08:54:31.310+06:00  WARN 19708 --- [           main] c.e.support.chat.SupportAnswerEvalTest   : RelevancyEvaluator failed: How long does standard delivery take inside the EU? (2 sources) -> Standard delivery takes 3 to 5 business days inside the EU.
+2026-11-19T08:54:31.879+06:00  WARN 19708 --- [           main] c.e.support.chat.SupportAnswerEvalTest   : RelevancyEvaluator failed: Where do I find my tracking number? (0 sources) -> I don't know the answer to that question. I can pass the question to a support agent for further assistance. Would you like me to escalate this to a support agent?
+  JUnit Jupiter:SupportAnswerEvalTest:answersStayRelevantAndGrounded(KnowledgeIngestionService, Builder, String)
+    MethodSource [className = 'com.example.support.chat.SupportAnswerEvalTest', methodName = 'answersStayRelevantAndGrounded', methodParameterTypes = 'com.example.support.knowledge.KnowledgeIngestionService, org.springframework.ai.chat.client.ChatClient$Builder, java.lang.String']
+Expecting actual:
+to be greater than or equal to:
+       com.example.support.chat.SupportAnswerEvalTest.answersStayRelevantAndGrounded(SupportAnswerEvalTest.java:62)
+[         1 tests found           ]
+[         0 tests successful      ]
+[         1 tests failed          ]

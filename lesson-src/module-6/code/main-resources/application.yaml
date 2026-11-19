@@ -1,0 +1,58 @@
+# The support app's application.yaml, as Modules 3 to 5 build it (here so the full app can start in tests).
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/support
+    username: support
+    password: ${SUPPORT_DB_PASSWORD:}
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      embedding:
+        model: text-embedding-3-small
+        metadata-mode: none
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        dimensions: 1536
+        distance-type: cosine-distance
+        index-type: hnsw
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: always
+    tools:
+      limits:
+        max-calls-per-tool-default: 5
+        max-calls-per-tool:
+          recentOrders: 2
+        max-total-tool-calls: 12
+    mcp:
+      client:
+        type: SYNC
+        initialized: false
+        request-timeout: 5s
+        streamable-http:
+          connections:
+            shipping:
+              url: https://shipping-mcp.internal.example.com
+  security:
+    oauth2:
+      client:
+        registration:
+          shipping:
+            provider: acme-login
+            client-id: support-assistant
+            client-secret: ${SHIPPING_MCP_CLIENT_SECRET:}
+            authorization-grant-type: client_credentials
+            scope: mcp,shipments.read
+        provider:
+          acme-login:
+            token-uri: https://login.example.com/oauth2/token
+      resourceserver:
+        jwt:
+          issuer-uri: https://login.example.com
+
+support:
+  mcp:
+    allowed-tools: track_shipment

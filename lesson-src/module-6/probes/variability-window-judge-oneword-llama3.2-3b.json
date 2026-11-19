@@ -1,0 +1,10 @@
+{
+  "prompt": "Evaluate whether or not the following claim is supported by the provided document.\nEvery number and time in the claim must appear in the document or follow directly from it.\nReply with one word, yes or no, and nothing else.\n\nDocument:\n{document}\n\nClaim:\n{claim}\n",
+  "verdicts": [
+    "No",
+    "No",
+    "No",
+    "No",
+    "No"
+  ]
+}

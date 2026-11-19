@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/support
+    username: support
+    password: ${SUPPORT_DB_PASSWORD}
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      embedding:
+        model: text-embedding-3-small
+        metadata-mode: none
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        dimensions: 1536
+        distance-type: cosine-distance
+        index-type: hnsw
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: always

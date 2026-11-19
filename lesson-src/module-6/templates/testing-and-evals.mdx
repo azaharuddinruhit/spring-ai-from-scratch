@@ -1,0 +1,200 @@
+---
+description: Test the support app against a real model and real pgvector with Testcontainers, assert on what stays fixed when the wording changes, and gate releases on LLM-as-a-judge evals with RelevancyEvaluator and FactCheckingEvaluator.
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import AnswerCheckLab from '@/components/islands/AnswerCheckLab';
+
+**You'll need:** JUnit 5 and Testcontainers basics, and the support app from Module 5.
+
+The support app has 63 tests, and all of them pass. Then we started the whole app for the first time, with a real model and real
+pgvector, and asked "Where is my order 1042?". It answered "I'm sorry, but I can't assist with that." The question had found no
+knowledge documents, so the RAG advisor replaced it with a refusal before the model saw it. No unit test could catch that,
+because none ran real retrieval and tools together. This lesson adds the two kinds of test that would have: integration tests
+against real containers, and evals that grade the answers themselves.
+
+## 1. Spring mental model
+
+Keep the tests you have. Each layer answers a different question:
+
+| Layer | Runs against | Checks | When |
+| --- | --- | --- | --- |
+| Unit and slice tests | `ScriptedChatModel`, `@WebMvcTest` | Your logic: advisors, tools, errors | Every build |
+| Integration tests | Ollama and pgvector in Testcontainers | The wiring: retrieval, filters, tool calls, memory | Every build (needs Docker) |
+| Evals | Your production model, graded by a judge model | The answers: relevant, and grounded in the documents | Nightly, and when a prompt or model changes |
+
+<Mermaid
+  caption="An eval asks the real app, then a second, stronger model grades each answer against the documents it was given."
+  code={`
+flowchart LR
+  Q["Golden question"] --> S["SupportChatService.ask"]
+  S --> A["SupportAnswer<br/>text + sources"]
+  A --> E["RelevancyEvaluator<br/>FactCheckingEvaluator"]
+  E --> J["Judge model"]
+  J -->|"yes / no"| G["Pass rate<br/>>= 80%?"]
+`}
+/>
+
+These rules come from the 2.0.2 classes and from running the tests below:
+
+- `@ServiceConnection` replaces URL properties. Boot's PostgreSQL support connects the datasource, and pgvector needs nothing
+  more because it is PostgreSQL. `spring-ai-spring-boot-testcontainers` adds the Ollama connection, which sets only the base URL.
+- A new Ollama container has no models, and `spring.ai.ollama.init.pull-model-strategy` defaults to `never`. Set
+  `when_missing`, and allow more than the default 5-minute `timeout` for the first download.
+- Model output changes from run to run, so assert on what doesn't: the tool that ran and its arguments, a value only the tool
+  result holds, the documents retrieved. Never the wording.
+- An evaluator takes an `EvaluationRequest` of question, documents and answer. `RelevancyEvaluator` asks the judge whether the
+  answer fits the question and the context. `FactCheckingEvaluator` sends only the documents and the answer, and asks whether
+  the answer is supported.
+- Both pass only when the judge's whole reply is the word "yes", ignoring case and surrounding space. "Yes." fails.
+- To grade an answer against the documents it was given, the service has to return them. The RAG advisor puts them in the
+  response metadata under `RetrievalAugmentationAdvisor.DOCUMENT_CONTEXT`.
+
+## 2. Interactive sandbox
+
+<AnswerCheckLab client:visible />
+
+Nothing here is invented. We asked `llama3.2:3b` the same question five times, with the app's system prompt and Spring AI's RAG
+template, then sent the answers to a 3B judge through the evaluators' exact prompts. Try each check. No string assertion fails the
+wrong answer without also failing correct ones, and the small judge fails everything. That is why the judge must be stronger than
+the model it grades, and why you check it against answers you labelled yourself before you trust its gate.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+The tests run Ollama, while production uses OpenAI, so the Ollama starter is a test dependency only. `evalTest` is a separate task
+that runs only tests tagged `eval`:
+
+<CodeFile
+  title="build.gradle (additions)"
+  lang="groovy"
+  lines="4,11,18,19,21"
+  code={`dependencies {
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.springframework.ai:spring-ai-spring-boot-testcontainers'
+    testImplementation 'org.springframework.ai:spring-ai-starter-model-ollama'
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
+    testImplementation 'org.testcontainers:testcontainers-ollama'
+}
+
+tasks.named('test') {
+    useJUnitPlatform {
+        excludeTags 'eval'
+    }
+}
+
+tasks.register('evalTest', Test) {
+    description = 'Grades real answers with a judge model.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'eval'
+    }
+}`}
+/>
+
+One configuration starts both containers. Reuse keeps the Ollama container, and its downloaded models, between runs on your
+machine:
+
+<CodeFile title="src/test/java/com/example/support/TestcontainersConfiguration.java">
+@@CODE test/com/example/support/TestcontainersConfiguration.java | ^ +@ServiceConnection; withReuse@@
+</CodeFile>
+
+The `it` profile switches the app to Ollama for chat and embeddings. `nomic-embed-text` makes 768-dimension vectors, not the
+1536 of `text-embedding-3-small`:
+
+<CodeFile title="src/test/resources/application-it.yaml">
+@@CODE test-resources/application-it.yaml | pull-model-strategy; timeout; dimensions@@
+</CodeFile>
+
+Every integration test shares one annotation. Classes with the same annotations share one Spring context, so the containers
+start once per run. A payment provider can't run in a container, so `PaymentClient` is a mock:
+
+<CodeFile title="src/test/java/com/example/support/SupportIntegrationTest.java">
+@@CODE test/com/example/support/SupportIntegrationTest.java | @Import; @MockitoBean@@
+</CodeFile>
+
+Retrieval and the audience filter, against real embeddings in real PostgreSQL. The assertions name sources, never text:
+
+<CodeFile title="src/test/java/com/example/support/knowledge/KnowledgeSearchIT.java">
+@@CODE test/com/example/support/knowledge/KnowledgeSearchIT.java | first\(\)\.isEqualTo; doesNotContain@@
+</CodeFile>
+
+This test caught the refusal from the introduction. The spy proves that the tool ran with the customer from the `ToolContext`, and
+the tracking number can only come from the tool's result:
+
+<CodeFile title="src/test/java/com/example/support/chat/SupportChatIT.java">
+@@CODE test/com/example/support/chat/SupportChatIT.java | verify\(orders\); contains\(@@
+</CodeFile>
+
+The fix passes the question through when nothing is retrieved. The rule against made-up policies moves into the system prompt:
+"Answer questions about policies, prices and shipping only from the context you are given. If it doesn't hold the answer, say you
+don't know and offer to pass the question to a support agent."
+
+<CodeFile title="src/main/java/com/example/support/knowledge/KnowledgeRagConfig.java">
+@@CODE main/com/example/support/knowledge/KnowledgeRagConfig.java | queryAugmenter@@
+</CodeFile>
+
+An eval grades an answer against the documents the model was given, so the service now returns them with the text. The controller
+still sends only the text:
+
+<CodeFile title="src/main/java/com/example/support/chat/SupportChatService.java">
+@@CODE main/com/example/support/chat/SupportChatService.java | public SupportAnswer ask; DOCUMENT_CONTEXT; return new SupportAnswer\(answer; record SupportAnswer@@
+</CodeFile>
+
+The eval asks every golden question, then grades all the answers with both evaluators. One judge reply is not a verdict on the
+release, so the gate is a pass rate:
+
+<CodeFile title="src/test/java/com/example/support/chat/SupportAnswerEvalTest.java">
+@@CODE test/com/example/support/chat/SupportAnswerEvalTest.java | @Tag; defaultOptions; new EvaluationRequest; isGreaterThanOrEqualTo\(MIN@@
+</CodeFile>
+
+<CodeFile title="src/test/resources/application-eval.yaml">
+@@CODE test-resources/application-eval.yaml | judge-model@@
+</CodeFile>
+
+Run `./gradlew evalTest` nightly, with `spring.ai.model.chat` pointing at your production model and a stronger judge, so you grade
+the model you ship.
+
+## 4. Production gotchas & security
+
+<Gotcha kind="reliability" title="Small models skip tools">
+With the same two tool definitions, `qwen2.5:1.5b` asked for the order number it had just been given. `llama3.2:3b` called
+`findOrder("1042")`. A test model that never calls tools makes every tool test fail, or worse, pass for the wrong reason. Check
+your test model with one direct tool call before you build on it.
+</Gotcha>
+
+<Gotcha kind="cost" title="The first run downloads gigabytes">
+`ollama/ollama` is 8.5 GB unpacked, and the models come on top. On your machine, set `testcontainers.reuse.enable=true` in
+`~/.testcontainers.properties` so `withReuse(true)` keeps them. CI never reuses containers: cache the image, or build one with the
+models inside using `OllamaContainer.commitToImage`. On Docker Desktop with WSL, `OllamaContainer` may ask for a GPU that isn't
+there and fail with "WSL environment detected but no adapters were found". Clear the request with
+`.withCreateContainerCmdModifier(cmd -> cmd.getHostConfig().withDeviceRequests(List.of()))`.
+</Gotcha>
+
+<Gotcha kind="reliability" title="A weak judge fails good answers">
+In our run, a 3B judge said NO to every answer, correct ones included. When it answered in sentences, Spring AI read even
+"Yes. The claim is supported…" as a fail. Use a judge stronger than the model under test, and before you trust its gate, run it on
+answers you labelled yourself and count how often it agrees.
+</Gotcha>
+
+<Gotcha kind="reliability" title="An eval task without a classpath runs nothing, and the build stays green">
+A registered `Test` task without `testClassesDirs` and `classpath` reports `NO-SOURCE` and succeeds. Your nightly eval job passes
+without grading a single answer. Check that its report lists the tests.
+</Gotcha>
+
+<Gotcha kind="migration" title="Your test model is not your production model">
+Thresholds and dimensions belong to an embedding model. The 0.5 similarity threshold was set for `text-embedding-3-small`; with
+`nomic-embed-text`, "Where do I find my tracking number?" retrieved nothing. Integration tests prove the wiring. Only evals against
+the production model tell you whether the answers are good.
+</Gotcha>
+
+## Recap
+
+- Unit tests check your logic, integration tests check the wiring against real containers, and evals grade the answers.
+- `@ServiceConnection` connects PostgreSQL and Ollama. Set `pull-model-strategy: when_missing` and a longer `timeout`.
+- Assert on what stays fixed: tools called, values only a tool returns, sources retrieved. Never the wording.
+- `RelevancyEvaluator` and `FactCheckingEvaluator` pass only on a bare "yes". Use a stronger judge, check it against labelled
+  answers, and gate on a pass rate in a separate `evalTest` task.

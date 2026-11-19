@@ -1,0 +1,23 @@
+spring:
+  ai:
+    model:
+      chat: ollama
+      embedding: ollama
+    ollama:
+      init:
+        pull-model-strategy: when_missing
+        timeout: 15m   # the default 5m is too short for a first download
+      chat:
+        model: llama3.2:3b
+        temperature: 0.0
+      embedding:
+        model: nomic-embed-text
+    vectorstore:
+      type: pgvector
+      pgvector:
+        dimensions: 768
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: always

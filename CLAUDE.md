@@ -126,6 +126,16 @@ Module 5 lesson code lives in `lesson-src/module-5/code` (63 tests; `lesson1/`, 
 lessons change). Lessons are generated from `lesson-src/module-5/templates/*.mdx` with `python lesson-src/module-5/assemble.py <template> <out> lesson-src/module-5/code`,
 which turns `@@CODE file | regex; regex@@` lines into fenced code with those lines highlighted. Edit the template, not the MDX.
 `lesson-src/module-5/run-tests.sh` compiles that code and runs its tests (it needs a local `cp.arg` classpath; see its header).
+Testing and evals (Module 6, verified; details in `lesson-src/module-6/findings.md`): there is no PgVector `@ServiceConnection`
+factory (Boot's PostgreSQL one covers pgvector); the Ollama one sets only the base URL; `spring.ai.ollama.init.pull-model-strategy`
+defaults to `never` and `init.timeout` to 5m; `OllamaContainer` requests a GPU when Docker lists an `nvidia` runtime, which fails
+on Docker Desktop/WSL without one; `RelevancyEvaluator` and `FactCheckingEvaluator` pass only on a bare "yes" (case and surrounding
+space ignored); `FactCheckingEvaluator` never sends the question; the RAG advisor puts retrieved documents in the `ChatResponse`
+metadata under `DOCUMENT_CONTEXT`; a registered Gradle `Test` task without `testClassesDirs`/`classpath` is `NO-SOURCE` and green.
+The first full-app run found that the Module 5 app refused order questions (empty-context augmenter), fixed in Module 6 with
+`allowEmptyContext(true)` plus a system-prompt rule; `qwen2.5:1.5b` never calls tools, `llama3.2:3b` does. Module 6 code lives in
+`lesson-src/module-6` (same workflow as Module 5; `// probe-only` lines are left out of lessons). `AnswerCheckLab` shows recorded
+`llama3.2:3b` answers and 3B-judge replies, nothing invented.
 
 MDX pitfall: `{` and `<` in prose are parsed as JSX. Put generics and braces inside backticks.
 

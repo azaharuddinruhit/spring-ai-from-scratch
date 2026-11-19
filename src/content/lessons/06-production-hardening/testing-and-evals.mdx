@@ -1,0 +1,560 @@
+---
+description: Test the support app against a real model and real pgvector with Testcontainers, assert on what stays fixed when the wording changes, and gate releases on LLM-as-a-judge evals with RelevancyEvaluator and FactCheckingEvaluator.
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import AnswerCheckLab from '@/components/islands/AnswerCheckLab';
+
+**You'll need:** JUnit 5 and Testcontainers basics, and the support app from Module 5.
+
+The support app has 63 tests, and all of them pass. Then we started the whole app for the first time, with a real model and real
+pgvector, and asked "Where is my order 1042?". It answered "I'm sorry, but I can't assist with that." The question had found no
+knowledge documents, so the RAG advisor replaced it with a refusal before the model saw it. No unit test could catch that,
+because none ran real retrieval and tools together. This lesson adds the two kinds of test that would have: integration tests
+against real containers, and evals that grade the answers themselves.
+
+## 1. Spring mental model
+
+Keep the tests you have. Each layer answers a different question:
+
+| Layer | Runs against | Checks | When |
+| --- | --- | --- | --- |
+| Unit and slice tests | `ScriptedChatModel`, `@WebMvcTest` | Your logic: advisors, tools, errors | Every build |
+| Integration tests | Ollama and pgvector in Testcontainers | The wiring: retrieval, filters, tool calls, memory | Every build (needs Docker) |
+| Evals | Your production model, graded by a judge model | The answers: relevant, and grounded in the documents | Nightly, and when a prompt or model changes |
+
+<Mermaid
+  caption="An eval asks the real app, then a second, stronger model grades each answer against the documents it was given."
+  code={`
+flowchart LR
+  Q["Golden question"] --> S["SupportChatService.ask"]
+  S --> A["SupportAnswer<br/>text + sources"]
+  A --> E["RelevancyEvaluator<br/>FactCheckingEvaluator"]
+  E --> J["Judge model"]
+  J -->|"yes / no"| G["Pass rate<br/>>= 80%?"]
+`}
+/>
+
+These rules come from the 2.0.2 classes and from running the tests below:
+
+- `@ServiceConnection` replaces URL properties. Boot's PostgreSQL support connects the datasource, and pgvector needs nothing
+  more because it is PostgreSQL. `spring-ai-spring-boot-testcontainers` adds the Ollama connection, which sets only the base URL.
+- A new Ollama container has no models, and `spring.ai.ollama.init.pull-model-strategy` defaults to `never`. Set
+  `when_missing`, and allow more than the default 5-minute `timeout` for the first download.
+- Model output changes from run to run, so assert on what doesn't: the tool that ran and its arguments, a value only the tool
+  result holds, the documents retrieved. Never the wording.
+- An evaluator takes an `EvaluationRequest` of question, documents and answer. `RelevancyEvaluator` asks the judge whether the
+  answer fits the question and the context. `FactCheckingEvaluator` sends only the documents and the answer, and asks whether
+  the answer is supported.
+- Both pass only when the judge's whole reply is the word "yes", ignoring case and surrounding space. "Yes." fails.
+- To grade an answer against the documents it was given, the service has to return them. The RAG advisor puts them in the
+  response metadata under `RetrievalAugmentationAdvisor.DOCUMENT_CONTEXT`.
+
+## 2. Interactive sandbox
+
+<AnswerCheckLab client:visible />
+
+Nothing here is invented. We asked `llama3.2:3b` the same question five times, with the app's system prompt and Spring AI's RAG
+template, then sent the answers to a 3B judge through the evaluators' exact prompts. Try each check. No string assertion fails the
+wrong answer without also failing correct ones, and the small judge fails everything. That is why the judge must be stronger than
+the model it grades, and why you check it against answers you labelled yourself before you trust its gate.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+The tests run Ollama, while production uses OpenAI, so the Ollama starter is a test dependency only. `evalTest` is a separate task
+that runs only tests tagged `eval`:
+
+<CodeFile
+  title="build.gradle (additions)"
+  lang="groovy"
+  lines="4,11,18,19,21"
+  code={`dependencies {
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.springframework.ai:spring-ai-spring-boot-testcontainers'
+    testImplementation 'org.springframework.ai:spring-ai-starter-model-ollama'
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
+    testImplementation 'org.testcontainers:testcontainers-ollama'
+}
+
+tasks.named('test') {
+    useJUnitPlatform {
+        excludeTags 'eval'
+    }
+}
+
+tasks.register('evalTest', Test) {
+    description = 'Grades real answers with a judge model.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'eval'
+    }
+}`}
+/>
+
+One configuration starts both containers. Reuse keeps the Ollama container, and its downloaded models, between runs on your
+machine:
+
+<CodeFile title="src/test/java/com/example/support/TestcontainersConfiguration.java">
+```java {15,21,26}
+package com.example.support;
+
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Bean;
+import org.testcontainers.ollama.OllamaContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+
+/** Real PostgreSQL with pgvector, and a real model in Ollama. {@code @ServiceConnection} sets the URLs. */
+@TestConfiguration(proxyBeanMethods = false)
+public class TestcontainersConfiguration {
+
+    @Bean
+    @ServiceConnection
+    PostgreSQLContainer postgres() {
+        return new PostgreSQLContainer(DockerImageName.parse("pgvector/pgvector:pg17").asCompatibleSubstituteFor("postgres"));
+    }
+
+    @Bean
+    @ServiceConnection
+    OllamaContainer ollama() {
+        // Kept between runs when ~/.testcontainers.properties says testcontainers.reuse.enable=true, so the models
+        // download once on your machine. CI never reuses, so cache the models there (see the gotchas).
+        return new OllamaContainer("ollama/ollama:0.40.16")
+                .withReuse(true);
+    }
+}
+```
+</CodeFile>
+
+The `it` profile switches the app to Ollama for chat and embeddings. `nomic-embed-text` makes 768-dimension vectors, not the
+1536 of `text-embedding-3-small`:
+
+<CodeFile title="src/test/resources/application-it.yaml">
+```yaml {8,9,18}
+spring:
+  ai:
+    model:
+      chat: ollama
+      embedding: ollama
+    ollama:
+      init:
+        pull-model-strategy: when_missing
+        timeout: 15m   # the default 5m is too short for a first download
+      chat:
+        model: llama3.2:3b
+        temperature: 0.0
+      embedding:
+        model: nomic-embed-text
+    vectorstore:
+      type: pgvector
+      pgvector:
+        dimensions: 768
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: always
+```
+</CodeFile>
+
+Every integration test shares one annotation. Classes with the same annotations share one Spring context, so the containers
+start once per run. A payment provider can't run in a container, so `PaymentClient` is a mock:
+
+<CodeFile title="src/test/java/com/example/support/SupportIntegrationTest.java">
+```java {20,22}
+package com.example.support;
+
+import com.example.support.refund.PaymentClient;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+/**
+ * The whole support app against real PostgreSQL and a real model. Every test class with the same annotations shares one
+ * Spring context, so the containers start once per run.
+ */
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@SpringBootTest
+@Import(TestcontainersConfiguration.class)
+@ActiveProfiles("it")
+@MockitoBean(types = PaymentClient.class) // a payment provider can't run in a container
+public @interface SupportIntegrationTest {
+}
+```
+</CodeFile>
+
+Retrieval and the audience filter, against real embeddings in real PostgreSQL. The assertions name sources, never text:
+
+<CodeFile title="src/test/java/com/example/support/knowledge/KnowledgeSearchIT.java">
+```java {32,40}
+package com.example.support.knowledge;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.example.support.SupportIntegrationTest;
+import com.example.support.knowledge.KnowledgeSearchService.KnowledgeHit;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
+
+@SupportIntegrationTest
+class KnowledgeSearchIT {
+
+    @Autowired
+    KnowledgeIngestionService ingestion;
+
+    @Autowired
+    KnowledgeSearchService search;
+
+    @BeforeEach
+    void ingest() {
+        ingestion.ingest(new ClassPathResource("knowledge/refunds.md"), "billing", Audience.CUSTOMER);
+        ingestion.ingest(new ClassPathResource("knowledge/shipping.md"), "billing", Audience.CUSTOMER);
+        ingestion.ingest(new ClassPathResource("knowledge/refund-exceptions.md"), "billing", Audience.STAFF);
+    }
+
+    @Test
+    void findsTheRefundPolicyFirst() {
+        assertThat(search.search("How long until my refund shows up?", "billing"))
+                .extracting(KnowledgeHit::source)
+                .first().isEqualTo("refunds.md");
+    }
+
+    @Test
+    void neverReturnsStaffDocumentsToCustomers() {
+        assertThat(search.search("Can I get a refund after 45 days?", "billing"))
+                .extracting(KnowledgeHit::source)
+                .isNotEmpty()
+                .doesNotContain("refund-exceptions.md");
+    }
+}
+```
+</CodeFile>
+
+This test caught the refusal from the introduction. The spy proves that the tool ran with the customer from the `ToolContext`, and
+the tracking number can only come from the tool's result:
+
+<CodeFile title="src/test/java/com/example/support/chat/SupportChatIT.java">
+```java {29,30}
+package com.example.support.chat;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
+
+import com.example.support.SupportIntegrationTest;
+import com.example.support.order.OrderRepository;
+import java.util.Locale;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.context.jdbc.Sql;
+
+@SupportIntegrationTest
+@Sql("/orders.sql")
+class SupportChatIT {
+
+    @Autowired
+    SupportChatService chat;
+
+    @MockitoSpyBean
+    OrderRepository orders;
+
+    @Test
+    void looksTheOrderUpForTheSignedInCustomer() {
+        String answer = chat.ask("alice", UUID.randomUUID(), "billing", "Where is my order 1042?", Locale.ENGLISH).text();
+
+        verify(orders).findForCustomer("alice", "1042"); // the tool ran, with the customer from the ToolContext
+        assertThat(answer).contains("1Z999AA10123456784"); // a value only the tool result holds
+    }
+}
+```
+</CodeFile>
+
+The fix passes the question through when nothing is retrieved. The rule against made-up policies moves into the system prompt:
+"Answer questions about policies, prices and shipping only from the context you are given. If it doesn't hold the answer, say you
+don't know and offer to pass the question to a support agent."
+
+<CodeFile title="src/main/java/com/example/support/knowledge/KnowledgeRagConfig.java">
+```java {31}
+package com.example.support.knowledge;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import org.springframework.ai.rag.generation.augmentation.ContextualQueryAugmenter;
+import org.springframework.ai.rag.preretrieval.query.transformation.CompressionQueryTransformer;
+import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+
+@Configuration(proxyBeanMethods = false)
+class KnowledgeRagConfig {
+
+    @Bean
+    RetrievalAugmentationAdvisor knowledgeRagAdvisor(ChatClient.Builder builder, VectorStore vectorStore) {
+        return RetrievalAugmentationAdvisor.builder()
+                // Turns a follow-up such as "and for gift cards?" into a standalone question, using the history.
+                .queryTransformers(CompressionQueryTransformer.builder()
+                        .chatClientBuilder(builder)
+                        .build())
+                .documentRetriever(VectorStoreDocumentRetriever.builder()
+                        .vectorStore(vectorStore)
+                        .topK(5)
+                        .similarityThreshold(0.5)
+                        .filterExpression(KnowledgeFilters.customerDocuments()) // when a call passes no filter
+                        .build())
+                // An order question finds no documents. The default would then replace it with a refusal, and the model
+                // would never call a tool. The system prompt keeps policy answers to the documents instead.
+                .queryAugmenter(ContextualQueryAugmenter.builder().allowEmptyContext(true).build())
+                // After memory (+ 200), so memory stores the question rather than the augmented prompt,
+                // and before tool calling (+ 300), so it retrieves once per question.
+                .order(Ordered.HIGHEST_PRECEDENCE + 225)
+                .build();
+    }
+}
+```
+</CodeFile>
+
+An eval grades an answer against the documents the model was given, so the service now returns them with the text. The controller
+still sends only the text:
+
+<CodeFile title="src/main/java/com/example/support/chat/SupportChatService.java">
+```java {38,58,59,67}
+package com.example.support.chat;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
+
+import com.example.support.knowledge.KnowledgeFilters;
+import com.example.support.tools.CustomerToolContext;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.model.tool.ToolCallLimitExceededException;
+import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
+import org.springframework.stereotype.Service;
+
+@Service
+public class SupportChatService {
+
+    static final String TOOL_LIMIT_ANSWER = "I couldn't finish looking that up. A support agent will follow up in this chat.";
+
+    private static final Logger log = LoggerFactory.getLogger(SupportChatService.class);
+
+    private final ChatClient supportChatClient;
+    private final ChatMemory chatMemory;
+
+    public SupportChatService(ChatClient supportChatClient, ChatMemory chatMemory) {
+        this.supportChatClient = supportChatClient;
+        this.chatMemory = chatMemory;
+    }
+
+    public SupportAnswer ask(String userId, UUID chatId, String product, String question, Locale language) {
+        ChatResponse response = supportChatClient.prompt()
+                .user(question)
+                .toolContext(CustomerToolContext.of(userId))
+                .advisors(advisor -> advisor
+                        .param(ChatMemory.CONVERSATION_ID, conversationId(userId, chatId))
+                        .param(TokenBudgetAdvisor.USER_ID, userId)
+                        .param(AnswerLanguageAdvisor.LANGUAGE, language)
+                        // Replaces the retriever's default filter, so it must keep the audience condition.
+                        .param(VectorStoreDocumentRetriever.FILTER_EXPRESSION, KnowledgeFilters.customerDocuments(product)))
+                .call()
+                .chatResponse();
+        Generation answer = response == null ? null : response.getResult();
+        if (answer == null) {
+            throw new IllegalStateException("The model returned no answer");
+        }
+        if (ToolCallLimitExceededException.FINISH_REASON.equals(answer.getMetadata().getFinishReason())) {
+            log.warn("Tool call limit reached for {}: {}", userId, answer.getOutput().getText());
+            return new SupportAnswer(TOOL_LIMIT_ANSWER, List.of());
+        }
+        List<Document> sources = response.getMetadata().getOrDefault(RetrievalAugmentationAdvisor.DOCUMENT_CONTEXT, List.of());
+        return new SupportAnswer(answer.getOutput().getText(), sources);
+    }
+
+    public void forget(String userId, UUID chatId) {
+        chatMemory.clear(conversationId(userId, chatId));
+    }
+
+    /** The answer, and the knowledge chunks it was given. Evals check the answer against exactly these. */
+    public record SupportAnswer(String text, List<Document> sources) {
+    }
+
+    /** A UUID that only this user's chat maps to, and that fits the 36-character JDBC column. */
+    static String conversationId(String userId, UUID chatId) {
+        return UUID.nameUUIDFromBytes((userId + ":" + chatId).getBytes(StandardCharsets.UTF_8)).toString();
+    }
+}
+```
+</CodeFile>
+
+The eval asks every golden question, then grades all the answers with both evaluators. One judge reply is not a verdict on the
+release, so the gate is a pass rate:
+
+<CodeFile title="src/test/java/com/example/support/chat/SupportAnswerEvalTest.java">
+```java {29,56,62,63,68}
+package com.example.support.chat;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.example.support.SupportIntegrationTest;
+import com.example.support.chat.SupportChatService.SupportAnswer;
+import com.example.support.knowledge.Audience;
+import com.example.support.knowledge.KnowledgeIngestionService;
+import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.evaluation.FactCheckingEvaluator;
+import org.springframework.ai.chat.evaluation.RelevancyEvaluator;
+import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.evaluation.EvaluationRequest;
+import org.springframework.ai.evaluation.Evaluator;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
+
+/** Grades real answers with a judge model. Slow and not free, so it runs in its own Gradle task, not in every build. */
+@Tag("eval")
+@SupportIntegrationTest
+@ActiveProfiles({"it", "eval"})
+@Sql("/orders.sql")
+class SupportAnswerEvalTest {
+
+    private static final Logger log = LoggerFactory.getLogger(SupportAnswerEvalTest.class);
+
+    /** Questions the knowledge base answers. Add every question a customer complained about. */
+    private static final List<String> GOLDEN_QUESTIONS = List.of(
+            "How long does a refund take to reach my card?",
+            "How many days do I have to ask for a refund?",
+            "Which card do you send my refund to?",
+            "How soon do you ship an order?",
+            "How long does standard delivery take inside the EU?",
+            "Where do I find my tracking number?");
+
+    private static final double MIN_PASS_RATE = 0.8;
+
+    @Autowired
+    SupportChatService chat;
+
+    @Test
+    void answersStayRelevantAndGrounded(@Autowired KnowledgeIngestionService ingestion, @Autowired ChatClient.Builder judge,
+                                        @Value("${support.eval.judge-model}") String judgeModel) {
+        ingestion.ingest(new ClassPathResource("knowledge/refunds.md"), "billing", Audience.CUSTOMER);
+        ingestion.ingest(new ClassPathResource("knowledge/shipping.md"), "billing", Audience.CUSTOMER);
+        judge.defaultOptions(ChatOptions.builder().model(judgeModel).temperature(0.0));
+        var relevancy = new RelevancyEvaluator(judge);
+        var factChecking = FactCheckingEvaluator.builder(judge).build();
+
+        List<EvaluationRequest> graded = GOLDEN_QUESTIONS.stream().map(this::answer).toList();
+
+        assertThat(passRate(relevancy, graded)).as("relevancy pass rate").isGreaterThanOrEqualTo(MIN_PASS_RATE);
+        assertThat(passRate(factChecking, graded)).as("fact-checking pass rate").isGreaterThanOrEqualTo(MIN_PASS_RATE);
+    }
+
+    private EvaluationRequest answer(String question) {
+        SupportAnswer answer = chat.ask("eval-user", UUID.randomUUID(), "billing", question, Locale.ENGLISH);
+        return new EvaluationRequest(question, answer.sources(), answer.text());
+    }
+
+    private static double passRate(Evaluator evaluator, List<EvaluationRequest> graded) {
+        long passed = graded.stream().filter(request -> {
+            boolean pass = evaluator.evaluate(request).isPass();
+            if (!pass) {
+                log.warn("{} failed: {} ({} sources) -> {}", evaluator.getClass().getSimpleName(), request.getUserText(),
+                        request.getDataList().size(), request.getResponseContent());
+            }
+            return pass;
+        }).count();
+        return (double) passed / graded.size();
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/test/resources/application-eval.yaml">
+```yaml {9}
+spring:
+  ai:
+    ollama:
+      init:
+        chat:
+          additional-models: llama3.1:8b
+support:
+  eval:
+    judge-model: llama3.1:8b   # a stronger model than the one it grades
+```
+</CodeFile>
+
+Run `./gradlew evalTest` nightly, with `spring.ai.model.chat` pointing at your production model and a stronger judge, so you grade
+the model you ship.
+
+## 4. Production gotchas & security
+
+<Gotcha kind="reliability" title="Small models skip tools">
+With the same two tool definitions, `qwen2.5:1.5b` asked for the order number it had just been given. `llama3.2:3b` called
+`findOrder("1042")`. A test model that never calls tools makes every tool test fail, or worse, pass for the wrong reason. Check
+your test model with one direct tool call before you build on it.
+</Gotcha>
+
+<Gotcha kind="cost" title="The first run downloads gigabytes">
+`ollama/ollama` is 8.5 GB unpacked, and the models come on top. On your machine, set `testcontainers.reuse.enable=true` in
+`~/.testcontainers.properties` so `withReuse(true)` keeps them. CI never reuses containers: cache the image, or build one with the
+models inside using `OllamaContainer.commitToImage`. On Docker Desktop with WSL, `OllamaContainer` may ask for a GPU that isn't
+there and fail with "WSL environment detected but no adapters were found". Clear the request with
+`.withCreateContainerCmdModifier(cmd -> cmd.getHostConfig().withDeviceRequests(List.of()))`.
+</Gotcha>
+
+<Gotcha kind="reliability" title="A weak judge fails good answers">
+In our run, a 3B judge said NO to every answer, correct ones included. When it answered in sentences, Spring AI read even
+"Yes. The claim is supported…" as a fail. Use a judge stronger than the model under test, and before you trust its gate, run it on
+answers you labelled yourself and count how often it agrees.
+</Gotcha>
+
+<Gotcha kind="reliability" title="An eval task without a classpath runs nothing, and the build stays green">
+A registered `Test` task without `testClassesDirs` and `classpath` reports `NO-SOURCE` and succeeds. Your nightly eval job passes
+without grading a single answer. Check that its report lists the tests.
+</Gotcha>
+
+<Gotcha kind="migration" title="Your test model is not your production model">
+Thresholds and dimensions belong to an embedding model. The 0.5 similarity threshold was set for `text-embedding-3-small`; with
+`nomic-embed-text`, "Where do I find my tracking number?" retrieved nothing. Integration tests prove the wiring. Only evals against
+the production model tell you whether the answers are good.
+</Gotcha>
+
+## Recap
+
+- Unit tests check your logic, integration tests check the wiring against real containers, and evals grade the answers.
+- `@ServiceConnection` connects PostgreSQL and Ollama. Set `pull-model-strategy: when_missing` and a longer `timeout`.
+- Assert on what stays fixed: tools called, values only a tool returns, sources retrieved. Never the wording.
+- `RelevancyEvaluator` and `FactCheckingEvaluator` pass only on a bare "yes". Use a stronger judge, check it against labelled
+  answers, and gate on a pass rate in a separate `evalTest` task.
