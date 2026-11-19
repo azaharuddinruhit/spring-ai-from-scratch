@@ -37,7 +37,8 @@ export const CURRICULUM: Module[] = [
     slug: '02-structured-outputs',
     number: 2,
     title: 'Deterministic Structured Outputs',
-    summary: 'Turning model text into Java records, lists and maps, with provider-native JSON Schema and validation retries.',
+    summary:
+      'Turning model text into Java records, lists and maps, with provider-native JSON Schema and validation retries, and decision models that answer with probabilities.',
     lessons: [
       { slug: 'structured-output-converters', title: 'The StructuredOutputConverter Ecosystem' },
       { slug: 'native-json-schema', title: 'Native JSON Schema & Strict Mode' },

@@ -20,6 +20,9 @@ Every lesson has four parts, then a short recap:
 | Spring AI | 2.0.2 |
 | Gradle | 9.9.1 (Groovy DSL) |
 
+Lessons marked "2.1 preview" teach features new in Spring AI 2.1 and are written for its release candidate (Spring AI 2.1.0-RC2 on
+Spring Boot 4.2.0-RC2). They move to the release when it is out; see [`UPGRADE-2.1.md`](UPGRADE-2.1.md).
+
 These versions are pinned in [`src/data/versions.ts`](src/data/versions.ts), and every generated build snippet reads them from there.
 
 ## Curriculum
@@ -27,7 +30,7 @@ These versions are pinned in [`src/data/versions.ts`](src/data/versions.ts), and
 | Module | Topic | Status |
 | --- | --- | --- |
 | 1 | Foundations & core abstractions | Published |
-| 2 | Deterministic structured outputs | Published |
+| 2 | Deterministic structured outputs | Published, plus the Decision Models preview |
 | 3 | The Advisors API & chat memory | Published |
 | 4 | RAG & ETL pipelines | Published |
 | 5 | Tool calling, MCP & agents | Published |
@@ -57,9 +60,10 @@ src/
   layouts/                  base and lesson layouts
 lesson-src/module-5/        Module 5 lesson sources: the verified Java code and tests, MDX templates, findings and probes
 lesson-src/module-6/        Module 6 lesson sources: the support app with the production changes, templates, findings and probes
+lesson-src/preview-2.1/     Spring AI 2.1 preview lesson sources, on the release candidate: code, tests, templates, findings, probes
 ```
 
-The Module 5 and 6 lessons are generated from `lesson-src/module-<n>/templates/` so their code is exactly the code that compiled
+The Module 5 and 6 lessons and the 2.1 preview lessons are generated from `lesson-src/<dir>/templates/` so their code is exactly the code that compiled
 and passed its tests; see [`lesson-src/module-5/README.md`](lesson-src/module-5/README.md) and
 [`lesson-src/module-6/README.md`](lesson-src/module-6/README.md).
 

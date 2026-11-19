@@ -3,6 +3,7 @@ spring:
     name: support
   ai:
     model:
+      # Ollama's is the default, but the OpenAI starter adds a decision model too, and two fail the startup.
       decision: ollama
     ollama:
       base-url: http://localhost:11434
@@ -20,6 +21,6 @@ spring:
 support:
   routing:
     # Set from labelled tickets, not left at 0.5: with d1-omni:600m, real injections scored 0.92 and above, while a customer
-    # asking what "ignore previous instructions" means scored 0.79 (lesson 2.3, findings.md).
+    # asking what "ignore previous instructions" means scored 0.79.
     injection-threshold: 0.9
     minimum-intent-confidence: 0.6
