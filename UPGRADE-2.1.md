@@ -123,14 +123,17 @@ Probed on 2026-11-19 over plain HTTP from this PC:
 
 For every lesson in step 2, before it merges:
 
-- [ ] A one-line pointer to it from the related existing lesson (Native JSON Schema, Modular RAG, Tool Calling or Multi-Provider
+- [x] A one-line pointer to it from the related existing lesson (Native JSON Schema, Modular RAG, Tool Calling or Multi-Provider
       Portability).
-- [ ] CLAUDE.md (its verified facts, the preview workflow), README.md (curriculum table), the module summary in
+- [x] CLAUDE.md (its verified facts, the preview workflow), README.md (curriculum table), the module summary in
       `src/data/curriculum.ts` if it changes. With the first lesson: PRODUCT.md (preview lessons are checked against RC2, not a
       release) and `VERSION` 1.6.
-- [ ] Check its page at 320px and 390px; `npm run build` passes; merge into `main`, push, confirm the deploy.
+- [x] Check its page at 320px and 390px; `npm run build` passes; merge into `main`, push, confirm the deploy. All four were
+      done this way; 1.5, the last, went live in 1.6.21.
 
 ### 4. At GA (phase 2)
+
+Not before 2.1.0 is on Maven Central (the owner chose on 2026-11-19 to wait rather than move the course to RC2).
 
 - [ ] Move the preview pins to 2.1.0 and Boot 4.2.0 GA, re-run the preview tests and recordings, drop the preview marks.
 - [ ] Move the existing lessons to 2.1: re-check what CLAUDE.md says to re-check on an upgrade and every fact in its "Content
