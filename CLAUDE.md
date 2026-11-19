@@ -86,7 +86,7 @@ Structured output (verified by running the 2.0.2 classes): `entity(Type, spec ->
 run out; schema properties are sorted by name unless `@JsonPropertyOrder`, and a bare `@JsonProperty("x")` makes the field optional.
 `RecordSchemaLab` reproduces the generator exactly; re-check it against `BeanOutputConverter.getJsonSchema()` when Spring AI is upgraded.
 Advisors and memory (verified by running the 2.0.2 classes): equal orders run in reverse registration order; advisors ordered after
-`ToolCallingAdvisor` run once per model call, and advisors before it see the summed usage; `SimpleLoggerAdvisor` and `SafeGuardAdvisor`
+`ToolCallingAdvisor` run once per model call, and advisors before it see the summed usage (a 2.0.1 change, the same on 2.1.0-RC2); `SimpleLoggerAdvisor` and `SafeGuardAdvisor`
 default to order 0, the RAG advisors to 0; `SafeGuardAdvisor` lower-cases `Prompt.getContents()` (system and memory included) and uses
 `contains`; `SimpleLoggerAdvisor` logs at DEBUG and its request line includes the context map; `BaseAdvisor` runs `before` on
 `boundedElastic` for streams and `after` only on the chunk with a finish reason; `stream()` skips `CallAdvisor`-only advisors.

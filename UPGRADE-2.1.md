@@ -156,8 +156,9 @@ For every lesson in step 2, before it merges:
 
 - ~~**The same code on Ollama's `/v1`.**~~ Settled in Lesson 1.5: `OpenAiChatModel` falls back to the `reasoning` field, and
   `deepseek-r1:1.5b` on Ollama gave `ReasoningPart`s (it ignored the tool, so the lesson's recordings use the Qwen model).
-- **Token usage across the tool loop.** The 2.1 notes call summed usage a change; CLAUDE.md already records summed usage for
-  2.0.2. Settle it when running the classes.
+- ~~**Token usage across the tool loop.**~~ Settled: the upgrade notes date the change to 2.0.1, and `UsageSumProbe` gives the same
+  result on 2.0.2 and 2.1.0-RC2 (the caller and advisors before `ToolCallingAdvisor` get the sum, advisors after it each call's
+  usage). Nothing changes in phase 2.
 
 Sources: [Upgrade notes](https://docs.spring.io/spring-ai/reference/2.1/upgrade-notes.html),
 [Decision Models](https://docs.spring.io/spring-ai/reference/2.1/api/decision.html),

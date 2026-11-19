@@ -32,5 +32,6 @@ server; pass the models it doesn't use as `none` (`--spring.ai.model.chat=none`,
   `--spring.ai.model.chat=openai --spring.ai.openai.base-url=http://127.0.0.1:4555/v1 --spring.ai.openai.api-key=$QWEN_API_KEY
   --spring.ai.openai.chat.model=$QWEN_MODEL`. The `*-log.jsonl` files are git-ignored, because they hold the server's model
   names.
+- `probes/java-usage/UsageSumProbe`: compiled and run the same way, to compare the token usage after a tool loop (no model needed).
 - `probes/java-options/OptionsMergeProbe`: compiled and run separately against this classpath and Module 6's (2.0.2), to compare
   how runtime options merge.

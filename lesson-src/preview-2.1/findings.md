@@ -162,6 +162,12 @@ with a 27B Qwen 3 reasoning model. Checked 2026-11-19 by running the probes in `
   With the default threshold, `d1-omni:600m` found no tool for any request, and its best tool was right once in three. Each
   search took about 1.5 s.
 
+## Token usage across the tool loop (`probes/java-usage/UsageSumProbe`)
+
+- A scripted model reports 100/10 tokens on the tool-call turn and 200/20 on the answer. On 2.1.0-RC2 and on 2.0.2 alike, the caller's
+  `ChatResponse` and an advisor before `ToolCallingAdvisor` see 300/30/330 (`DefaultUsage`), and an advisor ordered after it sees
+  110 and then 220. The upgrade notes list the accumulation as a 2.0.1 change, so the course's 2.0.2 facts already hold for 2.1.
+
 ## Lesson 1.5 message parts and reasoning (bytecode, `PartsRecordingProbe`, `OrderAssistantTest`, `ReasoningReplayTest`, `OrderAssistantIT`)
 
 - Parts are records in `chat.messages.part`: `TextPart(text, payload, attributes)`, `ReasoningPart(text, summary, payload,
