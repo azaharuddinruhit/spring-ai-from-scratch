@@ -61,6 +61,8 @@ There are no unit tests. `npm run build` is the gate.
 
 - `PRODUCT.md` records who the course is for, what it promises and what must never be claimed (no invented testimonials or numbers).
 - `BACKLOG.md` lists saved future tasks (learning-curve fixes, open checks). Start one only when the owner asks.
+- `UPGRADE-2.1.md` holds the agreed plan and checklist for moving the course to Spring AI 2.1 (branch `spring-ai-2.1`). Keep it
+  up to date as steps finish.
 - `DESIGN.md` is the visual system ("The Running Call"): tokens in its frontmatter, rules in its body, and a sidecar in
   `.impeccable/design.json`. Follow it for any UI change and update it when the system changes.
 
