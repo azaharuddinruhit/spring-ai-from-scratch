@@ -132,6 +132,7 @@ export default function AnswerCheckLab() {
   const passed = results.filter(Boolean).length;
   const agrees = RUNS.filter((run, i) => results[i] === (run.label === 'correct')).length;
   const wrongPasses = results[4];
+  const correctFails = RUNS.filter((run, i) => run.label === 'correct' && !results[i]).length;
 
   return (
     <LabFrame
@@ -164,6 +165,10 @@ export default function AnswerCheckLab() {
         <span className="font-medium tabular-nums">{agrees} of 5</span>, and{' '}
         {wrongPasses ? (
           <span className="font-medium text-rose-700 dark:text-rose-300">lets the wrong answer through</span>
+        ) : correctFails > 0 ? (
+          <span className="font-medium text-amber-700 dark:text-amber-300">
+            fails the wrong answer, but {correctFails === 1 ? 'one correct answer' : `${correctFails} correct answers`} too
+          </span>
         ) : (
           <span className="font-medium text-brand-700 dark:text-brand-300">fails the wrong answer</span>
         )}
