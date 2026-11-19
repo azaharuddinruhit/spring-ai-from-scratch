@@ -74,6 +74,8 @@ management:
 support:
   mcp:
     allowed-tools: track_shipment
+  privacy:
+    chat-retention: 30d   # a conversation nobody has used for this long is deleted
   knowledge:
     rewrite-model: gpt-5-nano
   cost:

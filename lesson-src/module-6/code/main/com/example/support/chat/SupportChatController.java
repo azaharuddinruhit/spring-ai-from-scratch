@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/chats/{chatId}")
+@RequestMapping("/api/chats")
 class SupportChatController {
 
     private final SupportChatService chatService;
@@ -27,15 +27,22 @@ class SupportChatController {
         this.chatService = chatService;
     }
 
-    @PostMapping("/messages")
+    @PostMapping("/{chatId}/messages")
     AnswerResponse ask(@PathVariable UUID chatId, @Valid @RequestBody AskRequest request, Principal principal, Locale locale) {
         return new AnswerResponse(chatService.ask(principal.getName(), chatId, request.product(), request.question(), locale).text());
     }
 
-    @DeleteMapping
+    @DeleteMapping("/{chatId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void forget(@PathVariable UUID chatId, Principal principal) {
         chatService.forget(principal.getName(), chatId);
+    }
+
+    /** Deletes every conversation of the signed-in customer. */
+    @DeleteMapping
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void forgetAll(Principal principal) {
+        chatService.forgetCustomer(principal.getName());
     }
 
     record AskRequest(@NotBlank @Size(max = 50) String product, @NotBlank @Size(max = 4000) String question) {

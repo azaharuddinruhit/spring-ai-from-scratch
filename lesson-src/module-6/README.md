@@ -5,6 +5,7 @@ against Spring AI 2.0.2, Boot 4.1.2 and Testcontainers 2.0.5.
 
 - `code/main`, `code/test` — the Java code. `code/main-resources/application.yaml` is the app's configuration as Modules 3–5 build
   it; `code/test-resources` holds the `it` and `eval` profiles, test data and knowledge files.
+  `code/lesson1/` holds the versions Lesson 1 shows of files that later lessons change (not compiled).
 - `templates/*.mdx` — the lesson sources. Generate a lesson with:
 
   ```bash
@@ -15,11 +16,12 @@ against Spring AI 2.0.2, Boot 4.1.2 and Testcontainers 2.0.5.
   `@@CODE <file> | <regex>; <regex>@@` lines become fenced code with the matching lines highlighted. Lines marked
   `// probe-only` (workarounds for this machine) are left out.
 - `findings.md` — every verified fact, with how it was checked. `probes/` — the scripts and recorded model output behind the
-  `AnswerCheckLab` and `TraceLab` sandboxes. To record traces, compile with `run-tests.sh`, then run its `java` line yourself
+  `AnswerCheckLab`, `TraceLab` and `AttackLab` sandboxes. `AttackRecordingProbe` and `attacks-to-sandbox.py` record and
+  convert the attacks the same way. To record traces, compile with `run-tests.sh`, then run its `java` line yourself
   with `-Dmanagement.tracing.sampling.probability=1.0 -Dprobe.out=probes/trace-after.json` (plus the content switches listed
   in `findings.md`) and `--select-class com.example.support.TraceRecordingProbe`, and finish with
   `python lesson-src/module-6/probes/trace-to-sandbox.py`.
-- `run-tests.sh` — compiles the code and runs the tests (74: unit, slice, verdict and three `*IT` tests against Docker). Pass
+- `run-tests.sh` — compiles the code and runs the tests (84: unit, slice and verdict tests, and four `*IT` classes against Docker). Pass
   JUnit console arguments to select others, for example the eval:
   `bash run-tests.sh --select-class com.example.support.chat.SupportAnswerEvalTest`. It needs `cp.arg` (see its header). On this
   machine the integration tests also need `TESTCONTAINERS_REUSE_ENABLE=true` and `TESTCONTAINERS_HOST_OVERRIDE=127.0.0.1`.

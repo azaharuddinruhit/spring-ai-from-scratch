@@ -107,7 +107,7 @@ The `it` profile switches the app to Ollama for chat and embeddings. `nomic-embe
 1536 of `text-embedding-3-small`:
 
 <CodeFile title="src/test/resources/application-it.yaml">
-@@CODE test-resources/application-it.yaml | pull-model-strategy; timeout; dimensions@@
+@@CODE lesson1/application-it.yaml | pull-model-strategy; timeout; dimensions@@
 </CodeFile>
 
 Every integration test shares one annotation. Classes with the same annotations share one Spring context, so the containers
@@ -134,7 +134,7 @@ An eval grades an answer against the documents the model was given, so the servi
 still sends only the text:
 
 <CodeFile title="src/main/java/com/example/support/chat/SupportChatService.java">
-@@CODE main/com/example/support/chat/SupportChatService.java | public SupportAnswer ask; DOCUMENT_CONTEXT; return new SupportAnswer\(answer; record SupportAnswer@@
+@@CODE lesson1/SupportChatService.java | public SupportAnswer ask; DOCUMENT_CONTEXT; return new SupportAnswer\(answer; record SupportAnswer@@
 </CodeFile>
 
 The eval asks every golden question, then grades all the answers with both evaluators. One judge reply is not a verdict on the

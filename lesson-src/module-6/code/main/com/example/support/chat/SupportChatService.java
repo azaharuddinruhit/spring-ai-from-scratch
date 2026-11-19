@@ -1,6 +1,8 @@
 package com.example.support.chat;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -19,6 +21,7 @@ import org.springframework.ai.model.tool.ToolCallLimitExceededException;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
 import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SupportChatService {
@@ -29,18 +32,24 @@ public class SupportChatService {
 
     private final ChatClient supportChatClient;
     private final ChatMemory chatMemory;
+    private final SupportChats chats;
+    private final Clock clock;
 
-    public SupportChatService(ChatClient supportChatClient, ChatMemory chatMemory) {
+    public SupportChatService(ChatClient supportChatClient, ChatMemory chatMemory, SupportChats chats, Clock clock) {
         this.supportChatClient = supportChatClient;
         this.chatMemory = chatMemory;
+        this.chats = chats;
+        this.clock = clock;
     }
 
     public SupportAnswer ask(String userId, UUID chatId, String product, String question, Locale language) {
+        String conversationId = conversationId(userId, chatId);
+        chats.recordUse(conversationId, userId, clock.instant());
         ChatResponse response = supportChatClient.prompt()
                 .user(question)
                 .toolContext(CustomerToolContext.of(userId))
                 .advisors(advisor -> advisor
-                        .param(ChatMemory.CONVERSATION_ID, conversationId(userId, chatId))
+                        .param(ChatMemory.CONVERSATION_ID, conversationId)
                         .param(TokenBudgetAdvisor.USER_ID, userId)
                         .param(AnswerLanguageAdvisor.LANGUAGE, language)
                         // Replaces the retriever's default filter, so it must keep the audience condition.
@@ -59,8 +68,31 @@ public class SupportChatService {
         return new SupportAnswer(answer.getOutput().getText(), sources);
     }
 
+    @Transactional
     public void forget(String userId, UUID chatId) {
-        chatMemory.clear(conversationId(userId, chatId));
+        delete(conversationId(userId, chatId));
+    }
+
+    /** Erasure: every conversation this customer has stored. */
+    @Transactional
+    public int forgetCustomer(String userId) {
+        return deleteAll(chats.ofCustomer(userId));
+    }
+
+    /** Retention: every conversation nobody has used for this long. */
+    @Transactional
+    public int forgetIdleChats(Duration retention) {
+        return deleteAll(chats.idleSince(clock.instant().minus(retention)));
+    }
+
+    private int deleteAll(List<String> conversationIds) {
+        conversationIds.forEach(this::delete);
+        return conversationIds.size();
+    }
+
+    private void delete(String conversationId) {
+        chatMemory.clear(conversationId);
+        chats.delete(conversationId);
     }
 
     /** The answer, and the knowledge chunks it was given. Evals check the answer against exactly these. */

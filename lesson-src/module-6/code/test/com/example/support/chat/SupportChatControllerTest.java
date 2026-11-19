@@ -87,6 +87,13 @@ class SupportChatControllerTest {
     }
 
     @Test
+    void forgetsAllChatsOfTheSignedInCustomer() {
+        assertThat(mvc.delete().uri("/api/chats").with(jwt().jwt(token -> token.subject("alice"))))
+                .hasStatus(HttpStatus.NO_CONTENT);
+        then(chatService).should().forgetCustomer("alice");
+    }
+
+    @Test
     void forgetsAChat() {
         assertThat(mvc.delete().uri("/api/chats/{chatId}", CHAT_ID).with(jwt().jwt(token -> token.subject("alice"))))
                 .hasStatus(HttpStatus.NO_CONTENT);
