@@ -6,7 +6,7 @@ targets Spring AI 2.1.0-RC2 and Spring Boot 4.2.0-RC2 (`pom.xml`, and `PREVIEW_S
 `UPGRADE-2.1.md`.
 
 - `code/<lesson>/main`, `test`, `main-resources`, `test-resources`: each preview lesson is its own small project
-  (`decision-models`, `decision-filter`, ...), with its own `application.yaml`. `code/probe-only.properties` holds settings the
+  (`decision-models`, `decision-filter`, ...), with its own `application.yaml`. `code/probe-only.properties` (and a lesson's own `code/<lesson>/probe-only.properties`) holds settings the
   shared workspace classpath needs and the lessons never show.
 - `templates/*.mdx`: the lesson sources. Generate a lesson with
   `python lesson-src/preview-2.1/assemble.py <template> <out.mdx> lesson-src/preview-2.1/code/<lesson>`; `@@CODE <file> | <regex>@@`
@@ -23,6 +23,9 @@ server; pass the models it doesn't use as `none` (`--spring.ai.model.chat=none`,
 `audio.transcription`, `moderation`).
 
 - `DecisionFactsProbe`, `RagToolFactsProbe`: Ollama with `d1-omni:600m` pulled, and `--spring.ai.model.decision=ollama`.
+- `PartsRecordingProbe`: the Lesson 1.5 recordings. It runs the lesson app (compile `code/message-parts/main` into `out/` too)
+  through the logging proxy, with `-Dprobe.log=<the proxy's file> -Dprobe.out=probes/parts-recording.json`; then
+  `probes/parts-to-sandbox.py` writes the sandbox data from both files.
 - `PartsFactsProbe`: an OpenAI-compatible server with a reasoning model. Its address, key and model name come from the
   environment (`QWEN_BASE_URL`, `QWEN_API_KEY`, `QWEN_MODEL`) and are never written to this repository. To see what Spring AI
   sends, run `python -I probes/logging-proxy.py 4555 probes/parts-log.jsonl` and point the app at it:

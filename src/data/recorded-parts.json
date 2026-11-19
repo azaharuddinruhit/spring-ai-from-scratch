@@ -1,0 +1,880 @@
+[
+ {
+  "key": "reply",
+  "answer": "Your order A-1042 has been shipped via DHL and is expected to arrive on November 21, 2026.",
+  "reasoning": "The order has been shipped by DHL, with the expected delivery date on November 21, 2026. I'll respond in 1-2 sentences.",
+  "calls": [
+   {
+    "request": {
+     "messages": [
+      {
+       "content": "You are the support assistant of an online shop. …",
+       "role": "system"
+      },
+      {
+       "content": "Where is my order A-1042?",
+       "role": "user"
+      }
+     ]
+    },
+    "reply": {
+     "role": "assistant",
+     "tool_calls": [
+      {
+       "function": {
+        "arguments": "{\"orderId\": \"A-1042\"}",
+        "name": "findOrder"
+       },
+       "id": "call-1",
+       "type": "function"
+      }
+     ],
+     "reasoning_content": "The user is asking about order A-1042. I need to use the findOrder tool.\n"
+    },
+    "promptTokens": 394,
+    "completionTokens": 56,
+    "millis": 3776,
+    "parts": [
+     {
+      "kind": "reasoning",
+      "text": "The user is asking about order A-1042. I need to use the findOrder tool.\n"
+     },
+     {
+      "kind": "toolCall",
+      "name": "findOrder",
+      "arguments": "{\"orderId\": \"A-1042\"}"
+     }
+    ]
+   },
+   {
+    "request": {
+     "messages": [
+      {
+       "content": "You are the support assistant of an online shop. …",
+       "role": "system"
+      },
+      {
+       "content": "Where is my order A-1042?",
+       "role": "user"
+      },
+      {
+       "role": "assistant",
+       "content": "",
+       "tool_calls": [
+        {
+         "id": "call-1",
+         "function": {
+          "arguments": "{\"orderId\": \"A-1042\"}",
+          "name": "findOrder"
+         },
+         "type": "function"
+        }
+       ],
+       "reasoning_content": "The user is asking about order A-1042. I need to use the findOrder tool.\n"
+      },
+      {
+       "content": "{\"orderId\":\"A-1042\",\"status\":\"SHIPPED\",\"carrier\":\"DHL\",\"expectedDelivery\":\"2026-11-21\"}",
+       "role": "tool",
+       "tool_call_id": "call-1"
+      }
+     ]
+    },
+    "reply": {
+     "content": "\n\nYour order A-1042 has been shipped via DHL and is expected to arrive on November 21, 2026.",
+     "role": "assistant",
+     "reasoning_content": "The order has been shipped by DHL, with the expected delivery date on November 21, 2026. I'll respond in 1-2 sentences.\n"
+    },
+    "promptTokens": 500,
+    "completionTokens": 69,
+    "millis": 3090,
+    "parts": [
+     {
+      "kind": "reasoning",
+      "text": "The order has been shipped by DHL, with the expected delivery date on November 21, 2026. I'll respond in 1-2 sentences.\n"
+     },
+     {
+      "kind": "text",
+      "text": "\n\nYour order A-1042 has been shipped via DHL and is expected to arrive on November 21, 2026."
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "key": "no-replay",
+  "answer": "Your order A-1042 has been shipped via DHL and is expected to arrive on November 21, 2026.",
+  "reasoning": null,
+  "calls": [
+   {
+    "request": {
+     "messages": [
+      {
+       "content": "You are the support assistant of an online shop. …",
+       "role": "system"
+      },
+      {
+       "content": "Where is my order A-1042?",
+       "role": "user"
+      }
+     ]
+    },
+    "reply": {
+     "role": "assistant",
+     "tool_calls": [
+      {
+       "function": {
+        "arguments": "{\"orderId\": \"A-1042\"}",
+        "name": "findOrder"
+       },
+       "id": "call-1",
+       "type": "function"
+      }
+     ],
+     "reasoning_content": "The user is asking about the order status of order A-1042. I need to use the findOrder tool.\n"
+    },
+    "promptTokens": 394,
+    "completionTokens": 60,
+    "millis": 2495,
+    "parts": [
+     {
+      "kind": "reasoning",
+      "text": "The user is asking about the order status of order A-1042. I need to use the findOrder tool.\n"
+     },
+     {
+      "kind": "toolCall",
+      "name": "findOrder",
+      "arguments": "{\"orderId\": \"A-1042\"}"
+     }
+    ]
+   },
+   {
+    "request": {
+     "messages": [
+      {
+       "content": "You are the support assistant of an online shop. …",
+       "role": "system"
+      },
+      {
+       "content": "Where is my order A-1042?",
+       "role": "user"
+      },
+      {
+       "role": "assistant",
+       "content": "",
+       "tool_calls": [
+        {
+         "id": "call-1",
+         "function": {
+          "arguments": "{\"orderId\": \"A-1042\"}",
+          "name": "findOrder"
+         },
+         "type": "function"
+        }
+       ]
+      },
+      {
+       "content": "{\"orderId\":\"A-1042\",\"status\":\"SHIPPED\",\"carrier\":\"DHL\",\"expectedDelivery\":\"2026-11-21\"}",
+       "role": "tool",
+       "tool_call_id": "call-1"
+      }
+     ]
+    },
+    "reply": {
+     "content": "\n\nYour order A-1042 has been shipped via DHL and is expected to arrive on November 21, 2026.",
+     "role": "assistant",
+     "reasoning_content": "I need to investigate this further. Let me confirm the details.\n\nSimple answer: The order has been shipped via DHL, and delivery is scheduled for November 21, 2026.\n"
+    },
+    "promptTokens": 477,
+    "completionTokens": 75,
+    "millis": 3104,
+    "parts": [
+     {
+      "kind": "reasoning",
+      "text": "I need to investigate this further. Let me confirm the details.\n\nSimple answer: The order has been shipped via DHL, and delivery is scheduled for November 21, 2026.\n"
+     },
+     {
+      "kind": "text",
+      "text": "\n\nYour order A-1042 has been shipped via DHL and is expected to arrive on November 21, 2026."
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "key": "quick-reply",
+  "answer": "Your order A-1042 has been shipped via DHL. It is expected to be delivered on 2026-11-21.",
+  "reasoning": null,
+  "calls": [
+   {
+    "request": {
+     "messages": [
+      {
+       "content": "You are the support assistant of an online shop. …",
+       "role": "system"
+      },
+      {
+       "content": "Where is my order A-1042?",
+       "role": "user"
+      }
+     ],
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "reply": {
+     "role": "assistant",
+     "tool_calls": [
+      {
+       "function": {
+        "arguments": "{\"orderId\": \"A-1042\"}",
+        "name": "findOrder"
+       },
+       "id": "call-1",
+       "type": "function"
+      }
+     ]
+    },
+    "promptTokens": 358,
+    "completionTokens": 31,
+    "millis": 1406,
+    "parts": [
+     {
+      "kind": "toolCall",
+      "name": "findOrder",
+      "arguments": "{\"orderId\": \"A-1042\"}"
+     }
+    ]
+   },
+   {
+    "request": {
+     "messages": [
+      {
+       "content": "You are the support assistant of an online shop. …",
+       "role": "system"
+      },
+      {
+       "content": "Where is my order A-1042?",
+       "role": "user"
+      },
+      {
+       "role": "assistant",
+       "content": "",
+       "tool_calls": [
+        {
+         "id": "call-1",
+         "function": {
+          "arguments": "{\"orderId\": \"A-1042\"}",
+          "name": "findOrder"
+         },
+         "type": "function"
+        }
+       ]
+      },
+      {
+       "content": "{\"orderId\":\"A-1042\",\"status\":\"SHIPPED\",\"carrier\":\"DHL\",\"expectedDelivery\":\"2026-11-21\"}",
+       "role": "tool",
+       "tool_call_id": "call-1"
+      }
+     ],
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "reply": {
+     "content": "Your order A-1042 has been shipped via DHL. It is expected to be delivered on 2026-11-21.",
+     "role": "assistant"
+    },
+    "promptTokens": 441,
+    "completionTokens": 34,
+    "millis": 1657,
+    "parts": [
+     {
+      "kind": "text",
+      "text": "Your order A-1042 has been shipped via DHL. It is expected to be delivered on 2026-11-21."
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "key": "stream",
+  "answer": "Your order A-1042 has been shipped via DHL and is expected to be delivered on November 21, 2026.",
+  "reasoning": null,
+  "calls": [
+   {
+    "request": {
+     "messages": [
+      {
+       "content": "You are the support assistant of an online shop. …",
+       "role": "system"
+      },
+      {
+       "content": "Where is my order A-1042?",
+       "role": "user"
+      }
+     ],
+     "stream": true
+    },
+    "reply": [
+     {
+      "reasoning_content": "The"
+     },
+     {
+      "reasoning_content": " user is asking about"
+     },
+     {
+      "reasoning_content": " order"
+     },
+     {
+      "reasoning_content": " A-10"
+     },
+     {
+      "reasoning_content": "42. I"
+     },
+     {
+      "reasoning_content": " should use the find"
+     },
+     {
+      "reasoning_content": "Order tool.\n"
+     },
+     {
+      "tool_calls": [
+       {
+        "id": "call-1",
+        "function": {
+         "arguments": "",
+         "name": "findOrder"
+        },
+        "type": "function",
+        "index": 0
+       }
+      ]
+     },
+     {
+      "tool_calls": [
+       {
+        "function": {
+         "arguments": "{\"orderId\": \""
+        },
+        "type": "function",
+        "index": 0
+       }
+      ]
+     },
+     {
+      "tool_calls": [
+       {
+        "function": {
+         "arguments": "A-10"
+        },
+        "type": "function",
+        "index": 0
+       }
+      ]
+     },
+     {
+      "tool_calls": [
+       {
+        "function": {
+         "arguments": "42"
+        },
+        "type": "function",
+        "index": 0
+       }
+      ]
+     },
+     {
+      "tool_calls": [
+       {
+        "function": {
+         "arguments": "\"}"
+        },
+        "type": "function",
+        "index": 0
+       }
+      ]
+     }
+    ],
+    "promptTokens": 394,
+    "completionTokens": 55,
+    "millis": 2599,
+    "chunks": [
+     {
+      "kind": "reasoning",
+      "text": "The",
+      "partIndex": 0,
+      "partial": true
+     },
+     {
+      "kind": "reasoning",
+      "text": " user is asking about",
+      "partIndex": 0,
+      "partial": true
+     },
+     {
+      "kind": "reasoning",
+      "text": " order",
+      "partIndex": 0,
+      "partial": true
+     },
+     {
+      "kind": "reasoning",
+      "text": " A-10",
+      "partIndex": 0,
+      "partial": true
+     },
+     {
+      "kind": "reasoning",
+      "text": "42. I",
+      "partIndex": 0,
+      "partial": true
+     },
+     {
+      "kind": "reasoning",
+      "text": " should use the find",
+      "partIndex": 0,
+      "partial": true
+     },
+     {
+      "kind": "reasoning",
+      "text": "Order tool.\n",
+      "partIndex": 0,
+      "partial": true
+     },
+     {
+      "kind": "toolCall",
+      "name": "findOrder",
+      "arguments": "",
+      "partIndex": 1,
+      "partial": true
+     },
+     {
+      "kind": "toolCall",
+      "name": "findOrder",
+      "arguments": "{\"orderId\": \"",
+      "partIndex": 1,
+      "partial": true
+     },
+     {
+      "kind": "toolCall",
+      "name": "findOrder",
+      "arguments": "A-10",
+      "partIndex": 1,
+      "partial": true
+     },
+     {
+      "kind": "toolCall",
+      "name": "findOrder",
+      "arguments": "42",
+      "partIndex": 1,
+      "partial": true
+     },
+     {
+      "kind": "toolCall",
+      "name": "findOrder",
+      "arguments": "\"}",
+      "partIndex": 1,
+      "partial": true
+     },
+     {
+      "kind": "toolCall",
+      "name": "findOrder",
+      "arguments": "{\"orderId\": \"A-1042\"}",
+      "partIndex": 1,
+      "partial": false
+     }
+    ],
+    "parts": [
+     {
+      "kind": "reasoning",
+      "text": "The user is asking about order A-1042. I should use the findOrder tool.\n"
+     },
+     {
+      "kind": "toolCall",
+      "name": "findOrder",
+      "arguments": "{\"orderId\": \"A-1042\"}"
+     }
+    ]
+   },
+   {
+    "request": {
+     "messages": [
+      {
+       "content": "You are the support assistant of an online shop. …",
+       "role": "system"
+      },
+      {
+       "content": "Where is my order A-1042?",
+       "role": "user"
+      },
+      {
+       "role": "assistant",
+       "content": "",
+       "tool_calls": [
+        {
+         "id": "call-1",
+         "function": {
+          "arguments": "{\"orderId\": \"A-1042\"}",
+          "name": "findOrder"
+         },
+         "type": "function"
+        }
+       ],
+       "reasoning_content": "The user is asking about order A-1042. I should use the findOrder tool.\n"
+      },
+      {
+       "content": "{\"orderId\":\"A-1042\",\"status\":\"SHIPPED\",\"carrier\":\"DHL\",\"expectedDelivery\":\"2026-11-21\"}",
+       "role": "tool",
+       "tool_call_id": "call-1"
+      }
+     ],
+     "stream": true
+    },
+    "reply": [
+     {
+      "reasoning_content": "The"
+     },
+     {
+      "reasoning_content": " order has been shipped"
+     },
+     {
+      "reasoning_content": ", the"
+     },
+     {
+      "reasoning_content": " carrier is DHL,"
+     },
+     {
+      "reasoning_content": " and the expected delivery"
+     },
+     {
+      "reasoning_content": " date is November"
+     },
+     {
+      "reasoning_content": " 21,"
+     },
+     {
+      "reasoning_content": " 202"
+     },
+     {
+      "reasoning_content": "6. Please answer"
+     },
+     {
+      "reasoning_content": " in one"
+     },
+     {
+      "reasoning_content": " or two sentences."
+     },
+     {
+      "reasoning_content": "\n",
+      "content": "\n\nYour"
+     },
+     {
+      "content": " order A-1"
+     },
+     {
+      "content": "042 has"
+     },
+     {
+      "content": " been shipped via"
+     },
+     {
+      "content": " DHL and is expected"
+     },
+     {
+      "content": " to be"
+     },
+     {
+      "content": " delivered on November "
+     },
+     {
+      "content": "21, "
+     },
+     {
+      "content": "2026"
+     },
+     {
+      "content": "."
+     }
+    ],
+    "promptTokens": 499,
+    "completionTokens": 71,
+    "millis": 2939,
+    "chunks": [
+     {
+      "kind": "reasoning",
+      "text": "The",
+      "partIndex": 0,
+      "partial": true
+     },
+     {
+      "kind": "reasoning",
+      "text": " order has been shipped",
+      "partIndex": 0,
+      "partial": true
+     },
+     {
+      "kind": "reasoning",
+      "text": ", the",
+      "partIndex": 0,
+      "partial": true
+     },
+     {
+      "kind": "reasoning",
+      "text": " carrier is DHL,",
+      "partIndex": 0,
+      "partial": true
+     },
+     {
+      "kind": "reasoning",
+      "text": " and the expected delivery",
+      "partIndex": 0,
+      "partial": true
+     },
+     {
+      "kind": "reasoning",
+      "text": " date is November",
+      "partIndex": 0,
+      "partial": true
+     },
+     {
+      "kind": "reasoning",
+      "text": " 21,",
+      "partIndex": 0,
+      "partial": true
+     },
+     {
+      "kind": "reasoning",
+      "text": " 202",
+      "partIndex": 0,
+      "partial": true
+     },
+     {
+      "kind": "reasoning",
+      "text": "6. Please answer",
+      "partIndex": 0,
+      "partial": true
+     },
+     {
+      "kind": "reasoning",
+      "text": " in one",
+      "partIndex": 0,
+      "partial": true
+     },
+     {
+      "kind": "reasoning",
+      "text": " or two sentences.",
+      "partIndex": 0,
+      "partial": true
+     },
+     {
+      "kind": "reasoning",
+      "text": "\n",
+      "partIndex": 0,
+      "partial": true
+     },
+     {
+      "kind": "text",
+      "text": " order A-1",
+      "partIndex": 1,
+      "partial": true
+     },
+     {
+      "kind": "text",
+      "text": "042 has",
+      "partIndex": 1,
+      "partial": true
+     },
+     {
+      "kind": "text",
+      "text": " been shipped via",
+      "partIndex": 1,
+      "partial": true
+     },
+     {
+      "kind": "text",
+      "text": " DHL and is expected",
+      "partIndex": 1,
+      "partial": true
+     },
+     {
+      "kind": "text",
+      "text": " to be",
+      "partIndex": 1,
+      "partial": true
+     },
+     {
+      "kind": "text",
+      "text": " delivered on November ",
+      "partIndex": 1,
+      "partial": true
+     },
+     {
+      "kind": "text",
+      "text": "21, ",
+      "partIndex": 1,
+      "partial": true
+     },
+     {
+      "kind": "text",
+      "text": "2026",
+      "partIndex": 1,
+      "partial": true
+     },
+     {
+      "kind": "text",
+      "text": ".",
+      "partIndex": 1,
+      "partial": true
+     }
+    ],
+    "parts": null
+   }
+  ]
+ },
+ {
+  "key": "no-tool",
+  "answer": "No, 391 is not prime—it's the product of 17 and 23 (17 × 23 = 391), so it has divisors other than 1 and itself.",
+  "reasoning": "The user is asking whether 391 is a prime number. This has nothing to do with the shop tool. Let me check: 391 = 17 × 23. 17*23 = 391. Yes, so 391 is not a prime number. I'll answer in 1-2 sentences.",
+  "calls": [
+   {
+    "request": {
+     "messages": [
+      {
+       "content": "You are the support assistant of an online shop. …",
+       "role": "system"
+      },
+      {
+       "content": "Is 391 a prime number?",
+       "role": "user"
+      }
+     ]
+    },
+    "reply": {
+     "content": "\n\nNo, 391 is not prime—it's the product of 17 and 23 (17 × 23 = 391), so it has divisors other than 1 and itself.",
+     "role": "assistant",
+     "reasoning_content": "The user is asking whether 391 is a prime number. This has nothing to do with the shop tool. Let me check: 391 = 17 × 23. 17*23 = 391. Yes, so 391 is not a prime number. I'll answer in 1-2 sentences.\n"
+    },
+    "promptTokens": 392,
+    "completionTokens": 126,
+    "millis": 5074,
+    "parts": [
+     {
+      "kind": "reasoning",
+      "text": "The user is asking whether 391 is a prime number. This has nothing to do with the shop tool. Let me check: 391 = 17 × 23. 17*23 = 391. Yes, so 391 is not a prime number. I'll answer in 1-2 sentences.\n"
+     },
+     {
+      "kind": "text",
+      "text": "\n\nNo, 391 is not prime—it's the product of 17 and 23 (17 × 23 = 391), so it has divisors other than 1 and itself."
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "key": "property-extra-body",
+  "answer": "Your order A-1042 has been shipped via DHL and is expected to arrive on November 21, 2026.",
+  "reasoning": "The order is shipped via DHL with an expected delivery date of 2026-11-21.",
+  "calls": [
+   {
+    "request": {
+     "messages": [
+      {
+       "content": "You are the support assistant of an online shop. …",
+       "role": "system"
+      },
+      {
+       "content": "Where is my order A-1042?",
+       "role": "user"
+      }
+     ],
+     "chat_template_kwargs": {
+      "enable_thinking": "false"
+     }
+    },
+    "reply": {
+     "role": "assistant",
+     "tool_calls": [
+      {
+       "function": {
+        "arguments": "{\"orderId\": \"A-1042\"}",
+        "name": "findOrder"
+       },
+       "id": "call-1",
+       "type": "function"
+      }
+     ],
+     "reasoning_content": "The user is asking about the location/status of their order A-1042. I need to use the findOrder tool to look up this order.\n"
+    },
+    "promptTokens": 356,
+    "completionTokens": 66,
+    "millis": 2584,
+    "parts": [
+     {
+      "kind": "reasoning",
+      "text": "The user is asking about the location/status of their order A-1042. I need to use the findOrder tool to look up this order.\n"
+     },
+     {
+      "kind": "toolCall",
+      "name": "findOrder",
+      "arguments": "{\"orderId\": \"A-1042\"}"
+     }
+    ]
+   },
+   {
+    "request": {
+     "messages": [
+      {
+       "content": "You are the support assistant of an online shop. …",
+       "role": "system"
+      },
+      {
+       "content": "Where is my order A-1042?",
+       "role": "user"
+      },
+      {
+       "role": "assistant",
+       "content": "",
+       "tool_calls": [
+        {
+         "id": "call-1",
+         "function": {
+          "arguments": "{\"orderId\": \"A-1042\"}",
+          "name": "findOrder"
+         },
+         "type": "function"
+        }
+       ],
+       "reasoning_content": "The user is asking about the location/status of their order A-1042. I need to use the findOrder tool to look up this order.\n"
+      },
+      {
+       "content": "{\"orderId\":\"A-1042\",\"status\":\"SHIPPED\",\"carrier\":\"DHL\",\"expectedDelivery\":\"2026-11-21\"}",
+       "role": "tool",
+       "tool_call_id": "call-1"
+      }
+     ],
+     "chat_template_kwargs": {
+      "enable_thinking": "false"
+     }
+    },
+    "reply": {
+     "content": "\n\nYour order A-1042 has been shipped via DHL and is expected to arrive on November 21, 2026.",
+     "role": "assistant",
+     "reasoning_content": "The order is shipped via DHL with an expected delivery date of 2026-11-21.\n"
+    },
+    "promptTokens": 472,
+    "completionTokens": 58,
+    "millis": 2382,
+    "parts": [
+     {
+      "kind": "reasoning",
+      "text": "The order is shipped via DHL with an expected delivery date of 2026-11-21.\n"
+     },
+     {
+      "kind": "text",
+      "text": "\n\nYour order A-1042 has been shipped via DHL and is expected to arrive on November 21, 2026."
+     }
+    ]
+   }
+  ]
+ }
+]

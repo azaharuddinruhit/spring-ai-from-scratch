@@ -24,7 +24,7 @@ export const CURRICULUM: Module[] = [
     number: 1,
     title: 'Foundations & Core Abstractions',
     summary:
-      'The Spring AI 2.x stack on Java 25 and Boot 4, the ChatClient fluent API, switching providers without code changes, and prompts with images and audio.',
+      'The Spring AI 2.x stack on Java 25 and Boot 4, the ChatClient fluent API, switching providers without code changes, prompts with images and audio, and reading replies part by part.',
     lessons: [
       { slug: 'spring-ai-2-architecture', title: 'Spring AI 2.x Architecture on Java 25' },
       { slug: 'chatclient-fluent-api', title: 'The ChatClient Fluent API' },

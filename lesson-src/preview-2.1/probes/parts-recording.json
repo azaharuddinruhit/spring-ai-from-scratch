@@ -1,0 +1,1209 @@
+[
+ {
+  "label": "reply",
+  "result": {
+   "answer": "\n\nYour order A-1042 has been shipped via DHL and is expected to arrive on November 21, 2026.",
+   "reasoning": "The order has been shipped by DHL, with the expected delivery date on November 21, 2026. I'll respond in 1-2 sentences.\n"
+  },
+  "millis": 6942,
+  "calls": [
+   {
+    "request": [
+     {
+      "type": "SYSTEM",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "You are the support assistant of an online shop. Look orders up with the tools; never invent order\ndetails. Answer in one or two sentences."
+       }
+      ]
+     },
+     {
+      "type": "USER",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "Where is my order A-1042?"
+       }
+      ]
+     }
+    ],
+    "reply": [
+     {
+      "class": "ReasoningPart",
+      "text": "The user is asking about order A-1042. I need to use the findOrder tool.\n",
+      "summary": null,
+      "payload": "null"
+     },
+     {
+      "class": "ToolCallPart",
+      "name": "findOrder",
+      "arguments": "{\"orderId\": \"A-1042\"}",
+      "id": "chatcmpl-tool-97f3332c4c92f0f0"
+     }
+    ],
+    "getText": "",
+    "promptTokens": 394,
+    "completionTokens": 56,
+    "finishReason": "TOOL_CALLS",
+    "millis": 3776
+   },
+   {
+    "request": [
+     {
+      "type": "SYSTEM",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "You are the support assistant of an online shop. Look orders up with the tools; never invent order\ndetails. Answer in one or two sentences."
+       }
+      ]
+     },
+     {
+      "type": "USER",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "Where is my order A-1042?"
+       }
+      ]
+     },
+     {
+      "type": "ASSISTANT",
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": "The user is asking about order A-1042. I need to use the findOrder tool.\n",
+        "summary": null,
+        "payload": "null"
+       },
+       {
+        "class": "ToolCallPart",
+        "name": "findOrder",
+        "arguments": "{\"orderId\": \"A-1042\"}",
+        "id": "chatcmpl-tool-97f3332c4c92f0f0"
+       }
+      ]
+     },
+     {
+      "type": "TOOL",
+      "parts": [
+       {
+        "class": "ToolResultPart",
+        "name": "findOrder",
+        "id": "chatcmpl-tool-97f3332c4c92f0f0",
+        "content": [
+         {
+          "class": "TextPart",
+          "text": "{\"orderId\":\"A-1042\",\"status\":\"SHIPPED\",\"carrier\":\"DHL\",\"expectedDelivery\":\"2026-11-21\"}"
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "reply": [
+     {
+      "class": "ReasoningPart",
+      "text": "The order has been shipped by DHL, with the expected delivery date on November 21, 2026. I'll respond in 1-2 sentences.\n",
+      "summary": null,
+      "payload": "null"
+     },
+     {
+      "class": "TextPart",
+      "text": "\n\nYour order A-1042 has been shipped via DHL and is expected to arrive on November 21, 2026."
+     }
+    ],
+    "getText": "\n\nYour order A-1042 has been shipped via DHL and is expected to arrive on November 21, 2026.",
+    "promptTokens": 500,
+    "completionTokens": 69,
+    "finishReason": "STOP",
+    "millis": 3090
+   }
+  ],
+  "wire": [
+   0,
+   2
+  ]
+ },
+ {
+  "label": "no-replay",
+  "result": "\n\nYour order A-1042 has been shipped via DHL and is expected to arrive on November 21, 2026.",
+  "millis": 5605,
+  "calls": [
+   {
+    "request": [
+     {
+      "type": "SYSTEM",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "You are the support assistant of an online shop. Look orders up with the tools; never invent order\ndetails. Answer in one or two sentences."
+       }
+      ]
+     },
+     {
+      "type": "USER",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "Where is my order A-1042?"
+       }
+      ]
+     }
+    ],
+    "reply": [
+     {
+      "class": "ReasoningPart",
+      "text": "The user is asking about the order status of order A-1042. I need to use the findOrder tool.\n",
+      "summary": null,
+      "payload": "null"
+     },
+     {
+      "class": "ToolCallPart",
+      "name": "findOrder",
+      "arguments": "{\"orderId\": \"A-1042\"}",
+      "id": "chatcmpl-tool-b135744afa52a67b"
+     }
+    ],
+    "getText": "",
+    "promptTokens": 394,
+    "completionTokens": 60,
+    "finishReason": "TOOL_CALLS",
+    "millis": 2495
+   },
+   {
+    "request": [
+     {
+      "type": "SYSTEM",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "You are the support assistant of an online shop. Look orders up with the tools; never invent order\ndetails. Answer in one or two sentences."
+       }
+      ]
+     },
+     {
+      "type": "USER",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "Where is my order A-1042?"
+       }
+      ]
+     },
+     {
+      "type": "ASSISTANT",
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": "The user is asking about the order status of order A-1042. I need to use the findOrder tool.\n",
+        "summary": null,
+        "payload": "null"
+       },
+       {
+        "class": "ToolCallPart",
+        "name": "findOrder",
+        "arguments": "{\"orderId\": \"A-1042\"}",
+        "id": "chatcmpl-tool-b135744afa52a67b"
+       }
+      ]
+     },
+     {
+      "type": "TOOL",
+      "parts": [
+       {
+        "class": "ToolResultPart",
+        "name": "findOrder",
+        "id": "chatcmpl-tool-b135744afa52a67b",
+        "content": [
+         {
+          "class": "TextPart",
+          "text": "{\"orderId\":\"A-1042\",\"status\":\"SHIPPED\",\"carrier\":\"DHL\",\"expectedDelivery\":\"2026-11-21\"}"
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "reply": [
+     {
+      "class": "ReasoningPart",
+      "text": "I need to investigate this further. Let me confirm the details.\n\nSimple answer: The order has been shipped via DHL, and delivery is scheduled for November 21, 2026.\n",
+      "summary": null,
+      "payload": "null"
+     },
+     {
+      "class": "TextPart",
+      "text": "\n\nYour order A-1042 has been shipped via DHL and is expected to arrive on November 21, 2026."
+     }
+    ],
+    "getText": "\n\nYour order A-1042 has been shipped via DHL and is expected to arrive on November 21, 2026.",
+    "promptTokens": 477,
+    "completionTokens": 75,
+    "finishReason": "STOP",
+    "millis": 3104
+   }
+  ],
+  "wire": [
+   2,
+   4
+  ]
+ },
+ {
+  "label": "quick-reply",
+  "result": "Your order A-1042 has been shipped via DHL. It is expected to be delivered on 2026-11-21.",
+  "millis": 3063,
+  "calls": [
+   {
+    "request": [
+     {
+      "type": "SYSTEM",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "You are the support assistant of an online shop. Look orders up with the tools; never invent order\ndetails. Answer in one or two sentences."
+       }
+      ]
+     },
+     {
+      "type": "USER",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "Where is my order A-1042?"
+       }
+      ]
+     }
+    ],
+    "reply": [
+     {
+      "class": "ToolCallPart",
+      "name": "findOrder",
+      "arguments": "{\"orderId\": \"A-1042\"}",
+      "id": "chatcmpl-tool-99512ba7552440dc"
+     }
+    ],
+    "getText": "",
+    "promptTokens": 358,
+    "completionTokens": 31,
+    "finishReason": "TOOL_CALLS",
+    "millis": 1406
+   },
+   {
+    "request": [
+     {
+      "type": "SYSTEM",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "You are the support assistant of an online shop. Look orders up with the tools; never invent order\ndetails. Answer in one or two sentences."
+       }
+      ]
+     },
+     {
+      "type": "USER",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "Where is my order A-1042?"
+       }
+      ]
+     },
+     {
+      "type": "ASSISTANT",
+      "parts": [
+       {
+        "class": "ToolCallPart",
+        "name": "findOrder",
+        "arguments": "{\"orderId\": \"A-1042\"}",
+        "id": "chatcmpl-tool-99512ba7552440dc"
+       }
+      ]
+     },
+     {
+      "type": "TOOL",
+      "parts": [
+       {
+        "class": "ToolResultPart",
+        "name": "findOrder",
+        "id": "chatcmpl-tool-99512ba7552440dc",
+        "content": [
+         {
+          "class": "TextPart",
+          "text": "{\"orderId\":\"A-1042\",\"status\":\"SHIPPED\",\"carrier\":\"DHL\",\"expectedDelivery\":\"2026-11-21\"}"
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "reply": [
+     {
+      "class": "TextPart",
+      "text": "Your order A-1042 has been shipped via DHL. It is expected to be delivered on 2026-11-21."
+     }
+    ],
+    "getText": "Your order A-1042 has been shipped via DHL. It is expected to be delivered on 2026-11-21.",
+    "promptTokens": 441,
+    "completionTokens": 34,
+    "finishReason": "STOP",
+    "millis": 1657
+   }
+  ],
+  "wire": [
+   4,
+   6
+  ]
+ },
+ {
+  "label": "stream",
+  "result": "\n\nYour order A-1042 has been shipped via DHL and is expected to be delivered on November 21, 2026.",
+  "millis": 5634,
+  "calls": [
+   {
+    "request": [
+     {
+      "type": "SYSTEM",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "You are the support assistant of an online shop. Look orders up with the tools; never invent order\ndetails. Answer in one or two sentences."
+       }
+      ]
+     },
+     {
+      "type": "USER",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "Where is my order A-1042?"
+       }
+      ]
+     }
+    ],
+    "chunks": [
+     {
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": ""
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": "The",
+        "summary": null,
+        "payload": "null",
+        "attributes": {
+         "partIndex": "0",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": " user is asking about",
+        "summary": null,
+        "payload": "null",
+        "attributes": {
+         "partIndex": "0",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": " order",
+        "summary": null,
+        "payload": "null",
+        "attributes": {
+         "partIndex": "0",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": " A-10",
+        "summary": null,
+        "payload": "null",
+        "attributes": {
+         "partIndex": "0",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": "42. I",
+        "summary": null,
+        "payload": "null",
+        "attributes": {
+         "partIndex": "0",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": " should use the find",
+        "summary": null,
+        "payload": "null",
+        "attributes": {
+         "partIndex": "0",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": "Order tool.\n",
+        "summary": null,
+        "payload": "null",
+        "attributes": {
+         "partIndex": "0",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ToolCallPart",
+        "name": "findOrder",
+        "arguments": "",
+        "id": "chatcmpl-tool-9e2f9875af162178",
+        "attributes": {
+         "partIndex": "1",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ToolCallPart",
+        "name": "findOrder",
+        "arguments": "{\"orderId\": \"",
+        "id": "chatcmpl-tool-9e2f9875af162178",
+        "attributes": {
+         "partIndex": "1",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ToolCallPart",
+        "name": "findOrder",
+        "arguments": "A-10",
+        "id": "chatcmpl-tool-9e2f9875af162178",
+        "attributes": {
+         "partIndex": "1",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ToolCallPart",
+        "name": "findOrder",
+        "arguments": "42",
+        "id": "chatcmpl-tool-9e2f9875af162178",
+        "attributes": {
+         "partIndex": "1",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ToolCallPart",
+        "name": "findOrder",
+        "arguments": "\"}",
+        "id": "chatcmpl-tool-9e2f9875af162178",
+        "attributes": {
+         "partIndex": "1",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ToolCallPart",
+        "name": "findOrder",
+        "arguments": "{\"orderId\": \"A-1042\"}",
+        "id": "chatcmpl-tool-9e2f9875af162178",
+        "attributes": {
+         "partIndex": "1"
+        },
+        "partial": false
+       }
+      ],
+      "text": ""
+     }
+    ],
+    "promptTokens": 394,
+    "completionTokens": 55,
+    "finishReason": "TOOL_CALLS",
+    "millis": 2599
+   },
+   {
+    "request": [
+     {
+      "type": "SYSTEM",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "You are the support assistant of an online shop. Look orders up with the tools; never invent order\ndetails. Answer in one or two sentences."
+       }
+      ]
+     },
+     {
+      "type": "USER",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "Where is my order A-1042?"
+       }
+      ]
+     },
+     {
+      "type": "ASSISTANT",
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": "The user is asking about order A-1042. I should use the findOrder tool.\n",
+        "summary": null,
+        "payload": "null"
+       },
+       {
+        "class": "ToolCallPart",
+        "name": "findOrder",
+        "arguments": "{\"orderId\": \"A-1042\"}",
+        "id": "chatcmpl-tool-9e2f9875af162178"
+       }
+      ]
+     },
+     {
+      "type": "TOOL",
+      "parts": [
+       {
+        "class": "ToolResultPart",
+        "name": "findOrder",
+        "id": "chatcmpl-tool-9e2f9875af162178",
+        "content": [
+         {
+          "class": "TextPart",
+          "text": "{\"orderId\":\"A-1042\",\"status\":\"SHIPPED\",\"carrier\":\"DHL\",\"expectedDelivery\":\"2026-11-21\"}"
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "chunks": [
+     {
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": ""
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": "The",
+        "summary": null,
+        "payload": "null",
+        "attributes": {
+         "partIndex": "0",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": " order has been shipped",
+        "summary": null,
+        "payload": "null",
+        "attributes": {
+         "partIndex": "0",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": ", the",
+        "summary": null,
+        "payload": "null",
+        "attributes": {
+         "partIndex": "0",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": " carrier is DHL,",
+        "summary": null,
+        "payload": "null",
+        "attributes": {
+         "partIndex": "0",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": " and the expected delivery",
+        "summary": null,
+        "payload": "null",
+        "attributes": {
+         "partIndex": "0",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": " date is November",
+        "summary": null,
+        "payload": "null",
+        "attributes": {
+         "partIndex": "0",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": " 21,",
+        "summary": null,
+        "payload": "null",
+        "attributes": {
+         "partIndex": "0",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": " 202",
+        "summary": null,
+        "payload": "null",
+        "attributes": {
+         "partIndex": "0",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": "6. Please answer",
+        "summary": null,
+        "payload": "null",
+        "attributes": {
+         "partIndex": "0",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": " in one",
+        "summary": null,
+        "payload": "null",
+        "attributes": {
+         "partIndex": "0",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": " or two sentences.",
+        "summary": null,
+        "payload": "null",
+        "attributes": {
+         "partIndex": "0",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": "\n",
+        "summary": null,
+        "payload": "null",
+        "attributes": {
+         "partIndex": "0",
+         "partial": "true"
+        },
+        "partial": true
+       },
+       {
+        "class": "TextPart",
+        "text": "\n\nYour",
+        "attributes": {
+         "partIndex": "1",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": "\n\nYour"
+     },
+     {
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": " order A-1",
+        "attributes": {
+         "partIndex": "1",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": " order A-1"
+     },
+     {
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "042 has",
+        "attributes": {
+         "partIndex": "1",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": "042 has"
+     },
+     {
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": " been shipped via",
+        "attributes": {
+         "partIndex": "1",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": " been shipped via"
+     },
+     {
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": " DHL and is expected",
+        "attributes": {
+         "partIndex": "1",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": " DHL and is expected"
+     },
+     {
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": " to be",
+        "attributes": {
+         "partIndex": "1",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": " to be"
+     },
+     {
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": " delivered on November ",
+        "attributes": {
+         "partIndex": "1",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": " delivered on November "
+     },
+     {
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "21, ",
+        "attributes": {
+         "partIndex": "1",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": "21, "
+     },
+     {
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "2026",
+        "attributes": {
+         "partIndex": "1",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": "2026"
+     },
+     {
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": ".",
+        "attributes": {
+         "partIndex": "1",
+         "partial": "true"
+        },
+        "partial": true
+       }
+      ],
+      "text": "."
+     },
+     {
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": ""
+       }
+      ],
+      "text": ""
+     },
+     {
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": ""
+       }
+      ],
+      "text": ""
+     }
+    ],
+    "promptTokens": 499,
+    "completionTokens": 71,
+    "finishReason": null,
+    "millis": 2939
+   }
+  ],
+  "wire": [
+   6,
+   8
+  ]
+ },
+ {
+  "label": "no-tool",
+  "result": {
+   "answer": "\n\nNo, 391 is not prime—it's the product of 17 and 23 (17 × 23 = 391), so it has divisors other than 1 and itself.",
+   "reasoning": "The user is asking whether 391 is a prime number. This has nothing to do with the shop tool. Let me check: 391 = 17 × 23. 17*23 = 391. Yes, so 391 is not a prime number. I'll answer in 1-2 sentences.\n"
+  },
+  "millis": 5074,
+  "calls": [
+   {
+    "request": [
+     {
+      "type": "SYSTEM",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "You are the support assistant of an online shop. Look orders up with the tools; never invent order\ndetails. Answer in one or two sentences."
+       }
+      ]
+     },
+     {
+      "type": "USER",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "Is 391 a prime number?"
+       }
+      ]
+     }
+    ],
+    "reply": [
+     {
+      "class": "ReasoningPart",
+      "text": "The user is asking whether 391 is a prime number. This has nothing to do with the shop tool. Let me check: 391 = 17 × 23. 17*23 = 391. Yes, so 391 is not a prime number. I'll answer in 1-2 sentences.\n",
+      "summary": null,
+      "payload": "null"
+     },
+     {
+      "class": "TextPart",
+      "text": "\n\nNo, 391 is not prime—it's the product of 17 and 23 (17 × 23 = 391), so it has divisors other than 1 and itself."
+     }
+    ],
+    "getText": "\n\nNo, 391 is not prime—it's the product of 17 and 23 (17 × 23 = 391), so it has divisors other than 1 and itself.",
+    "promptTokens": 392,
+    "completionTokens": 126,
+    "finishReason": "STOP",
+    "millis": 5074
+   }
+  ],
+  "wire": [
+   8,
+   9
+  ]
+ },
+ {
+  "label": "property-extra-body",
+  "result": {
+   "answer": "\n\nYour order A-1042 has been shipped via DHL and is expected to arrive on November 21, 2026.",
+   "reasoning": "The order is shipped via DHL with an expected delivery date of 2026-11-21.\n"
+  },
+  "millis": 4976,
+  "calls": [
+   {
+    "request": [
+     {
+      "type": "SYSTEM",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "You are the support assistant of an online shop. Look orders up with the tools; never invent order\ndetails. Answer in one or two sentences."
+       }
+      ]
+     },
+     {
+      "type": "USER",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "Where is my order A-1042?"
+       }
+      ]
+     }
+    ],
+    "reply": [
+     {
+      "class": "ReasoningPart",
+      "text": "The user is asking about the location/status of their order A-1042. I need to use the findOrder tool to look up this order.\n",
+      "summary": null,
+      "payload": "null"
+     },
+     {
+      "class": "ToolCallPart",
+      "name": "findOrder",
+      "arguments": "{\"orderId\": \"A-1042\"}",
+      "id": "chatcmpl-tool-8fdbf80e94265e1d"
+     }
+    ],
+    "getText": "",
+    "promptTokens": 356,
+    "completionTokens": 66,
+    "finishReason": "TOOL_CALLS",
+    "millis": 2584
+   },
+   {
+    "request": [
+     {
+      "type": "SYSTEM",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "You are the support assistant of an online shop. Look orders up with the tools; never invent order\ndetails. Answer in one or two sentences."
+       }
+      ]
+     },
+     {
+      "type": "USER",
+      "parts": [
+       {
+        "class": "TextPart",
+        "text": "Where is my order A-1042?"
+       }
+      ]
+     },
+     {
+      "type": "ASSISTANT",
+      "parts": [
+       {
+        "class": "ReasoningPart",
+        "text": "The user is asking about the location/status of their order A-1042. I need to use the findOrder tool to look up this order.\n",
+        "summary": null,
+        "payload": "null"
+       },
+       {
+        "class": "ToolCallPart",
+        "name": "findOrder",
+        "arguments": "{\"orderId\": \"A-1042\"}",
+        "id": "chatcmpl-tool-8fdbf80e94265e1d"
+       }
+      ]
+     },
+     {
+      "type": "TOOL",
+      "parts": [
+       {
+        "class": "ToolResultPart",
+        "name": "findOrder",
+        "id": "chatcmpl-tool-8fdbf80e94265e1d",
+        "content": [
+         {
+          "class": "TextPart",
+          "text": "{\"orderId\":\"A-1042\",\"status\":\"SHIPPED\",\"carrier\":\"DHL\",\"expectedDelivery\":\"2026-11-21\"}"
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "reply": [
+     {
+      "class": "ReasoningPart",
+      "text": "The order is shipped via DHL with an expected delivery date of 2026-11-21.\n",
+      "summary": null,
+      "payload": "null"
+     },
+     {
+      "class": "TextPart",
+      "text": "\n\nYour order A-1042 has been shipped via DHL and is expected to arrive on November 21, 2026."
+     }
+    ],
+    "getText": "\n\nYour order A-1042 has been shipped via DHL and is expected to arrive on November 21, 2026.",
+    "promptTokens": 472,
+    "completionTokens": 58,
+    "finishReason": "STOP",
+    "millis": 2382
+   }
+  ],
+  "wire": [
+   9,
+   11
+  ]
+ }
+]

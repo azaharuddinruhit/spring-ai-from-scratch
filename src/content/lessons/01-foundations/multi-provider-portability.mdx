@@ -8,6 +8,7 @@ import Gotcha from '@/components/Gotcha.astro';
 import ProviderSwitcherLab from '@/components/ProviderSwitcherLab.astro';
 import { gradleDependencies } from '@/data/snippets';
 import ProjectTree from '@/components/ProjectTree.astro';
+import { lessonHref } from '@/lib/course';
 
 Your services depend on `ChatClient`, and `ChatClient` depends on the `ChatModel` interface. Which implementation sits behind it is
 decided at build time by the **starter on the classpath**, and at runtime by **properties**. It works the same way as swapping
@@ -191,7 +192,8 @@ auto-configured `ChatClient.Builder` then fails at startup with a `NoUniqueBeanD
 <Gotcha kind="reliability" title="Portable code, but behavior differs by provider">
 The Java code is portable. Model behavior is not. Default `max-tokens`, whether `temperature` is supported (OpenAI's GPT-5 family rejects it),
 JSON-schema strictness, multimodal support and tool-calling quality all differ between providers. Run the same evaluation suite against each
-provider you switch to (Module 6) rather than assuming parity.
+provider you switch to (Module 6) rather than assuming parity. Reasoning models also return their thinking, which the
+<a href={lessonHref('01-foundations/message-parts-and-reasoning')}>Message Parts & Reasoning</a> preview lesson reads on Spring AI 2.1.
 </Gotcha>
 
 <Gotcha kind="security" title="'Local' doesn't automatically mean private">

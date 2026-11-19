@@ -1,0 +1,641 @@
+---
+description: Read a reply as ordered parts, keep a reasoning model's thinking apart from the answer, see it replayed across a tool call, and switch it off per request.
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import MessagePartsLab from '@/components/islands/MessagePartsLab';
+import ProjectTree from '@/components/ProjectTree.astro';
+import { buildGradle } from '@/data/snippets';
+import { PREVIEW_STACK } from '@/data/versions';
+
+**You'll need:** an OpenAI-compatible server with a reasoning model that calls tools. This lesson's recordings used a 27B Qwen 3
+reasoning model. Ollama's `/v1` works for the reasoning, but `deepseek-r1:1.5b` ignored the tool in our runs. This lesson is its own
+small project.
+
+In Spring AI 2.1 a message is an ordered list of parts. A reasoning model's reply holds its reasoning, then a tool call or the
+answer, each as its own part. `getText()`, `getToolCalls()` and `getMedia()` are still there, as views onto those parts. Before
+2.1, `OpenAiChatModel` kept the reasoning only in the message metadata, under `reasoningContent`; 2.1 still puts it there, and
+makes it a part as well. This lesson reads replies part by
+part, keeps the reasoning away from the customer, watches it go back to the model across a tool call, and switches it off when a
+question doesn't need it.
+
+## 1. Spring mental model
+
+Parts work like a multipart HTTP body: one message, several typed sections in order, and helpers that pick out the sections of one
+type. The model's text is one section; its reasoning is another.
+
+<Mermaid
+  caption="One question with a tool call: the reasoning of the first call goes back to the model, and the caller gets the last reply."
+  code={`
+sequenceDiagram
+  participant S as OrderAssistant
+  participant C as ChatClient
+  participant M as OpenAiChatModel
+  participant L as Reasoning model
+  S->>C: Where is my order A-1042?
+  C->>M: call 1
+  M->>L: system, user, tools
+  L-->>M: reasoning_content + tool_calls
+  M-->>C: ReasoningPart, ToolCallPart
+  C->>C: run findOrder: ToolResultPart
+  C->>M: call 2
+  M->>L: assistant turn with its reasoning_content, then the tool result
+  L-->>M: reasoning_content + content
+  M-->>C: ReasoningPart, TextPart
+  C-->>S: the last reply only
+`}
+/>
+
+The parts live in `org.springframework.ai.chat.messages.part`:
+
+| Part | Holds | Read it with |
+| --- | --- | --- |
+| `TextPart` | the text | `getText()` |
+| `ReasoningPart` | `text`, `summary`, an opaque provider `payload` | `AssistantMessage.getReasoning()` |
+| `ToolCallPart` | an `AssistantMessage.ToolCall` | `getToolCalls()` |
+| `ToolResultPart` | the tool call's id and name, the result as parts, `isError` | `ToolResponseMessage.getResults()` |
+| `MediaPart` | a `Media` | `getMedia()` |
+| `UnknownPart` | a provider's part Spring AI has no type for: `provider`, `kind`, `rawJson` | `getParts()` |
+
+These rules come from the 2.1.0-RC2 classes and from running them:
+
+- `getParts()` is declared on `AbstractMessage`, not on the `Message` interface, and `MessagePart` isn't sealed. A `switch` over
+  parts needs a `default` branch.
+- `OpenAiChatModel` turns the response's `reasoning_content` field into a `ReasoningPart`, and falls back to `reasoning`, the field
+  Ollama's `/v1` uses. Through an OpenAI-compatible server, `summary` and `payload` are null.
+- On the next call it sends that reasoning back as `reasoning_content`, unless `replay-reasoning-content` is false. It doesn't send
+  reasoning whose `payload` comes from another provider.
+- After a tool call, `ChatClient` returns the last model call's message. The reasoning that led to the tool call went back to the
+  model; the caller never sees it.
+- A stream delivers partial parts, each with a `partIndex` attribute. `stream().content()` emits only the text.
+
+## 2. Interactive sandbox
+
+<MessagePartsLab client:visible />
+
+Every run in the sandbox was recorded from the lesson's `OrderAssistant` and a 27B Qwen 3 reasoning model. The sandbox shows the
+parts Spring AI built and the JSON that went over the wire. Another model will reason and answer differently.
+
+Things to try:
+
+- On **Reasoning and a tool call**, call 1 holds a `ReasoningPart` and a `ToolCallPart`, and no text. Switch to **Wire JSON** on
+  call 2: the assistant turn goes back with its `reasoning_content`. The answer the service returned carries only call 2's reasoning.
+- Pick **Replay off**. Call 2's request sends the tool call without the reasoning, and the model still answered from the tool result.
+- Compare **Thinking off, from Java** with the first run: no `ReasoningPart`, 65 completion tokens instead of 125 over the two calls,
+  and 3.1 seconds instead of 6.9.
+- Pick **Thinking off, as a property**. The request says `"enable_thinking": "false"`, a string, and the model reasoned anyway.
+- Pick **Streaming**: seven reasoning chunks, then the tool call's arguments in fragments and once complete.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+<ProjectTree />
+
+One starter: the OpenAI one talks to any OpenAI-compatible server.
+
+<CodeFile title="build.gradle" lang="groovy" lines="3,22,28" code={buildGradle(['spring-ai-starter-model-openai'], PREVIEW_STACK)} />
+
+<CodeFile title="src/main/resources/application.yaml">
+```yaml {7,12}
+spring:
+  application:
+    name: assistant
+  ai:
+    openai:
+      # Any OpenAI-compatible server with a reasoning model. Ollama's is http://localhost:11434/v1, which ignores the key.
+      base-url: http://localhost:11434/v1
+      api-key: ${OPENAI_API_KEY:unused}
+      chat:
+        # Reasoning comes back from Ollama too, but this small model ignored the tool in our runs. The lesson's recordings
+        # used a 27B Qwen 3 reasoning model.
+        model: deepseek-r1:1.5b
+```
+</CodeFile>
+
+The tool answers from fixed data, so the recordings show what the model was given:
+
+<CodeFile title="src/main/java/com/example/assistant/OrderTools.java">
+```java {16}
+package com.example.assistant;
+
+import java.time.LocalDate;
+
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.stereotype.Component;
+
+/** One tool with fixed data, so a recorded reply shows exactly what the model was given. */
+@Component
+public class OrderTools {
+
+    public record Order(String orderId, String status, String carrier, LocalDate expectedDelivery) {
+    }
+
+    @Tool(description = "Look up an order: its status, carrier and expected delivery date.")
+    public Order findOrder(@ToolParam(description = "The order id, for example A-1042") String orderId) {
+        return new Order(orderId, "SHIPPED", "DHL", LocalDate.parse("2026-11-21"));
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/assistant/AssistantConfig.java">
+```java {16}
+package com.example.assistant;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+class AssistantConfig {
+
+    @Bean
+    ChatClient assistantChatClient(ChatClient.Builder builder, OrderTools tools) {
+        return builder
+                .defaultSystem("""
+                        You are the support assistant of an online shop. Look orders up with the tools; never invent order
+                        details. Answer in one or two sentences.""")
+                .defaultTools(tools)
+                .build();
+    }
+}
+```
+</CodeFile>
+
+The service returns the answer and the reasoning as separate fields, so a controller can send the customer only the answer and
+keep the reasoning for logs or review:
+
+<CodeFile title="src/main/java/com/example/assistant/Reply.java">
+```java {4}
+package com.example.assistant;
+
+/** The answer for the customer, and the model's reasoning kept apart from it. */
+public record Reply(String answer, String reasoning) {
+}
+```
+</CodeFile>
+
+`reply` reads the parts, `quickReply` switches thinking off for one request, and `describe` shows a `switch` over parts with record
+patterns:
+
+<CodeFile title="src/main/java/com/example/assistant/OrderAssistant.java">
+```java {29,44,46,53,66,72}
+package com.example.assistant;
+
+import static java.util.stream.Collectors.joining;
+
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.part.MediaPart;
+import org.springframework.ai.chat.messages.part.MessagePart;
+import org.springframework.ai.chat.messages.part.ReasoningPart;
+import org.springframework.ai.chat.messages.part.TextPart;
+import org.springframework.ai.chat.messages.part.ToolCallPart;
+import org.springframework.ai.chat.messages.part.ToolResultPart;
+import org.springframework.ai.chat.messages.part.UnknownPart;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.stereotype.Service;
+
+import reactor.core.publisher.Flux;
+
+@Service
+public class OrderAssistant {
+
+    private static final Logger log = LoggerFactory.getLogger(OrderAssistant.class);
+
+    /** Qwen 3's chat template reads this flag. It has to arrive as a JSON boolean: the string "false" counts as true. */
+    private static final Map<String, Object> NO_THINKING = Map.of("chat_template_kwargs", Map.of("enable_thinking", false));
+
+    private final ChatClient assistantChatClient;
+
+    public OrderAssistant(ChatClient assistantChatClient) {
+        this.assistantChatClient = assistantChatClient;
+    }
+
+    /**
+     * The answer and the reasoning behind it, as separate fields; only the answer is meant for the customer. After a tool call
+     * the reply is the last model call's, so its reasoning is the reasoning that followed the tool result.
+     */
+    public Reply reply(String question) {
+        AssistantMessage message = assistantChatClient.prompt().user(question).call().chatResponse().getResult().getOutput();
+        message.getParts().forEach(part -> log.debug("Reply part: {}", describe(part)));
+        String reasoning = message.getReasoning().stream().map(ReasoningPart::text).collect(joining("\n"));
+        // Reasoning servers put the answer after a blank line.
+        return new Reply(message.getText().strip(), reasoning.strip());
+    }
+
+    /** The same call with thinking switched off for this request: faster and cheaper, for questions that need no thought. */
+    public String quickReply(String question) {
+        return assistantChatClient.prompt()
+                .user(question)
+                .options(OpenAiChatOptions.builder().extraBody(NO_THINKING))
+                .call()
+                .content();
+    }
+
+    /** Streams the answer's text; reasoning chunks carry no text, so none of it reaches the customer. */
+    public Flux<String> streamReply(String question) {
+        return assistantChatClient.prompt().user(question).stream().content();
+    }
+
+    static String describe(MessagePart part) {
+        return switch (part) {
+            case TextPart(String text, _, _) -> "text, " + text.length() + " characters";
+            case ReasoningPart(String text, _, _, _) -> "reasoning, " + text.length() + " characters";
+            case ToolCallPart(AssistantMessage.ToolCall call, _, _) -> "tool call " + call.name() + " " + call.arguments();
+            case ToolResultPart result -> "tool result from " + result.name();
+            case MediaPart(var media, _, _) -> "media " + media.getMimeType();
+            case UnknownPart unknown -> "unknown " + unknown.provider() + " " + unknown.kind();
+            // MessagePart isn't sealed, so a provider can add part types of its own.
+            default -> part.getClass().getSimpleName();
+        };
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/assistant/AssistantApplication.java">
+```java {6}
+package com.example.assistant;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class AssistantApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(AssistantApplication.class, args);
+    }
+}
+```
+</CodeFile>
+
+The first test scripts the chat model with parts: reasoning and a tool call, then reasoning and text. It pins what the service
+returns, that the tool loop keeps the first reasoning in the history, and that a stream drops the reasoning:
+
+<CodeFile title="src/test/java/com/example/assistant/OrderAssistantTest.java">
+```java {46,54,62}
+package com.example.assistant;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.part.ReasoningPart;
+import org.springframework.ai.chat.messages.part.StreamingParts;
+import org.springframework.ai.chat.messages.part.TextPart;
+import org.springframework.ai.chat.messages.part.ToolCallPart;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.model.tool.ToolCallingChatOptions;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+
+import reactor.core.publisher.Flux;
+
+/** The assistant over a scripted chat model that replies with parts: reasoning and a tool call, then reasoning and text. */
+@SpringBootTest
+class OrderAssistantTest {
+
+    @Autowired
+    OrderAssistant assistant;
+
+    @BeforeEach
+    void reset() {
+        ScriptedChatModel.PROMPTS.clear();
+    }
+
+    @Test
+    void theAnswerAndTheLastCallsReasoningComeBackApart() {
+        Reply reply = assistant.reply("Where is my order A-1042?");
+
+        assertThat(reply.answer()).isEqualTo("Your order A-1042 shipped with DHL.");
+        assertThat(reply.reasoning()).isEqualTo("It shipped with DHL.");
+    }
+
+    @Test
+    void theReasoningBeforeTheToolCallGoesBackToTheModelWithIt() {
+        assistant.reply("Where is my order A-1042?");
+
+        AssistantMessage toolCallTurn = (AssistantMessage) ScriptedChatModel.PROMPTS.get(1).getInstructions().get(2);
+        assertThat(toolCallTurn.getReasoning()).extracting(ReasoningPart::text).containsExactly("Look the order up first.");
+        assertThat(toolCallTurn.getToolCalls()).extracting(AssistantMessage.ToolCall::name).containsExactly("findOrder");
+    }
+
+    @Test
+    void aStreamCarriesOnlyTheAnswerText() {
+        List<String> chunks = assistant.streamReply("Is 391 prime?").collectList().block();
+
+        assertThat(String.join("", chunks)).isEqualTo("No: 17 × 23.");
+    }
+
+    @Test
+    void describeNamesEachPartType() {
+        assertThat(OrderAssistant.describe(ReasoningPart.of("Look it up."))).isEqualTo("reasoning, 11 characters");
+        assertThat(OrderAssistant.describe(ToolCallPart.of(findOrder()))).isEqualTo("tool call findOrder {\"orderId\":\"A-1042\"}");
+        assertThat(OrderAssistant.describe(TextPart.of("Shipped."))).isEqualTo("text, 8 characters");
+    }
+
+    static AssistantMessage.ToolCall findOrder() {
+        return new AssistantMessage.ToolCall("call-1", "function", "findOrder", "{\"orderId\":\"A-1042\"}");
+    }
+
+    @TestConfiguration
+    static class ScriptedChatModel {
+
+        static final List<Prompt> PROMPTS = new ArrayList<>();
+
+        @Bean
+        @Primary
+        ChatModel scriptedChatModel() {
+            return new ChatModel() {
+                @Override
+                public ChatOptions getOptions() {
+                    return ToolCallingChatOptions.builder().build();
+                }
+
+                @Override
+                public ChatResponse call(Prompt prompt) {
+                    PROMPTS.add(prompt);
+                    AssistantMessage reply = PROMPTS.size() == 1
+                            ? AssistantMessage.builder()
+                                    .parts(List.of(ReasoningPart.of("Look the order up first."), ToolCallPart.of(findOrder())))
+                                    .build()
+                            : AssistantMessage.builder()
+                                    .parts(List.of(ReasoningPart.of("It shipped with DHL."),
+                                            TextPart.of("\n\nYour order A-1042 shipped with DHL.")))
+                                    .build();
+                    return new ChatResponse(List.of(new Generation(reply)));
+                }
+
+                @Override
+                public Flux<ChatResponse> stream(Prompt prompt) {
+                    return Flux.just(
+                            chunk(StreamingParts.partial(ReasoningPart.of("17 times 23"), 0)),
+                            chunk(StreamingParts.partial(ReasoningPart.of(" is 391."), 0)),
+                            chunk(StreamingParts.partial(TextPart.of("No: "), 1)),
+                            chunk(StreamingParts.partial(TextPart.of("17 × 23."), 1)));
+                }
+
+                private static ChatResponse chunk(org.springframework.ai.chat.messages.part.MessagePart part) {
+                    return new ChatResponse(List.of(new Generation(AssistantMessage.builder().parts(List.of(part)).build())));
+                }
+            };
+        }
+    }
+}
+```
+</CodeFile>
+
+The second runs the real `OpenAiChatModel` against a fake OpenAI-compatible server built on the JDK's `HttpServer`. It checks the
+wire without any model: the reasoning goes back, Ollama's `reasoning` field works, and the thinking flag is a JSON boolean:
+
+<CodeFile title="src/test/java/com/example/assistant/ReasoningReplayTest.java">
+```java {85,91,103}
+package com.example.assistant;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
+
+import com.sun.net.httpserver.HttpServer;
+
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+
+/**
+ * The real OpenAiChatModel against a fake OpenAI-compatible server that answers with canned replies and keeps every request
+ * body, so the test sees what goes over the wire without a model.
+ */
+@SpringBootTest
+class ReasoningReplayTest {
+
+    static final HttpServer SERVER = start();
+    static final List<JsonNode> REQUESTS = new ArrayList<>();
+    static final Deque<String> REPLIES = new ArrayDeque<>();
+    static final JsonMapper JSON = JsonMapper.builder().build();
+
+    static final String TOOL_CALL = """
+            {
+              "role": "assistant",
+              "reasoning_content": "Look the order up first.",
+              "tool_calls": [
+                {
+                  "id": "call-1",
+                  "type": "function",
+                  "function": { "name": "findOrder", "arguments": "{\\"orderId\\":\\"A-1042\\"}" }
+                }
+              ]
+            }""";
+
+    static final String ANSWER = """
+            {
+              "role": "assistant",
+              "reasoning_content": "It shipped with DHL.",
+              "content": "\\n\\nYour order A-1042 shipped with DHL."
+            }""";
+
+    @Autowired
+    OrderAssistant assistant;
+
+    @DynamicPropertySource
+    static void fakeServer(DynamicPropertyRegistry registry) {
+        registry.add("spring.ai.openai.base-url", () -> "http://localhost:" + SERVER.getAddress().getPort() + "/v1");
+    }
+
+    @BeforeEach
+    void reset() {
+        REQUESTS.clear();
+        REPLIES.clear();
+    }
+
+    @AfterAll
+    static void stop() {
+        SERVER.stop(0);
+    }
+
+    @Test
+    void theNextRequestSendsTheReasoningBackWithTheToolCall() {
+        REPLIES.addAll(List.of(TOOL_CALL, ANSWER));
+
+        Reply reply = assistant.reply("Where is my order A-1042?");
+
+        JsonNode toolCallTurn = REQUESTS.get(1).get("messages").get(2);
+        assertThat(toolCallTurn.get("role").asString()).isEqualTo("assistant");
+        assertThat(toolCallTurn.get("reasoning_content").asString()).isEqualTo("Look the order up first.");
+        assertThat(reply).isEqualTo(new Reply("Your order A-1042 shipped with DHL.", "It shipped with DHL."));
+    }
+
+    @Test
+    void ollamasReasoningFieldBecomesAReasoningPartToo() {
+        REPLIES.add(ANSWER.replace("reasoning_content", "reasoning"));
+
+        assertThat(assistant.reply("Where is my order A-1042?").reasoning()).isEqualTo("It shipped with DHL.");
+    }
+
+    @Test
+    void aQuickReplySwitchesThinkingOffWithAJsonBoolean() {
+        REPLIES.add(ANSWER);
+
+        assistant.quickReply("Where is my order A-1042?");
+
+        JsonNode flag = REQUESTS.getFirst().get("chat_template_kwargs").get("enable_thinking");
+        assertThat(flag.isBoolean()).isTrue();
+        assertThat(flag.asBoolean()).isFalse();
+    }
+
+    static HttpServer start() {
+        try {
+            HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+            server.createContext("/", exchange -> {
+                REQUESTS.add(JSON.readTree(exchange.getRequestBody().readAllBytes()));
+                String message = REPLIES.poll();
+                String finish = message.contains("tool_calls") ? "tool_calls" : "stop";
+                byte[] body = """
+                        {
+                          "id": "chatcmpl-1",
+                          "object": "chat.completion",
+                          "created": 0,
+                          "model": "fake",
+                          "choices": [ { "index": 0, "finish_reason": "%s", "message": %s } ],
+                          "usage": { "prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15 }
+                        }""".formatted(finish, message).getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().add("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, body.length);
+                exchange.getResponseBody().write(body);
+                exchange.close();
+            });
+            server.start();
+            return server;
+        }
+        catch (IOException e) {
+            throw new IllegalStateException("Could not start the fake server", e);
+        }
+    }
+}
+```
+</CodeFile>
+
+The integration test asks the configured model, and checks with a spy that the tool really ran:
+
+<CodeFile title="src/test/java/com/example/assistant/OrderAssistantIT.java">
+```java {30,31,39}
+package com.example.assistant;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
+
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+
+/**
+ * The whole path against the reasoning model application.yaml points at. It passed against a 27B Qwen 3 reasoning model;
+ * deepseek-r1:1.5b on Ollama returned reasoning but never called the tool.
+ */
+@Tag("ollama")
+@SpringBootTest
+class OrderAssistantIT {
+
+    @Autowired
+    OrderAssistant assistant;
+
+    @MockitoSpyBean
+    OrderTools tools;
+
+    @Test
+    void theModelReasonsCallsTheToolAndAnswersFromIt() {
+        Reply reply = assistant.reply("Where is my order A-1042?");
+
+        verify(tools).findOrder("A-1042");
+        assertThat(reply.reasoning()).isNotBlank();
+        assertThat(reply.answer()).contains("DHL").doesNotContain(reply.reasoning());
+    }
+
+    @Test
+    void aQuickReplyStillCallsTheTool() {
+        assertThat(assistant.quickReply("Where is my order A-1042?")).contains("DHL");
+
+        verify(tools).findOrder("A-1042");
+    }
+}
+```
+</CodeFile>
+
+## 4. Production gotchas & security
+
+<Gotcha kind="security" title="Reasoning is not for the customer">
+In the recordings the reasoning restated the tool result and the system prompt's rules ("This has nothing to do with the shop tool",
+"I'll respond in 1-2 sentences"). Send customers `getText()` only, and treat the reasoning like any other log that holds customer data.
+`stream().content()` already leaves it out; a `stream().chatResponse()` carries the reasoning parts.
+</Gotcha>
+
+<Gotcha kind="reliability" title="Switch thinking off with a boolean, not a property">
+`spring.ai.openai.chat.extra-body.chat_template_kwargs.enable_thinking: false` binds into a `Map` as the string `"false"`. The
+server's chat template treats any non-empty string as true, so the model kept reasoning. Build the map in Java, as `quickReply` does,
+and the server receives a JSON `false`. The flag belongs to Qwen 3's chat template: `deepseek-r1:1.5b` on Ollama reasoned with it all
+the same.
+</Gotcha>
+
+<Gotcha kind="cost" title="Reasoning tokens are completion tokens">
+With reasoning, the two calls for "Where is my order A-1042?" took 125 completion tokens and 6.9 seconds; without it, 65 and 3.1. A
+question about one order needs no thought. Keep reasoning for the requests that do, and switch it off per request.
+</Gotcha>
+
+<Gotcha kind="reliability" title="The caller gets the last call's reasoning">
+After a tool call, the reply `ChatClient` returns is the last model call's. Its reasoning came after the tool result. The reasoning
+that chose the tool went back to the model, and the caller never gets it. If you need it for review, log it in an advisor ordered
+after `ToolCallingAdvisor`, which runs once per model call.
+</Gotcha>
+
+<Gotcha kind="reliability" title="The answer starts with a blank line">
+The recorded server put two newlines before every answer, after the reasoning. `getText()` keeps them; `Reply` strips them.
+</Gotcha>
+
+<Gotcha kind="migration" title="Written against a release candidate">
+Message parts are new in Spring AI 2.1, and this lesson was checked against 2.1.0-RC2. `getToolCalls()` and `getMedia()` now return
+unmodifiable lists, and message `equals()` compares parts. Names can still change before the release. The lesson moves to the
+release when it's out.
+</Gotcha>
+
+## Recap
+
+- A message is an ordered list of parts. `getText()`, `getReasoning()` and `getToolCalls()` read the parts of one type.
+- `OpenAiChatModel` builds a `ReasoningPart` from `reasoning_content` or `reasoning`, and replays it on the next call unless
+  `replay-reasoning-content` is false.
+- Return the answer and the reasoning separately, and show customers only the answer.
+- Switch thinking off per request with a JSON boolean built in Java. The property binds it as a string.
+- After a tool call you get the last call's reasoning; a stream's `content()` holds no reasoning.

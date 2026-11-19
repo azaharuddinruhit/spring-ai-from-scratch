@@ -12,6 +12,8 @@ rm -rf out && mkdir -p out
 cp -r "$lesson/main-resources/." "$lesson/test-resources/." out/
 # Probe-only settings (the workspace classpath has more starters than the lesson app); never shown in a lesson.
 cp code/probe-only.properties out/application.properties
+# A lesson's own workspace-only settings, for starters its app doesn't have (for example a second chat model).
+[ -f "$lesson/probe-only.properties" ] && cat "$lesson/probe-only.properties" >> out/application.properties
 find "$lesson/main" "$lesson/test" -name "*.java" > out/sources.txt
 javac -parameters -Xlint:deprecation @cp.arg -d out @out/sources.txt 2>&1 | grep -v "^Note"
 selection=("$@")

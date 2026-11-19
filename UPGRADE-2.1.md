@@ -115,7 +115,9 @@ Probed on 2026-11-19 over plain HTTP from this PC:
 - [x] 5.4 Tool Search & DecisionToolIndex and the tool search sandbox. Shipped in 1.6; found on the way: with `d1-omni:600m` the
       decision index finds no tool, the model's `maxResults` overrides `max-results` (and 0 fails the request with Lucene), and
       with ten tools a search costs more tokens than sending them all unless it is limited.
-- [ ] 1.5 Message Parts & Reasoning.
+- [x] 1.5 Message Parts & Reasoning and the parts sandbox. Shipped in 1.6; found on the way: `ChatClient` returns only the last
+      tool-loop call's reasoning, `extra-body` as a property sends `enable_thinking` as a string (thinking stays on), and Ollama's
+      `/v1` `reasoning` field becomes a `ReasoningPart` too (which settles the first open question).
 
 ### 3. Ship each lesson as it is finished
 
@@ -152,8 +154,8 @@ For every lesson in step 2, before it merges:
 
 ## Open questions
 
-- **The same code on Ollama's `/v1`.** Ollama's OpenAI-compatible endpoint names the field `reasoning`; confirm that the lesson
-  code a reader runs against Ollama gets `ReasoningPart`s too.
+- ~~**The same code on Ollama's `/v1`.**~~ Settled in Lesson 1.5: `OpenAiChatModel` falls back to the `reasoning` field, and
+  `deepseek-r1:1.5b` on Ollama gave `ReasoningPart`s (it ignored the tool, so the lesson's recordings use the Qwen model).
 - **Token usage across the tool loop.** The 2.1 notes call summed usage a change; CLAUDE.md already records summed usage for
   2.0.2. Settle it when running the classes.
 

@@ -29,7 +29,7 @@ These versions are pinned in [`src/data/versions.ts`](src/data/versions.ts), and
 
 | Module | Topic | Status |
 | --- | --- | --- |
-| 1 | Foundations & core abstractions | Published |
+| 1 | Foundations & core abstractions | Published, plus the Message Parts preview |
 | 2 | Deterministic structured outputs | Published, plus the Decision Models preview |
 | 3 | The Advisors API & chat memory | Published |
 | 4 | RAG & ETL pipelines | Published, plus the Decision Filter & Reranker preview |

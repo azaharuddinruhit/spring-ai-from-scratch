@@ -162,6 +162,37 @@ with a 27B Qwen 3 reasoning model. Checked 2026-11-19 by running the probes in `
   With the default threshold, `d1-omni:600m` found no tool for any request, and its best tool was right once in three. Each
   search took about 1.5 s.
 
+## Lesson 1.5 message parts and reasoning (bytecode, `PartsRecordingProbe`, `OrderAssistantTest`, `ReasoningReplayTest`, `OrderAssistantIT`)
+
+- Parts are records in `chat.messages.part`: `TextPart(text, payload, attributes)`, `ReasoningPart(text, summary, payload,
+  attributes)`, `ToolCallPart(toolCall, ...)`, `ToolResultPart(id, name, content, isError, ...)`, `MediaPart(media, ...)`,
+  `UnknownPart(provider, kind, rawJson, ...)`; `MessagePart` is a plain interface (not sealed), so a `switch` needs `default`.
+  `getParts()` is on `AbstractMessage`, not on `Message`. `ReasoningPart.replayableTo(provider)` is true without a payload.
+- `OpenAiChatModel` reads `reasoning_content` and falls back to `reasoning` (Ollama's `/v1`, checked with `deepseek-r1:1.5b`); it
+  still also writes the `reasoningContent` metadata entry, which 2.0.2 used alone. It replays reasoning as `reasoning_content`
+  unless `replay-reasoning-content` (`OpenAiChatOptions.replayReasoningContent`) is false, and skips reasoning whose payload
+  provider isn't `openai.chat.completions` (DEBUG "Not replaying reasoning signed by another provider").
+- Recording (`probes/parts-recording.json`, 27B Qwen 3 model through the logging proxy) of the lesson's `OrderAssistant`, "Where
+  is my order A-1042?": call 1 `[ReasoningPart, ToolCallPart]`, `getText()` empty, 394 prompt / 56 completion tokens; call 2's
+  request sends the tool-call turn with `reasoning_content`; reply `[ReasoningPart, TextPart]`, 500 / 69, 6.9 s in all. `ChatClient`
+  returns only the last call's message, so the reasoning before the tool call never reaches the caller. The text starts with
+  `
+
+`.
+- `replayReasoningContent(false)`: call 2's assistant turn has no `reasoning_content`; the model still answered from the tool result.
+- Thinking off per request with `OpenAiChatOptions.builder().extraBody(Map.of("chat_template_kwargs", Map.of("enable_thinking",
+  false)))` on `ChatClient.options(...)`: no `ReasoningPart`, 358 + 441 prompt and 31 + 34 completion tokens, 3.1 s; the configured
+  model is kept. The property `spring.ai.openai.chat.extra-body.chat_template_kwargs.enable_thinking=false` sends the string
+  `"false"` and the model reasoned anyway (checked again on 2.1, as the owner's other app found on 2.0).
+- Streaming: partial parts carry `partIndex` and `partial` attributes (`StreamingParts`); call 1 streamed 7 reasoning chunks and 6
+  tool-call chunks (argument fragments, then the complete call, `partial` false); `stream().content()` emitted only the text, and
+  the tool loop replayed the aggregated reasoning on call 2.
+- `deepseek-r1:1.5b` on Ollama `/v1`: reasoning parts in every reply, but 44 prompt tokens with the tool definitions in the
+  request; it never called the tool and invented answers, and `enable_thinking: false` didn't stop its reasoning
+  (`probes/parts-ollama.json`). `OrderAssistantIT` passed 2 of 2 against the 27B model.
+- `ReasoningReplayTest` runs the real `OpenAiChatModel` against a JDK `HttpServer` with canned replies; with
+  `replay-reasoning-content=false` its replay test fails, as it should.
+
 ## Lesson 5.4 tool search (bytecode, `ToolSearchFactsProbe`, `ToolSearchRecordingProbe`, `ToolSearchWiringTest`, `SupportChatIT`)
 
 - 2.0.2 already had `ToolSearchToolCallingAdvisor` with the regex, Lucene and vector indexes; 2.1 adds `DecisionToolIndex`.

@@ -174,6 +174,14 @@ and found no tool, favoured the first listed tool and varied between runs. With 
 tokens than sending all tools (17,171 vs 21,886-23,399 over six requests; Lucene with 3 results 15,780). `llama3.2:3b` found
 the tool and didn't call it (0 of 5), so `SupportChatIT` checks the call with a spy and passed with the 27B model. `ToolSearchLab`
 replays `src/data/recorded-tool-search.json` (from `probes/tool-search-to-sandbox.py`); update them together.
+Message parts (Lesson 1.5, verified on RC2): parts are records in `chat.messages.part`; `MessagePart` isn't sealed (a `switch`
+needs `default`) and `getParts()` is on `AbstractMessage`, not `Message`; `OpenAiChatModel` reads `reasoning_content`, then
+`reasoning` (Ollama `/v1`), into a `ReasoningPart` (also still the `reasoningContent` metadata entry), and replays it as
+`reasoning_content` unless `replay-reasoning-content` is false; `ChatClient` returns only the last tool-loop call's message, so
+the reasoning before a tool call never reaches the caller; `extra-body` set as a property binds `enable_thinking` as the string
+`"false"` (thinking stays on), a Java `Map` sends a boolean; streams carry partial parts with `partIndex`/`partial`, and
+`content()` holds no reasoning; `deepseek-r1:1.5b` on Ollama reasons but ignored the tool. `MessagePartsLab` shows
+`src/data/recorded-parts.json` (from `probes/parts-to-sandbox.py`); update them together.
 Observability (Module 6 Lesson 2, verified): `spring-boot-starter-opentelemetry` alone exports traces and metrics over OTLP (no
 actuator); sampling defaults to 0.1; traces export only once `management.opentelemetry.tracing.export.otlp.endpoint` is set;
 spans are `spring.ai.chat.client`, `spring.ai.advisor`, `gen_ai.client.operation`, `db.vector.client.operation`, `spring.ai.tool`;

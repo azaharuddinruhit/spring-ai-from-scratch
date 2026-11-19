@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: assistant
+  ai:
+    openai:
+      # Any OpenAI-compatible server with a reasoning model. Ollama's is http://localhost:11434/v1, which ignores the key.
+      base-url: http://localhost:11434/v1
+      api-key: ${OPENAI_API_KEY:unused}
+      chat:
+        # Reasoning comes back from Ollama too, but this small model ignored the tool in our runs. The lesson's recordings
+        # used a 27B Qwen 3 reasoning model.
+        model: deepseek-r1:1.5b
