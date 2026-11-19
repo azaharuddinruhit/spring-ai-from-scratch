@@ -1,0 +1,1905 @@
+[ {
+  "request" : "Where is my order A-1042?",
+  "index" : "regex",
+  "answer" : "\n\nOrder A-1042 (PB-200 blender) has been shipped via DHL, with expected delivery on 2026-11-21. I don't have real-time location tracking details beyond that.",
+  "millis" : 13024,
+  "calls" : [ {
+    "millis" : 4668,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"track order status and shipment location by order ID\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 573,
+    "completionTokens" : 70
+  }, {
+    "millis" : 2965,
+    "toolsSent" : [ "warrantyStatus", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "findOrder", "refundOrder", "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"orderId\": \"A-1042\"}",
+      "name" : "findOrder"
+    } ],
+    "text" : "",
+    "promptTokens" : 1272,
+    "completionTokens" : 61
+  }, {
+    "millis" : 5288,
+    "toolsSent" : [ "warrantyStatus", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "findOrder", "refundOrder", "toolSearchTool" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nOrder A-1042 (PB-200 blender) has been shipped via DHL, with expected delivery on 2026-11-21. I don't have real-time location tracking details beyond that.",
+    "promptTokens" : 1392,
+    "completionTokens" : 104
+  } ],
+  "searches" : [ {
+    "query" : "track order status and shipment location by order ID",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 8,
+    "results" : [ {
+      "tool" : "findOrder",
+      "score" : 4.9523809523809526
+    }, {
+      "tool" : "cancelOrder",
+      "score" : 3.875
+    }, {
+      "tool" : "refundOrder",
+      "score" : 3.875
+    }, {
+      "tool" : "warrantyStatus",
+      "score" : 2.5555555555555554
+    }, {
+      "tool" : "updateDeliveryAddress",
+      "score" : 1.1136363636363635
+    }, {
+      "tool" : "applyVoucher",
+      "score" : 1.108695652173913
+    } ]
+  } ]
+}, {
+  "request" : "Where is my order A-1042?",
+  "index" : "lucene",
+  "answer" : "\n\nOrder A-1042 (PB-200 blender) has been shipped via DHL and is expected to arrive on November 21, 2026.\n\n\nYour order A-1042 (PB-200 blender) has been shipped via DHL and is expected to arrive on November 21, 2026.",
+  "millis" : 10820,
+  "calls" : [ {
+    "millis" : 3357,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"Look up order status and tracking information\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 573,
+    "completionTokens" : 74
+  }, {
+    "millis" : 2389,
+    "toolsSent" : [ "toolSearchTool", "startReturn", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "findOrder", "openTicket", "refundOrder", "checkStock" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"orderId\": \"A-1042\"}",
+      "name" : "findOrder"
+    } ],
+    "text" : "",
+    "promptTokens" : 1508,
+    "completionTokens" : 50
+  }, {
+    "millis" : 4608,
+    "toolsSent" : [ "toolSearchTool", "startReturn", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "findOrder", "openTicket", "refundOrder", "checkStock" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nOrder A-1042 (PB-200 blender) has been shipped via DHL and is expected to arrive on November 21, 2026.\n\n\nYour order A-1042 (PB-200 blender) has been shipped via DHL and is expected to arrive on November 21, 2026.",
+    "promptTokens" : 1617,
+    "completionTokens" : 97
+  } ],
+  "searches" : [ {
+    "query" : "Look up order status and tracking information",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 257,
+    "results" : [ {
+      "tool" : "findOrder",
+      "score" : 3.12373948097229
+    }, {
+      "tool" : "openTicket",
+      "score" : 0.6109709143638611
+    }, {
+      "tool" : "checkStock",
+      "score" : 0.47221946716308594
+    }, {
+      "tool" : "startReturn",
+      "score" : 0.45594847202301025
+    }, {
+      "tool" : "cancelOrder",
+      "score" : 0.3479117155075073
+    }, {
+      "tool" : "refundOrder",
+      "score" : 0.3479117155075073
+    }, {
+      "tool" : "applyVoucher",
+      "score" : 0.3479117155075073
+    }, {
+      "tool" : "updateDeliveryAddress",
+      "score" : 0.2964116334915161
+    } ]
+  } ]
+}, {
+  "request" : "Where is my order A-1042?",
+  "index" : "vector",
+  "answer" : "\n\nYour order A-1042 (PB-200 blender) has been shipped with DHL. It is expected to be delivered on 2026-11-21.",
+  "millis" : 11393,
+  "calls" : [ {
+    "millis" : 3327,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"track order status by order ID\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 573,
+    "completionTokens" : 74
+  }, {
+    "millis" : 3319,
+    "toolsSent" : [ "startReturn", "warrantyStatus", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "toolSearchTool", "findOrder", "searchProducts", "refundOrder", "openTicket", "checkStock" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"orderId\": \"A-1042\"}",
+      "name" : "findOrder"
+    } ],
+    "text" : "",
+    "promptTokens" : 1694,
+    "completionTokens" : 59
+  }, {
+    "millis" : 4224,
+    "toolsSent" : [ "startReturn", "warrantyStatus", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "toolSearchTool", "findOrder", "searchProducts", "refundOrder", "openTicket", "checkStock" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nYour order A-1042 (PB-200 blender) has been shipped with DHL. It is expected to be delivered on 2026-11-21.",
+    "promptTokens" : 1812,
+    "completionTokens" : 80
+  } ],
+  "searches" : [ {
+    "query" : "track order status by order ID",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 59,
+    "results" : [ {
+      "tool" : "findOrder",
+      "score" : 0.6969323501267504
+    }, {
+      "tool" : "checkStock",
+      "score" : 0.602408465131562
+    }, {
+      "tool" : "updateDeliveryAddress",
+      "score" : 0.5470962152942357
+    }, {
+      "tool" : "cancelOrder",
+      "score" : 0.5436692116181426
+    }, {
+      "tool" : "applyVoucher",
+      "score" : 0.5190474486065055
+    }, {
+      "tool" : "searchProducts",
+      "score" : 0.5178630724576693
+    }, {
+      "tool" : "warrantyStatus",
+      "score" : 0.5037262916747685
+    }, {
+      "tool" : "refundOrder",
+      "score" : 0.49003379883612724
+    }, {
+      "tool" : "startReturn",
+      "score" : 0.4782174073821867
+    }, {
+      "tool" : "openTicket",
+      "score" : 0.41530468180942215
+    } ]
+  } ]
+}, {
+  "request" : "Where is my order A-1042?",
+  "index" : "decision",
+  "answer" : "\n\nI'm unable to look up order A-1042 right now because the order-tracking system isn't available. Please try again later or contact our support team with your order number.",
+  "millis" : 19065,
+  "calls" : [ {
+    "millis" : 3111,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"look up order status and tracking location by order ID\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 573,
+    "completionTokens" : 71
+  }, {
+    "millis" : 2292,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"order tracking\", \"maxResults\": 10}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 660,
+    "completionTokens" : 55
+  }, {
+    "millis" : 2611,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"order\", \"maxResults\": 10}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 731,
+    "completionTokens" : 56
+  }, {
+    "millis" : 4341,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nI'm unable to look up order A-1042 right now because the order-tracking system isn't available. Please try again later or contact our support team with your order number.",
+    "promptTokens" : 803,
+    "completionTokens" : 79
+  } ],
+  "searches" : [ {
+    "query" : "look up order status and tracking location by order ID",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 2301,
+    "results" : [ ],
+    "anyToolApplies" : 0.15194705974055217,
+    "bestTool" : {
+      "findOrder" : 0.8351283889252041,
+      "openTicket" : 3.225320400625166E-5,
+      "checkStock" : 0.1193023750332454,
+      "searchProducts" : 0.0015153230673842237,
+      "cancelOrder" : 0.005228005208582254,
+      "refundOrder" : 1.9354053961125097E-5,
+      "startReturn" : 0.033678145727514555,
+      "updateDeliveryAddress" : 2.425781933829139E-5,
+      "applyVoucher" : 1.9833905112457234E-4,
+      "warrantyStatus" : 0.004873557909639105
+    }
+  }, {
+    "query" : "order tracking",
+    "maxResults" : 10,
+    "categoryFilter" : null,
+    "millis" : 2031,
+    "results" : [ ],
+    "anyToolApplies" : 0.11966455497563486,
+    "bestTool" : {
+      "findOrder" : 0.9365058358126775,
+      "openTicket" : 2.5933284430983646E-5,
+      "checkStock" : 0.04060085580200576,
+      "searchProducts" : 3.1438084159935434E-4,
+      "cancelOrder" : 0.0073377373929179,
+      "refundOrder" : 1.7077749348840397E-5,
+      "startReturn" : 0.013177225957215453,
+      "updateDeliveryAddress" : 2.221994008144041E-5,
+      "applyVoucher" : 1.4080193126459622E-4,
+      "warrantyStatus" : 0.0018579312884579068
+    }
+  }, {
+    "query" : "order",
+    "maxResults" : 10,
+    "categoryFilter" : null,
+    "millis" : 2354,
+    "results" : [ ],
+    "anyToolApplies" : 0.17310773302068408,
+    "bestTool" : {
+      "findOrder" : 0.7584354557973204,
+      "openTicket" : 3.6257942683910704E-5,
+      "checkStock" : 0.20392501973562382,
+      "searchProducts" : 0.0031541789827246986,
+      "cancelOrder" : 0.0056390385366442836,
+      "refundOrder" : 4.975405982948891E-5,
+      "startReturn" : 0.020301575144461993,
+      "updateDeliveryAddress" : 1.4243562508914648E-5,
+      "applyVoucher" : 2.976112295773056E-4,
+      "warrantyStatus" : 0.008146865008625305
+    }
+  } ]
+}, {
+  "request" : "Where is my order A-1042?",
+  "index" : "none",
+  "answer" : "\n\nYour order A-1042 has been shipped with DHL. It is expected to arrive on November 21, 2026.",
+  "millis" : 7816,
+  "calls" : [ {
+    "millis" : 2670,
+    "toolsSent" : [ "findOrder", "openTicket", "checkStock", "searchProducts", "cancelOrder", "refundOrder", "startReturn", "updateDeliveryAddress", "applyVoucher", "warrantyStatus" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"orderId\": \"A-1042\"}",
+      "name" : "findOrder"
+    } ],
+    "text" : "",
+    "promptTokens" : 1292,
+    "completionTokens" : 50
+  }, {
+    "millis" : 5144,
+    "toolsSent" : [ "findOrder", "openTicket", "checkStock", "searchProducts", "cancelOrder", "refundOrder", "startReturn", "updateDeliveryAddress", "applyVoucher", "warrantyStatus" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nYour order A-1042 has been shipped with DHL. It is expected to arrive on November 21, 2026.",
+    "promptTokens" : 1401,
+    "completionTokens" : 107
+  } ],
+  "searches" : [ ]
+}, {
+  "request" : "The kettle from order A-1042 leaks. I want to send it back.",
+  "index" : "regex",
+  "answer" : "\n\nOrder A-1042 actually contains a PB-200 blender, not a kettle, so I can't start a kettle return on it. Please double-check the order number, or confirm whether the leaking item is the blender from that order.",
+  "millis" : 17172,
+  "calls" : [ {
+    "millis" : 5217,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"look up order details by order ID\"}",
+      "name" : "toolSearchTool"
+    }, {
+      "arguments" : "{\"query\": \"create return / refund for defective product\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 581,
+    "completionTokens" : 128
+  }, {
+    "millis" : 2693,
+    "toolsSent" : [ "startReturn", "updateDeliveryAddress", "toolSearchTool", "cancelOrder", "applyVoucher", "findOrder", "searchProducts", "refundOrder", "openTicket", "checkStock" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"orderId\": \"A-1042\"}",
+      "name" : "findOrder"
+    } ],
+    "text" : "",
+    "promptTokens" : 1672,
+    "completionTokens" : 50
+  }, {
+    "millis" : 9248,
+    "toolsSent" : [ "startReturn", "updateDeliveryAddress", "toolSearchTool", "cancelOrder", "applyVoucher", "findOrder", "searchProducts", "refundOrder", "openTicket", "checkStock" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nOrder A-1042 actually contains a PB-200 blender, not a kettle, so I can't start a kettle return on it. Please double-check the order number, or confirm whether the leaking item is the blender from that order.",
+    "promptTokens" : 1781,
+    "completionTokens" : 187
+  } ],
+  "searches" : [ {
+    "query" : "look up order details by order ID",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 0,
+    "results" : [ {
+      "tool" : "findOrder",
+      "score" : 6.214285714285714
+    }, {
+      "tool" : "updateDeliveryAddress",
+      "score" : 4.113636363636363
+    }, {
+      "tool" : "cancelOrder",
+      "score" : 3.875
+    }, {
+      "tool" : "refundOrder",
+      "score" : 3.875
+    }, {
+      "tool" : "openTicket",
+      "score" : 2.111111111111111
+    }, {
+      "tool" : "applyVoucher",
+      "score" : 1.108695652173913
+    } ]
+  }, {
+    "query" : "create return / refund for defective product",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 0,
+    "results" : [ {
+      "tool" : "startReturn",
+      "score" : 4.944444444444445
+    }, {
+      "tool" : "refundOrder",
+      "score" : 4.5
+    }, {
+      "tool" : "searchProducts",
+      "score" : 3.863095238095238
+    }, {
+      "tool" : "checkStock",
+      "score" : 1.1923076923076923
+    } ]
+  } ]
+}, {
+  "request" : "The kettle from order A-1042 leaks. I want to send it back.",
+  "index" : "lucene",
+  "answer" : "\n\nThere's a KT-10 kettle in our catalogue, but order A-1042 only has a PB-200 blender. Please share the order number for the kettle and I'll start the return right away.",
+  "millis" : 31017,
+  "calls" : [ {
+    "millis" : 3852,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"look up order details\"}",
+      "name" : "toolSearchTool"
+    }, {
+      "arguments" : "{\"query\": \"process return or refund for defective item\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 581,
+    "completionTokens" : 105
+  }, {
+    "millis" : 8442,
+    "toolsSent" : [ "startReturn", "warrantyStatus", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "findOrder", "searchProducts", "toolSearchTool", "openTicket", "refundOrder" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"orderId\": \"A-1042\"}",
+      "name" : "findOrder"
+    }, {
+      "arguments" : "{\"orderId\": \"A-1042\"}",
+      "name" : "warrantyStatus"
+    } ],
+    "text" : "",
+    "promptTokens" : 1638,
+    "completionTokens" : 189
+  }, {
+    "millis" : 13228,
+    "toolsSent" : [ "startReturn", "warrantyStatus", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "findOrder", "searchProducts", "toolSearchTool", "openTicket", "refundOrder" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"kettle\"}",
+      "name" : "searchProducts"
+    } ],
+    "text" : "Order A-1042 only contains a PB-200 blender, not a kettle, so I can't start a kettle return from that order. Could you confirm the correct order number for the kettle?",
+    "promptTokens" : 1907,
+    "completionTokens" : 293
+  }, {
+    "millis" : 5414,
+    "toolsSent" : [ "startReturn", "warrantyStatus", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "findOrder", "searchProducts", "toolSearchTool", "openTicket", "refundOrder" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nThere's a KT-10 kettle in our catalogue, but order A-1042 only has a PB-200 blender. Please share the order number for the kettle and I'll start the return right away.",
+    "promptTokens" : 2229,
+    "completionTokens" : 106
+  } ],
+  "searches" : [ {
+    "query" : "look up order details",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 33,
+    "results" : [ {
+      "tool" : "findOrder",
+      "score" : 1.7820186614990234
+    }, {
+      "tool" : "openTicket",
+      "score" : 0.6109709143638611
+    }, {
+      "tool" : "cancelOrder",
+      "score" : 0.3479117155075073
+    }, {
+      "tool" : "refundOrder",
+      "score" : 0.3479117155075073
+    }, {
+      "tool" : "applyVoucher",
+      "score" : 0.3479117155075073
+    }, {
+      "tool" : "updateDeliveryAddress",
+      "score" : 0.2964116334915161
+    } ]
+  }, {
+    "query" : "process return or refund for defective item",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 9,
+    "results" : [ {
+      "tool" : "startReturn",
+      "score" : 2.3146286010742188
+    }, {
+      "tool" : "searchProducts",
+      "score" : 1.0000615119934082
+    }, {
+      "tool" : "refundOrder",
+      "score" : 1.0000615119934082
+    }, {
+      "tool" : "warrantyStatus",
+      "score" : 0.7436625361442566
+    }, {
+      "tool" : "openTicket",
+      "score" : 0.6109709143638611
+    } ]
+  } ]
+}, {
+  "request" : "The kettle from order A-1042 leaks. I want to send it back.",
+  "index" : "vector",
+  "answer" : "\n\nOrder A-1042 contains a PB-200 blender, not a kettle, so I can't start a kettle return for it. Could you check whether the kettle came from a different order number?",
+  "millis" : 14476,
+  "calls" : [ {
+    "millis" : 3500,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"order lookup return refund initiate return\", \"maxResults\": 5}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 581,
+    "completionTokens" : 78
+  }, {
+    "millis" : 4112,
+    "toolsSent" : [ "startReturn", "cancelOrder", "applyVoucher", "findOrder", "toolSearchTool", "refundOrder" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"orderId\": \"A-1042\"}",
+      "name" : "findOrder"
+    } ],
+    "text" : "",
+    "promptTokens" : 1198,
+    "completionTokens" : 91
+  }, {
+    "millis" : 6482,
+    "toolsSent" : [ "startReturn", "cancelOrder", "applyVoucher", "findOrder", "toolSearchTool", "refundOrder" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nOrder A-1042 contains a PB-200 blender, not a kettle, so I can't start a kettle return for it. Could you check whether the kettle came from a different order number?",
+    "promptTokens" : 1348,
+    "completionTokens" : 129
+  } ],
+  "searches" : [ {
+    "query" : "order lookup return refund initiate return",
+    "maxResults" : 5,
+    "categoryFilter" : null,
+    "millis" : 51,
+    "results" : [ {
+      "tool" : "refundOrder",
+      "score" : 0.7307016035705356
+    }, {
+      "tool" : "startReturn",
+      "score" : 0.6208013481140541
+    }, {
+      "tool" : "findOrder",
+      "score" : 0.53706354619729
+    }, {
+      "tool" : "cancelOrder",
+      "score" : 0.5123737759812936
+    }, {
+      "tool" : "applyVoucher",
+      "score" : 0.4708770339948819
+    } ]
+  } ]
+}, {
+  "request" : "The kettle from order A-1042 leaks. I want to send it back.",
+  "index" : "decision",
+  "answer" : "\n\nI'm sorry — my order system is currently unavailable, so I can't pull up A-1042 or start the return yet. Please try again in a little while, or contact our support team directly and they'll get the leaky kettle back on track.",
+  "millis" : 40514,
+  "calls" : [ {
+    "millis" : 6429,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"process return refund for a customer order\"}",
+      "name" : "toolSearchTool"
+    }, {
+      "arguments" : "{\"query\": \"look up order details by order ID\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 581,
+    "completionTokens" : 135
+  }, {
+    "millis" : 4487,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"return product order A-1042\", \"maxResults\": 10}",
+      "name" : "toolSearchTool"
+    }, {
+      "arguments" : "{\"query\": \"order lookup customer account\", \"maxResults\": 10}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 738,
+    "completionTokens" : 106
+  }, {
+    "millis" : 6574,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"return\", \"maxResults\": 10}",
+      "name" : "toolSearchTool"
+    }, {
+      "arguments" : "{\"query\": \"order\", \"maxResults\": 10}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 866,
+    "completionTokens" : 151
+  }, {
+    "millis" : 11009,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nI'm sorry — my order system is currently unavailable, so I can't pull up A-1042 or start the return yet. Please try again in a little while, or contact our support team directly and they'll get the leaky kettle back on track.",
+    "promptTokens" : 1039,
+    "completionTokens" : 194
+  } ],
+  "searches" : [ {
+    "query" : "process return refund for a customer order",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 2275,
+    "results" : [ ],
+    "anyToolApplies" : 0.16520624299093695,
+    "bestTool" : {
+      "findOrder" : 0.7589354907257243,
+      "openTicket" : 7.988461135901883E-5,
+      "checkStock" : 0.041960335088003314,
+      "searchProducts" : 1.6378853469853482E-4,
+      "cancelOrder" : 7.632078643861333E-4,
+      "refundOrder" : 2.981864127948682E-4,
+      "startReturn" : 0.19592631961623566,
+      "updateDeliveryAddress" : 7.984896351331866E-6,
+      "applyVoucher" : 2.426836077083009E-5,
+      "warrantyStatus" : 0.0018405338896760515
+    }
+  }, {
+    "query" : "look up order details by order ID",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 2233,
+    "results" : [ ],
+    "anyToolApplies" : 0.15554113495786137,
+    "bestTool" : {
+      "findOrder" : 0.8569743041750286,
+      "openTicket" : 1.942784312041409E-5,
+      "checkStock" : 0.09588167819345167,
+      "searchProducts" : 0.0011409439715468243,
+      "cancelOrder" : 0.007370003550752565,
+      "refundOrder" : 8.414118836041653E-6,
+      "startReturn" : 0.03352203057197847,
+      "updateDeliveryAddress" : 2.5111017236113765E-5,
+      "applyVoucher" : 2.0604909563384804E-4,
+      "warrantyStatus" : 0.00485203746241533
+    }
+  }, {
+    "query" : "return product order A-1042",
+    "maxResults" : 10,
+    "categoryFilter" : null,
+    "millis" : 1893,
+    "results" : [ ],
+    "anyToolApplies" : 0.14092796848169728,
+    "bestTool" : {
+      "findOrder" : 0.6978471479772074,
+      "openTicket" : 4.993482582435928E-6,
+      "checkStock" : 0.032815472844549436,
+      "searchProducts" : 1.7593180978757556E-4,
+      "cancelOrder" : 2.0657476069251E-6,
+      "refundOrder" : 7.571309002555171E-5,
+      "startReturn" : 0.26723230326472386,
+      "updateDeliveryAddress" : 9.290142969940695E-7,
+      "applyVoucher" : 2.179792910409288E-5,
+      "warrantyStatus" : 0.001823644840115835
+    }
+  }, {
+    "query" : "order lookup customer account",
+    "maxResults" : 10,
+    "categoryFilter" : null,
+    "millis" : 1867,
+    "results" : [ ],
+    "anyToolApplies" : 0.16391873373281124,
+    "bestTool" : {
+      "findOrder" : 0.7915478055607924,
+      "openTicket" : 4.1867270380711084E-5,
+      "checkStock" : 0.16639047415323654,
+      "searchProducts" : 0.0029502758706954433,
+      "cancelOrder" : 0.018825256378607897,
+      "refundOrder" : 1.2307275159232798E-4,
+      "startReturn" : 0.013286819488345536,
+      "updateDeliveryAddress" : 6.828614797181831E-5,
+      "applyVoucher" : 7.21136681147375E-4,
+      "warrantyStatus" : 0.006045005697229957
+    }
+  }, {
+    "query" : "return",
+    "maxResults" : 10,
+    "categoryFilter" : null,
+    "millis" : 1868,
+    "results" : [ ],
+    "anyToolApplies" : 0.11879552768071837,
+    "bestTool" : {
+      "findOrder" : 0.46291397010562835,
+      "openTicket" : 3.150195962385762E-5,
+      "checkStock" : 0.1657542990412128,
+      "searchProducts" : 7.137897751811607E-4,
+      "cancelOrder" : 2.4465149545487605E-4,
+      "refundOrder" : 4.012594786562523E-6,
+      "startReturn" : 0.3637942052571287,
+      "updateDeliveryAddress" : 8.300502452073207E-6,
+      "applyVoucher" : 1.5105605463489004E-4,
+      "warrantyStatus" : 0.00638421321389697
+    }
+  }, {
+    "query" : "order",
+    "maxResults" : 10,
+    "categoryFilter" : null,
+    "millis" : 1863,
+    "results" : [ ],
+    "anyToolApplies" : 0.17310773302068408,
+    "bestTool" : {
+      "findOrder" : 0.7584354557973204,
+      "openTicket" : 3.6257942683910704E-5,
+      "checkStock" : 0.20392501973562382,
+      "searchProducts" : 0.0031541789827246986,
+      "cancelOrder" : 0.0056390385366442836,
+      "refundOrder" : 4.975405982948891E-5,
+      "startReturn" : 0.020301575144461993,
+      "updateDeliveryAddress" : 1.4243562508914648E-5,
+      "applyVoucher" : 2.976112295773056E-4,
+      "warrantyStatus" : 0.008146865008625305
+    }
+  } ]
+}, {
+  "request" : "The kettle from order A-1042 leaks. I want to send it back.",
+  "index" : "none",
+  "answer" : "\n\nI've started return R-1042 for the leaking kettle. Your return label is on its way by email.",
+  "millis" : 6767,
+  "calls" : [ {
+    "millis" : 4254,
+    "toolsSent" : [ "findOrder", "openTicket", "checkStock", "searchProducts", "cancelOrder", "refundOrder", "startReturn", "updateDeliveryAddress", "applyVoucher", "warrantyStatus" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"orderId\": \"A-1042\", \"reason\": \"Kettle leaks\"}",
+      "name" : "startReturn"
+    } ],
+    "text" : "",
+    "promptTokens" : 1300,
+    "completionTokens" : 92
+  }, {
+    "millis" : 2510,
+    "toolsSent" : [ "findOrder", "openTicket", "checkStock", "searchProducts", "cancelOrder", "refundOrder", "startReturn", "updateDeliveryAddress", "applyVoucher", "warrantyStatus" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nI've started return R-1042 for the leaking kettle. Your return label is on its way by email.",
+    "promptTokens" : 1424,
+    "completionTokens" : 42
+  } ],
+  "searches" : [ ]
+}, {
+  "request" : "I moved house. Can order A-1077 go to 12 Elm Road, Leeds instead?",
+  "index" : "regex",
+  "answer" : "\n\nOrder A-1077 has already shipped, so I can’t change the address directly. I’ve opened ticket **T-5521** to check whether DHL can redirect it to 12 Elm Road, Leeds.",
+  "millis" : 37261,
+  "calls" : [ {
+    "millis" : 5842,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"look up order by order ID and change shipping address delivery address customer A-1077\", \"maxResults\": 10}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 585,
+    "completionTokens" : 112
+  }, {
+    "millis" : 5350,
+    "toolsSent" : [ "startReturn", "toolSearchTool", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "findOrder", "refundOrder", "openTicket", "checkStock" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"orderId\": \"A-1077\"}",
+      "name" : "findOrder"
+    } ],
+    "text" : "",
+    "promptTokens" : 1558,
+    "completionTokens" : 82
+  }, {
+    "millis" : 7380,
+    "toolsSent" : [ "startReturn", "toolSearchTool", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "findOrder", "refundOrder", "openTicket", "checkStock" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"redirect or intercept shipped package with carrier DHL to new delivery address\", \"maxResults\": 10}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 1699,
+    "completionTokens" : 128
+  }, {
+    "millis" : 15160,
+    "toolsSent" : [ "startReturn", "toolSearchTool", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "findOrder", "refundOrder", "openTicket", "checkStock" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"summary\": \"Order A-1077 has already shipped via DHL. The customer has moved and requests delivery to 12 Elm Road, Leeds. Please check whether the parcel can be redirected or the address changed.\"}",
+      "name" : "openTicket"
+    } ],
+    "text" : "",
+    "promptTokens" : 1856,
+    "completionTokens" : 265
+  }, {
+    "millis" : 3503,
+    "toolsSent" : [ "startReturn", "toolSearchTool", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "findOrder", "refundOrder", "openTicket", "checkStock" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nOrder A-1077 has already shipped, so I can’t change the address directly. I’ve opened ticket **T-5521** to check whether DHL can redirect it to 12 Elm Road, Leeds.",
+    "promptTokens" : 2146,
+    "completionTokens" : 66
+  } ],
+  "searches" : [ {
+    "query" : "look up order by order ID and change shipping address delivery address customer A-1077",
+    "maxResults" : 10,
+    "categoryFilter" : null,
+    "millis" : 1,
+    "results" : [ {
+      "tool" : "updateDeliveryAddress",
+      "score" : 11.5
+    }, {
+      "tool" : "findOrder",
+      "score" : 7.214285714285714
+    }, {
+      "tool" : "cancelOrder",
+      "score" : 3.875
+    }, {
+      "tool" : "refundOrder",
+      "score" : 3.875
+    }, {
+      "tool" : "openTicket",
+      "score" : 2.111111111111111
+    }, {
+      "tool" : "applyVoucher",
+      "score" : 1.108695652173913
+    }, {
+      "tool" : "startReturn",
+      "score" : 1.0833333333333333
+    }, {
+      "tool" : "checkStock",
+      "score" : 1.0769230769230769
+    } ]
+  }, {
+    "query" : "redirect or intercept shipped package with carrier DHL to new delivery address",
+    "maxResults" : 10,
+    "categoryFilter" : null,
+    "millis" : 1,
+    "results" : [ {
+      "tool" : "updateDeliveryAddress",
+      "score" : 7.863095238095238
+    }, {
+      "tool" : "findOrder",
+      "score" : 2.106382978723404
+    }, {
+      "tool" : "cancelOrder",
+      "score" : 1.1282051282051282
+    }, {
+      "tool" : "checkStock",
+      "score" : 1.0769230769230769
+    } ]
+  } ]
+}, {
+  "request" : "I moved house. Can order A-1077 go to 12 Elm Road, Leeds instead?",
+  "index" : "lucene",
+  "answer" : "\n\nI can’t change the address directly because order A-1077 has already shipped. I’ve opened support ticket **T-5521** to ask DHL whether it can be redirected to **12 Elm Road, Leeds**.",
+  "millis" : 27761,
+  "calls" : [ {
+    "millis" : 3993,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"look up order by order number and update delivery address\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 585,
+    "completionTokens" : 81
+  }, {
+    "millis" : 2304,
+    "toolsSent" : [ "startReturn", "toolSearchTool", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "findOrder", "searchProducts", "refundOrder", "openTicket", "checkStock" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"orderId\": \"A-1077\"}",
+      "name" : "findOrder"
+    } ],
+    "text" : "",
+    "promptTokens" : 1620,
+    "completionTokens" : 42
+  }, {
+    "millis" : 15717,
+    "toolsSent" : [ "startReturn", "toolSearchTool", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "findOrder", "searchProducts", "refundOrder", "openTicket", "checkStock" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"summary\": \"Customer moved house; please ask DHL whether shipped order A-1077, expected 2026-11-21, can be redirected to 12 Elm Road, Leeds.\"}",
+      "name" : "openTicket"
+    } ],
+    "text" : "",
+    "promptTokens" : 1721,
+    "completionTokens" : 265
+  }, {
+    "millis" : 5684,
+    "toolsSent" : [ "startReturn", "toolSearchTool", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "findOrder", "searchProducts", "refundOrder", "openTicket", "checkStock" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nI can’t change the address directly because order A-1077 has already shipped. I’ve opened support ticket **T-5521** to ask DHL whether it can be redirected to **12 Elm Road, Leeds**.",
+    "promptTokens" : 2011,
+    "completionTokens" : 112
+  } ],
+  "searches" : [ {
+    "query" : "look up order by order number and update delivery address",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 36,
+    "results" : [ {
+      "tool" : "findOrder",
+      "score" : 3.0578198432922363
+    }, {
+      "tool" : "updateDeliveryAddress",
+      "score" : 1.9345440864562988
+    }, {
+      "tool" : "searchProducts",
+      "score" : 1.0000615119934082
+    }, {
+      "tool" : "checkStock",
+      "score" : 0.9444389343261719
+    }, {
+      "tool" : "cancelOrder",
+      "score" : 0.6958234310150146
+    }, {
+      "tool" : "refundOrder",
+      "score" : 0.6958234310150146
+    }, {
+      "tool" : "applyVoucher",
+      "score" : 0.6958234310150146
+    }, {
+      "tool" : "openTicket",
+      "score" : 0.6109709143638611
+    }, {
+      "tool" : "startReturn",
+      "score" : 0.45594847202301025
+    } ]
+  } ]
+}, {
+  "request" : "I moved house. Can order A-1077 go to 12 Elm Road, Leeds instead?",
+  "index" : "vector",
+  "answer" : "\n\nUnfortunately, order A-1077 has already been shipped via DHL, so I can no longer change the delivery address directly. I can open a support ticket to ask the team to try redirecting it to 12 Elm Road, Leeds — would you like me to do that?",
+  "millis" : 26900,
+  "calls" : [ {
+    "millis" : 3364,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"change order delivery address ship to\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 585,
+    "completionTokens" : 66
+  }, {
+    "millis" : 5280,
+    "toolsSent" : [ "startReturn", "toolSearchTool", "warrantyStatus", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "findOrder", "searchProducts", "refundOrder", "openTicket", "checkStock" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"orderId\": \"A-1077\"}",
+      "name" : "findOrder"
+    } ],
+    "text" : "",
+    "promptTokens" : 1698,
+    "completionTokens" : 104
+  }, {
+    "millis" : 17855,
+    "toolsSent" : [ "startReturn", "toolSearchTool", "warrantyStatus", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "findOrder", "searchProducts", "refundOrder", "openTicket", "checkStock" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nUnfortunately, order A-1077 has already been shipped via DHL, so I can no longer change the delivery address directly. I can open a support ticket to ask the team to try redirecting it to 12 Elm Road, Leeds — would you like me to do that?",
+    "promptTokens" : 1861,
+    "completionTokens" : 364
+  } ],
+  "searches" : [ {
+    "query" : "change order delivery address ship to",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 49,
+    "results" : [ {
+      "tool" : "updateDeliveryAddress",
+      "score" : 0.8180429312523252
+    }, {
+      "tool" : "findOrder",
+      "score" : 0.5879591423334285
+    }, {
+      "tool" : "cancelOrder",
+      "score" : 0.5532191459201758
+    }, {
+      "tool" : "startReturn",
+      "score" : 0.5386873965281922
+    }, {
+      "tool" : "checkStock",
+      "score" : 0.4995999632835337
+    }, {
+      "tool" : "refundOrder",
+      "score" : 0.4683341225485294
+    }, {
+      "tool" : "applyVoucher",
+      "score" : 0.4445584052886549
+    }, {
+      "tool" : "searchProducts",
+      "score" : 0.4082050663997401
+    }, {
+      "tool" : "openTicket",
+      "score" : 0.3965991067644803
+    }, {
+      "tool" : "warrantyStatus",
+      "score" : 0.3376187093768196
+    } ]
+  } ]
+}, {
+  "request" : "I moved house. Can order A-1077 go to 12 Elm Road, Leeds instead?",
+  "index" : "decision",
+  "answer" : "\n\nI’m unable to access order A-1077 or update its delivery address with the tools available. Please contact our support team directly to confirm the change to 12 Elm Road, Leeds.",
+  "millis" : 21647,
+  "calls" : [ {
+    "millis" : 3291,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"lookup order and update shipping address customer moved house\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 585,
+    "completionTokens" : 61
+  }, {
+    "millis" : 2477,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"order\", \"maxResults\": 10}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 662,
+    "completionTokens" : 54
+  }, {
+    "millis" : 11707,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nI’m unable to access order A-1077 or update its delivery address with the tools available. Please contact our support team directly to confirm the change to 12 Elm Road, Leeds.",
+    "promptTokens" : 732,
+    "completionTokens" : 191
+  } ],
+  "searches" : [ {
+    "query" : "lookup order and update shipping address customer moved house",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 2298,
+    "results" : [ ],
+    "anyToolApplies" : 0.12477913035818029,
+    "bestTool" : {
+      "findOrder" : 0.4969491005377297,
+      "openTicket" : 1.6447586234810295E-4,
+      "checkStock" : 0.19278207016447224,
+      "searchProducts" : 0.0010917756759380084,
+      "cancelOrder" : 0.0025548647153489958,
+      "refundOrder" : 1.1588449287019206E-5,
+      "startReturn" : 0.021461922625469372,
+      "updateDeliveryAddress" : 0.2822180296427489,
+      "applyVoucher" : 3.3653408931805256E-4,
+      "warrantyStatus" : 0.002429638237339493
+    }
+  }, {
+    "query" : "order",
+    "maxResults" : 10,
+    "categoryFilter" : null,
+    "millis" : 1860,
+    "results" : [ ],
+    "anyToolApplies" : 0.17310773302068408,
+    "bestTool" : {
+      "findOrder" : 0.7584354557973204,
+      "openTicket" : 3.6257942683910704E-5,
+      "checkStock" : 0.20392501973562382,
+      "searchProducts" : 0.0031541789827246986,
+      "cancelOrder" : 0.0056390385366442836,
+      "refundOrder" : 4.975405982948891E-5,
+      "startReturn" : 0.020301575144461993,
+      "updateDeliveryAddress" : 1.4243562508914648E-5,
+      "applyVoucher" : 2.976112295773056E-4,
+      "warrantyStatus" : 0.008146865008625305
+    }
+  } ]
+}, {
+  "request" : "I moved house. Can order A-1077 go to 12 Elm Road, Leeds instead?",
+  "index" : "none",
+  "answer" : "\n\nOrder A-1077 has already shipped, so I couldn't update the address directly. I've opened ticket T-5521 for the support team to contact DHL about redirecting the delivery to 12 Elm Road, Leeds.\n\n\nOrder A-1077 has already shipped, so I couldn't update the address directly. I've opened ticket T-5521 for the support team to contact DHL about redirecting the delivery to 12 Elm Road, Leeds.",
+  "millis" : 32608,
+  "calls" : [ {
+    "millis" : 17804,
+    "toolsSent" : [ "findOrder", "openTicket", "checkStock", "searchProducts", "cancelOrder", "refundOrder", "startReturn", "updateDeliveryAddress", "applyVoucher", "warrantyStatus" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"orderId\": \"A-1077\"}",
+      "name" : "findOrder"
+    } ],
+    "text" : "",
+    "promptTokens" : 1304,
+    "completionTokens" : 369
+  }, {
+    "millis" : 9004,
+    "toolsSent" : [ "findOrder", "openTicket", "checkStock", "searchProducts", "cancelOrder", "refundOrder", "startReturn", "updateDeliveryAddress", "applyVoucher", "warrantyStatus" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"summary\": \"Customer for shipped order A-1077 (PB-200 blender, DHL, expected delivery 2026-11-21) has moved and needs delivery redirected to 12 Elm Road, Leeds. Please contact DHL about a redirection.\"}",
+      "name" : "openTicket"
+    } ],
+    "text" : "I'm afraid A-1077 has already shipped via DHL, so I can't change the delivery address through the usual process — let me open a ticket for the support team to arrange a redirect with the carrier.",
+    "promptTokens" : 1732,
+    "completionTokens" : 186
+  }, {
+    "millis" : 5795,
+    "toolsSent" : [ "findOrder", "openTicket", "checkStock", "searchProducts", "cancelOrder", "refundOrder", "startReturn", "updateDeliveryAddress", "applyVoucher", "warrantyStatus" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nOrder A-1077 has already shipped, so I couldn't update the address directly. I've opened ticket T-5521 for the support team to contact DHL about redirecting the delivery to 12 Elm Road, Leeds.\n\n\nOrder A-1077 has already shipped, so I couldn't update the address directly. I've opened ticket T-5521 for the support team to contact DHL about redirecting the delivery to 12 Elm Road, Leeds.",
+    "promptTokens" : 1943,
+    "completionTokens" : 131
+  } ],
+  "searches" : [ ]
+}, {
+  "request" : "Is the PB-200 blender in stock?",
+  "index" : "regex",
+  "answer" : "\n\nThe PB-200 blender is currently out of stock, but the next delivery is expected on November 28, 2026. I can check back or help you with alternatives in the meantime.",
+  "millis" : 18465,
+  "calls" : [ {
+    "millis" : 3523,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"check product inventory stock availability by product ID\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 573,
+    "completionTokens" : 77
+  }, {
+    "millis" : 9616,
+    "toolsSent" : [ "warrantyStatus", "searchProducts", "toolSearchTool", "checkStock" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"productCode\": \"PB-200\"}",
+      "name" : "checkStock"
+    }, {
+      "arguments" : "{\"query\": \"PB-200 blender\"}",
+      "name" : "searchProducts"
+    } ],
+    "text" : "",
+    "promptTokens" : 959,
+    "completionTokens" : 220
+  }, {
+    "millis" : 5307,
+    "toolsSent" : [ "warrantyStatus", "searchProducts", "toolSearchTool", "checkStock" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nThe PB-200 blender is currently out of stock, but the next delivery is expected on November 28, 2026. I can check back or help you with alternatives in the meantime.",
+    "promptTokens" : 1242,
+    "completionTokens" : 116
+  } ],
+  "searches" : [ {
+    "query" : "check product inventory stock availability by product ID",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 0,
+    "results" : [ {
+      "tool" : "checkStock",
+      "score" : 8.5
+    }, {
+      "tool" : "searchProducts",
+      "score" : 3.863095238095238
+    }, {
+      "tool" : "warrantyStatus",
+      "score" : 1.5
+    } ]
+  } ]
+}, {
+  "request" : "Is the PB-200 blender in stock?",
+  "index" : "lucene",
+  "answer" : "\n\nNo, the PB-200 blender is currently out of stock. The next delivery is expected on 28 November 2026.",
+  "millis" : 9224,
+  "calls" : [ {
+    "millis" : 2909,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"check product stock availability inventory\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 573,
+    "completionTokens" : 64
+  }, {
+    "millis" : 2303,
+    "toolsSent" : [ "warrantyStatus", "searchProducts", "toolSearchTool", "checkStock" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"productCode\": \"PB-200\"}",
+      "name" : "checkStock"
+    } ],
+    "text" : "",
+    "promptTokens" : 946,
+    "completionTokens" : 50
+  }, {
+    "millis" : 3966,
+    "toolsSent" : [ "warrantyStatus", "searchProducts", "toolSearchTool", "checkStock" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nNo, the PB-200 blender is currently out of stock. The next delivery is expected on 28 November 2026.",
+    "promptTokens" : 1040,
+    "completionTokens" : 74
+  } ],
+  "searches" : [ {
+    "query" : "check product stock availability inventory",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 23,
+    "results" : [ {
+      "tool" : "checkStock",
+      "score" : 2.043562412261963
+    }, {
+      "tool" : "searchProducts",
+      "score" : 0.7436625361442566
+    }, {
+      "tool" : "warrantyStatus",
+      "score" : 0.7436625361442566
+    } ]
+  } ]
+}, {
+  "request" : "Is the PB-200 blender in stock?",
+  "index" : "vector",
+  "answer" : "\n\nNo, the PB-200 blender is currently out of stock. The next delivery to our warehouse is expected on 2026-11-28, when it should be available again.",
+  "millis" : 14773,
+  "calls" : [ {
+    "millis" : 3714,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"check product inventory stock availability by product ID\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 573,
+    "completionTokens" : 79
+  }, {
+    "millis" : 5967,
+    "toolsSent" : [ "startReturn", "toolSearchTool", "warrantyStatus", "updateDeliveryAddress", "applyVoucher", "cancelOrder", "searchProducts", "findOrder", "refundOrder", "openTicket", "checkStock" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"productCode\": \"PB-200\"}",
+      "name" : "checkStock"
+    } ],
+    "text" : "",
+    "promptTokens" : 1699,
+    "completionTokens" : 111
+  }, {
+    "millis" : 4713,
+    "toolsSent" : [ "startReturn", "toolSearchTool", "warrantyStatus", "updateDeliveryAddress", "applyVoucher", "cancelOrder", "searchProducts", "findOrder", "refundOrder", "openTicket", "checkStock" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nNo, the PB-200 blender is currently out of stock. The next delivery to our warehouse is expected on 2026-11-28, when it should be available again.",
+    "promptTokens" : 1854,
+    "completionTokens" : 90
+  } ],
+  "searches" : [ {
+    "query" : "check product inventory stock availability by product ID",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 54,
+    "results" : [ {
+      "tool" : "checkStock",
+      "score" : 0.7482923934226297
+    }, {
+      "tool" : "searchProducts",
+      "score" : 0.6321814341112937
+    }, {
+      "tool" : "warrantyStatus",
+      "score" : 0.6109738664290113
+    }, {
+      "tool" : "findOrder",
+      "score" : 0.5734031367177378
+    }, {
+      "tool" : "applyVoucher",
+      "score" : 0.4831841333767438
+    }, {
+      "tool" : "startReturn",
+      "score" : 0.4766427562619907
+    }, {
+      "tool" : "cancelOrder",
+      "score" : 0.4637715039048945
+    }, {
+      "tool" : "updateDeliveryAddress",
+      "score" : 0.4326136530732729
+    }, {
+      "tool" : "refundOrder",
+      "score" : 0.3584470450878169
+    }, {
+      "tool" : "openTicket",
+      "score" : 0.3486891637915688
+    } ]
+  } ]
+}, {
+  "request" : "Is the PB-200 blender in stock?",
+  "index" : "decision",
+  "answer" : "\n\nI couldn't find a way to look up the PB-200 blender's stock status right now. If you can share your order number or the product link, I'll try to help from another angle.",
+  "millis" : 22493,
+  "calls" : [ {
+    "millis" : 3476,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"check product inventory stock availability by product ID\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 573,
+    "completionTokens" : 69
+  }, {
+    "millis" : 2674,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"product search catalog inventory\", \"maxResults\": 10}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 658,
+    "completionTokens" : 57
+  }, {
+    "millis" : 3899,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"stock availability\", \"maxResults\": 10}",
+      "name" : "toolSearchTool"
+    }, {
+      "arguments" : "{\"query\": \"blender product details\", \"maxResults\": 10}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 731,
+    "completionTokens" : 100
+  }, {
+    "millis" : 4789,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nI couldn't find a way to look up the PB-200 blender's stock status right now. If you can share your order number or the product link, I'll try to help from another angle.",
+    "promptTokens" : 853,
+    "completionTokens" : 88
+  } ],
+  "searches" : [ {
+    "query" : "check product inventory stock availability by product ID",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 2238,
+    "results" : [ ],
+    "anyToolApplies" : 0.21385229163938474,
+    "bestTool" : {
+      "findOrder" : 0.20786861649043814,
+      "openTicket" : 2.8621314398798E-5,
+      "checkStock" : 0.7418136929833343,
+      "searchProducts" : 0.005709339187557251,
+      "cancelOrder" : 0.013888557925881345,
+      "refundOrder" : 1.2333167913813659E-5,
+      "startReturn" : 0.022840560339707158,
+      "updateDeliveryAddress" : 3.729334270618495E-5,
+      "applyVoucher" : 3.0874989809691355E-4,
+      "warrantyStatus" : 0.007492235349965838
+    }
+  }, {
+    "query" : "product search catalog inventory",
+    "maxResults" : 10,
+    "categoryFilter" : null,
+    "millis" : 1759,
+    "results" : [ ],
+    "anyToolApplies" : 0.19322480512248272,
+    "bestTool" : {
+      "findOrder" : 0.518951181694824,
+      "openTicket" : 5.7526033828323536E-5,
+      "checkStock" : 0.37290581441031034,
+      "searchProducts" : 0.029139378471600908,
+      "cancelOrder" : 0.023800996300024444,
+      "refundOrder" : 2.8343396824765504E-5,
+      "startReturn" : 0.04578938915439958,
+      "updateDeliveryAddress" : 1.096217282453739E-4,
+      "applyVoucher" : 0.0012655265160605275,
+      "warrantyStatus" : 0.007952222293881591
+    }
+  }, {
+    "query" : "stock availability",
+    "maxResults" : 10,
+    "categoryFilter" : null,
+    "millis" : 1792,
+    "results" : [ ],
+    "anyToolApplies" : 0.14213802404616124,
+    "bestTool" : {
+      "findOrder" : 0.38688248511076034,
+      "openTicket" : 2.307204157312338E-5,
+      "checkStock" : 0.5483960060919524,
+      "searchProducts" : 0.002778830680538574,
+      "cancelOrder" : 0.0036529806694042665,
+      "refundOrder" : 4.869921072187507E-6,
+      "startReturn" : 0.042191554121606356,
+      "updateDeliveryAddress" : 3.584305273286724E-5,
+      "applyVoucher" : 2.2500769252396677E-4,
+      "warrantyStatus" : 0.01580935061783606
+    }
+  }, {
+    "query" : "blender product details",
+    "maxResults" : 10,
+    "categoryFilter" : null,
+    "millis" : 1846,
+    "results" : [ ],
+    "anyToolApplies" : 0.13097010484954055,
+    "bestTool" : {
+      "findOrder" : 0.5620991333163802,
+      "openTicket" : 2.4660499673790264E-5,
+      "checkStock" : 0.3749984475035225,
+      "searchProducts" : 0.04897618967124348,
+      "cancelOrder" : 0.003360691812741537,
+      "refundOrder" : 6.9552838569256164E-6,
+      "startReturn" : 0.005745832907137199,
+      "updateDeliveryAddress" : 4.016697526501456E-6,
+      "applyVoucher" : 1.7676354607895137E-4,
+      "warrantyStatus" : 0.004607308761838853
+    }
+  } ]
+}, {
+  "request" : "Is the PB-200 blender in stock?",
+  "index" : "none",
+  "answer" : "\n\nThe PB-200 blender is currently out of stock, but the next delivery arrives on 2026-11-28.",
+  "millis" : 6693,
+  "calls" : [ {
+    "millis" : 2902,
+    "toolsSent" : [ "findOrder", "openTicket", "checkStock", "searchProducts", "cancelOrder", "refundOrder", "startReturn", "updateDeliveryAddress", "applyVoucher", "warrantyStatus" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"productCode\": \"PB-200\"}",
+      "name" : "checkStock"
+    } ],
+    "text" : "",
+    "promptTokens" : 1292,
+    "completionTokens" : 66
+  }, {
+    "millis" : 3788,
+    "toolsSent" : [ "findOrder", "openTicket", "checkStock", "searchProducts", "cancelOrder", "refundOrder", "startReturn", "updateDeliveryAddress", "applyVoucher", "warrantyStatus" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nThe PB-200 blender is currently out of stock, but the next delivery arrives on 2026-11-28.",
+    "promptTokens" : 1402,
+    "completionTokens" : 83
+  } ],
+  "searches" : [ ]
+}, {
+  "request" : "Please cancel order A-1077.",
+  "index" : "regex",
+  "answer" : "\n\nOrder A-1077 has been cancelled.",
+  "millis" : 6311,
+  "calls" : [ {
+    "millis" : 2378,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"cancel order\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 572,
+    "completionTokens" : 61
+  }, {
+    "millis" : 2496,
+    "toolsSent" : [ "updateDeliveryAddress", "cancelOrder", "applyVoucher", "toolSearchTool", "findOrder", "refundOrder" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"orderId\": \"A-1077\"}",
+      "name" : "cancelOrder"
+    } ],
+    "text" : "",
+    "promptTokens" : 1169,
+    "completionTokens" : 56
+  }, {
+    "millis" : 1422,
+    "toolsSent" : [ "updateDeliveryAddress", "cancelOrder", "applyVoucher", "toolSearchTool", "findOrder", "refundOrder" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nOrder A-1077 has been cancelled.",
+    "promptTokens" : 1251,
+    "completionTokens" : 21
+  } ],
+  "searches" : [ {
+    "query" : "cancel order",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 0,
+    "results" : [ {
+      "tool" : "cancelOrder",
+      "score" : 7.5
+    }, {
+      "tool" : "findOrder",
+      "score" : 3.9523809523809526
+    }, {
+      "tool" : "refundOrder",
+      "score" : 3.875
+    }, {
+      "tool" : "updateDeliveryAddress",
+      "score" : 1.1136363636363635
+    }, {
+      "tool" : "applyVoucher",
+      "score" : 1.108695652173913
+    } ]
+  } ]
+}, {
+  "request" : "Please cancel order A-1077.",
+  "index" : "lucene",
+  "answer" : "\n\nOrder A-1077 has been cancelled.",
+  "millis" : 17801,
+  "calls" : [ {
+    "millis" : 3484,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"cancel order A-1077 order cancellation\", \"maxResults\": 5}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 572,
+    "completionTokens" : 70
+  }, {
+    "millis" : 12184,
+    "toolsSent" : [ "startReturn", "cancelOrder", "applyVoucher", "findOrder", "refundOrder", "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"orderId\": \"A-1077\"}",
+      "name" : "cancelOrder"
+    } ],
+    "text" : "",
+    "promptTokens" : 1181,
+    "completionTokens" : 196
+  }, {
+    "millis" : 2089,
+    "toolsSent" : [ "startReturn", "cancelOrder", "applyVoucher", "findOrder", "refundOrder", "toolSearchTool" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nOrder A-1077 has been cancelled.",
+    "promptTokens" : 1403,
+    "completionTokens" : 39
+  } ],
+  "searches" : [ {
+    "query" : "cancel order A-1077 order cancellation",
+    "maxResults" : 5,
+    "categoryFilter" : null,
+    "millis" : 20,
+    "results" : [ {
+      "tool" : "cancelOrder",
+      "score" : 1.6958849430084229
+    }, {
+      "tool" : "applyVoucher",
+      "score" : 1.1444579362869263
+    }, {
+      "tool" : "refundOrder",
+      "score" : 0.6958234310150146
+    }, {
+      "tool" : "startReturn",
+      "score" : 0.5943546295166016
+    }, {
+      "tool" : "findOrder",
+      "score" : 0.5928232669830322
+    } ]
+  } ]
+}, {
+  "request" : "Please cancel order A-1077.",
+  "index" : "vector",
+  "answer" : "\n\nOrder A-1077 has been cancelled. You'll receive a confirmation and any payment will be refunded to your original payment method.",
+  "millis" : 12395,
+  "calls" : [ {
+    "millis" : 2380,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"cancel order\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 572,
+    "completionTokens" : 62
+  }, {
+    "millis" : 6625,
+    "toolsSent" : [ "startReturn", "warrantyStatus", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "findOrder", "searchProducts", "toolSearchTool", "refundOrder", "openTicket", "checkStock" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"orderId\": \"A-1077\"}",
+      "name" : "cancelOrder"
+    } ],
+    "text" : "",
+    "promptTokens" : 1681,
+    "completionTokens" : 134
+  }, {
+    "millis" : 3012,
+    "toolsSent" : [ "startReturn", "warrantyStatus", "updateDeliveryAddress", "cancelOrder", "applyVoucher", "findOrder", "searchProducts", "toolSearchTool", "refundOrder", "openTicket", "checkStock" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nOrder A-1077 has been cancelled. You'll receive a confirmation and any payment will be refunded to your original payment method.",
+    "promptTokens" : 1841,
+    "completionTokens" : 46
+  } ],
+  "searches" : [ {
+    "query" : "cancel order",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 48,
+    "results" : [ {
+      "tool" : "cancelOrder",
+      "score" : 0.8041475513427243
+    }, {
+      "tool" : "refundOrder",
+      "score" : 0.5968369860429333
+    }, {
+      "tool" : "applyVoucher",
+      "score" : 0.572375493418788
+    }, {
+      "tool" : "findOrder",
+      "score" : 0.5419648858581119
+    }, {
+      "tool" : "updateDeliveryAddress",
+      "score" : 0.5307663738749943
+    }, {
+      "tool" : "startReturn",
+      "score" : 0.5251684947898874
+    }, {
+      "tool" : "checkStock",
+      "score" : 0.5008893457651534
+    }, {
+      "tool" : "openTicket",
+      "score" : 0.4708051610815127
+    }, {
+      "tool" : "warrantyStatus",
+      "score" : 0.43258045647430404
+    }, {
+      "tool" : "searchProducts",
+      "score" : 0.40791936451966115
+    } ]
+  } ]
+}, {
+  "request" : "Please cancel order A-1077.",
+  "index" : "decision",
+  "answer" : "\n\nI'm sorry, I can't cancel order A-1077 right now because I couldn't find an order-management tool to perform the cancellation. Please try again later or contact our support team directly.",
+  "millis" : 18431,
+  "calls" : [ {
+    "millis" : 2646,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"cancel order\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 572,
+    "completionTokens" : 58
+  }, {
+    "millis" : 2380,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"order management modify order status\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 646,
+    "completionTokens" : 49
+  }, {
+    "millis" : 2896,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"order\", \"maxResults\": 10}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 711,
+    "completionTokens" : 60
+  }, {
+    "millis" : 4723,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nI'm sorry, I can't cancel order A-1077 right now because I couldn't find an order-management tool to perform the cancellation. Please try again later or contact our support team directly.",
+    "promptTokens" : 787,
+    "completionTokens" : 82
+  } ],
+  "searches" : [ {
+    "query" : "cancel order",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 2037,
+    "results" : [ ],
+    "anyToolApplies" : 0.16172059903897615,
+    "bestTool" : {
+      "findOrder" : 0.6690544174405798,
+      "openTicket" : 9.449236302911927E-5,
+      "checkStock" : 0.20483459798276576,
+      "searchProducts" : 0.001638177939682592,
+      "cancelOrder" : 0.060614080084668336,
+      "refundOrder" : 3.113460847488583E-5,
+      "startReturn" : 0.05133186134670628,
+      "updateDeliveryAddress" : 8.22015634571902E-5,
+      "applyVoucher" : 2.839586728610175E-4,
+      "warrantyStatus" : 0.0120350779977751
+    }
+  }, {
+    "query" : "order management modify order status",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 1914,
+    "results" : [ ],
+    "anyToolApplies" : 0.16669160287300416,
+    "bestTool" : {
+      "findOrder" : 0.8987102422565888,
+      "openTicket" : 8.394037311229518E-5,
+      "checkStock" : 0.053035001176764546,
+      "searchProducts" : 0.0023473448252528746,
+      "cancelOrder" : 0.020731316940177928,
+      "refundOrder" : 9.901306614281183E-5,
+      "startReturn" : 0.017782861204776523,
+      "updateDeliveryAddress" : 4.7075019479602884E-4,
+      "applyVoucher" : 8.074352873341528E-4,
+      "warrantyStatus" : 0.005932094675053974
+    }
+  }, {
+    "query" : "order",
+    "maxResults" : 10,
+    "categoryFilter" : null,
+    "millis" : 1821,
+    "results" : [ ],
+    "anyToolApplies" : 0.17310773302068408,
+    "bestTool" : {
+      "findOrder" : 0.7584354557973204,
+      "openTicket" : 3.6257942683910704E-5,
+      "checkStock" : 0.20392501973562382,
+      "searchProducts" : 0.0031541789827246986,
+      "cancelOrder" : 0.0056390385366442836,
+      "refundOrder" : 4.975405982948891E-5,
+      "startReturn" : 0.020301575144461993,
+      "updateDeliveryAddress" : 1.4243562508914648E-5,
+      "applyVoucher" : 2.976112295773056E-4,
+      "warrantyStatus" : 0.008146865008625305
+    }
+  } ]
+}, {
+  "request" : "Please cancel order A-1077.",
+  "index" : "none",
+  "answer" : "\n\nOrder A-1077 has already been shipped (DHL, expected delivery 2026-11-21), so it can't be canceled. Once it arrives, I can start a return for you.",
+  "millis" : 12550,
+  "calls" : [ {
+    "millis" : 8942,
+    "toolsSent" : [ "findOrder", "openTicket", "checkStock", "cancelOrder", "warrantyStatus", "applyVoucher", "startReturn", "refundOrder", "updateDeliveryAddress", "searchProducts" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"orderId\": \"A-1077\"}",
+      "name" : "findOrder"
+    } ],
+    "text" : "",
+    "promptTokens" : 1291,
+    "completionTokens" : 151
+  }, {
+    "millis" : 3557,
+    "toolsSent" : [ "findOrder", "openTicket", "checkStock", "cancelOrder", "warrantyStatus", "applyVoucher", "startReturn", "refundOrder", "updateDeliveryAddress", "searchProducts" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nOrder A-1077 has already been shipped (DHL, expected delivery 2026-11-21), so it can't be canceled. Once it arrives, I can start a return for you.",
+    "promptTokens" : 1501,
+    "completionTokens" : 80
+  } ],
+  "searches" : [ ]
+}, {
+  "request" : "What's the weather in Paris tomorrow?",
+  "index" : "none",
+  "answer" : "\n\nI'm the shop's support assistant, so I can't look up the weather. But I'm happy to help with orders, stock, returns, or anything else about your purchases.",
+  "millis" : 6118,
+  "calls" : [ {
+    "millis" : 6117,
+    "toolsSent" : [ "findOrder", "openTicket", "checkStock", "cancelOrder", "warrantyStatus", "applyVoucher", "startReturn", "refundOrder", "updateDeliveryAddress", "searchProducts" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nI'm the shop's support assistant, so I can't look up the weather. But I'm happy to help with orders, stock, returns, or anything else about your purchases.",
+    "promptTokens" : 1289,
+    "completionTokens" : 119
+  } ],
+  "searches" : [ ]
+}, {
+  "request" : "What's the weather in Paris tomorrow?",
+  "index" : "regex",
+  "answer" : "\n\nI'm the online shop support assistant, so I don't have access to weather forecasts. For tomorrow's weather in Paris, I'd suggest checking a weather service like Météo-France or AccuWeather.",
+  "millis" : 9626,
+  "calls" : [ {
+    "millis" : 4870,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"weather forecast for a city\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 570,
+    "completionTokens" : 80
+  }, {
+    "millis" : 4681,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nI'm the online shop support assistant, so I don't have access to weather forecasts. For tomorrow's weather in Paris, I'd suggest checking a weather service like Météo-France or AccuWeather.",
+    "promptTokens" : 666,
+    "completionTokens" : 87
+  } ],
+  "searches" : [ {
+    "query" : "weather forecast for a city",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 2,
+    "results" : [ ]
+  } ]
+}, {
+  "request" : "What's the weather in Paris tomorrow?",
+  "index" : "lucene",
+  "answer" : "\n\nI don't have a weather tool available, so I can't tell you tomorrow's forecast in Paris. I can help with shop questions though — like checking stock, applying a voucher, or starting a return.",
+  "millis" : 11345,
+  "calls" : [ {
+    "millis" : 4291,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"weather forecast lookup for a city\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 570,
+    "completionTokens" : 100
+  }, {
+    "millis" : 6678,
+    "toolsSent" : [ "startReturn", "toolSearchTool", "openTicket", "checkStock", "applyVoucher" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nI don't have a weather tool available, so I can't tell you tomorrow's forecast in Paris. I can help with shop questions though — like checking stock, applying a voucher, or starting a return.",
+    "promptTokens" : 1124,
+    "completionTokens" : 115
+  } ],
+  "searches" : [ {
+    "query" : "weather forecast lookup for a city",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 154,
+    "results" : [ {
+      "score" : 1.1842737197875977,
+      "tool" : "startReturn"
+    }, {
+      "score" : 1.1329083442687988,
+      "tool" : "openTicket"
+    }, {
+      "score" : 0.44863447546958923,
+      "tool" : "applyVoucher"
+    }, {
+      "score" : 0.36858469247817993,
+      "tool" : "checkStock"
+    } ]
+  } ]
+}, {
+  "request" : "What's the weather in Paris tomorrow?",
+  "index" : "vector",
+  "answer" : "\n\nI don't have access to weather forecasts, so I can't tell you what tomorrow's weather in Paris will be. I can help with orders, stock, returns, and other shop questions, though.",
+  "millis" : 15461,
+  "calls" : [ {
+    "millis" : 6294,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"weather forecast for a city\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 570,
+    "completionTokens" : 129
+  }, {
+    "millis" : 4917,
+    "toolsSent" : [ "startReturn", "openTicket", "checkStock", "refundOrder", "searchProducts", "toolSearchTool", "findOrder", "cancelOrder", "updateDeliveryAddress", "warrantyStatus", "applyVoucher" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nI don't have access to weather forecasts, so I can't tell you what tomorrow's weather in Paris will be. I can help with orders, stock, returns, and other shop questions, though.",
+    "promptTokens" : 1746,
+    "completionTokens" : 92
+  } ],
+  "searches" : [ {
+    "query" : "weather forecast for a city",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 66,
+    "results" : [ {
+      "score" : 0.4460101264745501,
+      "tool" : "checkStock"
+    }, {
+      "score" : 0.43761390258977445,
+      "tool" : "findOrder"
+    }, {
+      "score" : 0.4190815638948419,
+      "tool" : "cancelOrder"
+    }, {
+      "score" : 0.4122565475014393,
+      "tool" : "searchProducts"
+    }, {
+      "score" : 0.412163157720943,
+      "tool" : "warrantyStatus"
+    }, {
+      "score" : 0.4102742794237818,
+      "tool" : "startReturn"
+    }, {
+      "score" : 0.39484284031690936,
+      "tool" : "updateDeliveryAddress"
+    }, {
+      "score" : 0.38437878619993415,
+      "tool" : "openTicket"
+    }, {
+      "score" : 0.3589563721158855,
+      "tool" : "applyVoucher"
+    }, {
+      "score" : 0.3163445497648565,
+      "tool" : "refundOrder"
+    } ]
+  } ]
+}, {
+  "request" : "What's the weather in Paris tomorrow?",
+  "index" : "decision",
+  "answer" : "\n\nI don't have access to weather information, so I can't tell you what the weather will be like in Paris tomorrow. For an accurate forecast, I'd suggest checking a weather service like the Météo-France website or a weather app.",
+  "millis" : 17448,
+  "calls" : [ {
+    "millis" : 3866,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ {
+      "arguments" : "{\"query\": \"weather forecast for a city\"}",
+      "name" : "toolSearchTool"
+    } ],
+    "text" : "",
+    "promptTokens" : 570,
+    "completionTokens" : 87
+  }, {
+    "millis" : 4341,
+    "toolsSent" : [ "toolSearchTool" ],
+    "toolCalls" : [ ],
+    "text" : "\n\nI don't have access to weather information, so I can't tell you what the weather will be like in Paris tomorrow. For an accurate forecast, I'd suggest checking a weather service like the Météo-France website or a weather app.",
+    "promptTokens" : 673,
+    "completionTokens" : 85
+  } ],
+  "searches" : [ {
+    "query" : "weather forecast for a city",
+    "maxResults" : null,
+    "categoryFilter" : null,
+    "millis" : 9227,
+    "results" : [ ],
+    "anyToolApplies" : 0.24387700696409614,
+    "bestTool" : {
+      "findOrder" : 0.5618545180258638,
+      "openTicket" : 8.915487870015717E-6,
+      "checkStock" : 0.4059712947549794,
+      "refundOrder" : 4.441177784129976E-6,
+      "applyVoucher" : 1.130788009475177E-4,
+      "warrantyStatus" : 5.857728148940454E-4,
+      "updateDeliveryAddress" : 1.707984042855153E-5,
+      "searchProducts" : 0.002922840661394014,
+      "startReturn" : 0.003568410737767425,
+      "cancelOrder" : 0.024953647698071152
+    }
+  } ]
+} ]

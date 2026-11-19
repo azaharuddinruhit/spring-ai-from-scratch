@@ -1,0 +1,608 @@
+---
+description: Send the model one search tool instead of every tool, compare the regex, Lucene, vector and decision indexes on recorded requests, and bound what a search returns.
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import ToolSearchLab from '@/components/islands/ToolSearchLab';
+import ProjectTree from '@/components/ProjectTree.astro';
+import { buildGradle } from '@/data/snippets';
+import { PREVIEW_STACK } from '@/data/versions';
+
+**You'll need:** an OpenAI-compatible chat model that calls tools; this lesson's recordings used a 27B Qwen 3 reasoning model.
+For the decision profile, Ollama with `d1-omni:600m`. Lesson 2.3 introduces decision models. This lesson is its own small project.
+
+Every tool definition goes with every model call. This lesson's ten tools cost about 720 prompt tokens more per call than a
+single search tool, and a catalogue of a hundred would cost ten times that, while making it harder for the model to pick the
+right one.
+`ToolSearchToolCallingAdvisor` sends the model a single `toolSearchTool` instead and adds the tools its searches find. Spring AI
+2.0 already had it with regex, Lucene and vector indexes; 2.1 adds `DecisionToolIndex`, which asks a decision model which tool
+fits. This lesson runs six customer requests through all four indexes and through plain tool calling, then sets the app up from
+what we measured.
+
+## 1. Spring mental model
+
+Tool search is a lazy lookup, like resolving a bean by name only when the code asks for it: the model starts with a directory
+and looks up the tools it needs.
+
+<Mermaid
+  caption="One request with tool search: three model calls instead of two."
+  code={`
+sequenceDiagram
+  participant C as ChatClient
+  participant A as ToolSearchToolCallingAdvisor
+  participant I as ToolIndex
+  participant M as Chat model
+  C->>A: question, ten tools, session id
+  A->>I: index the ten tools for this session
+  A->>M: call 1: toolSearchTool only
+  M->>A: toolSearchTool("track order status")
+  A->>I: search
+  I-->>A: findOrder, applyVoucher, cancelOrder
+  A->>M: call 2: toolSearchTool + the three tools found
+  M->>A: findOrder("A-1042")
+  A->>M: call 3: the tool result
+  M-->>C: the answer
+`}
+/>
+
+`spring.ai.chat.client.tool-search-advisor.enabled: true` replaces the auto-configured `ToolCallingAdvisor.Builder`, so every
+`ChatClient` built from the injected builder searches. `tool-index-type` picks the index:
+
+| Index | How it matches the model's query | Cut-off | Needs |
+| --- | --- | --- | --- |
+| `regex` (default) | the words minus stop words, as a case-insensitive pattern over names and descriptions | any match | nothing |
+| `lucene` | full-text scoring over names and descriptions | score 0.25 | nothing (Lucene comes with the starter) |
+| `vector` | embedding similarity in a `VectorStore` | none | a `VectorStore` bean |
+| `decision` | one decision-model call: the best tool, and whether any tool applies | applicability 0.5 | a `DecisionModel` bean |
+
+These rules come from the 2.1.0-RC2 classes and from running them:
+
+- The advisor keeps one index per session and reads the session from the request context, under
+  `chat_memory_conversation_id` unless you set `session-id-key-name`. A request without it fails with
+  `IllegalArgumentException: context must contain a non-null value for 'chat_memory_conversation_id'`.
+- Every request starts again with `toolSearchTool` alone, even in the same session. Tools found earlier come back only when the
+  conversation history that named them is part of the prompt.
+- The model chooses `maxResults`. The advisor's `max-results` is used only when the model leaves it out, and without either the
+  indexes return up to 10 tools.
+- `DecisionToolIndex` returns nothing unless `any_tool_applies` reaches `applicability-threshold`. If it does, it returns every
+  tool with a probability above zero, best first, up to the limit.
+
+## 2. Interactive sandbox
+
+<ToolSearchLab client:visible />
+
+The sandbox shows recordings: each request answered once per index, once with Lucene limited to three results, and once with all
+ten tools and no search. The chat model was a 27B Qwen 3 reasoning model; the decision index used `d1-omni:600m`. Another model
+will search and answer differently.
+
+Things to try:
+
+- Keep "Where is my order A-1042?" on **Lucene, 3 results**: the model searches, calls `findOrder`, then answers, in 2,616 prompt
+  tokens against 2,693 for sending all ten tools. Switch to **Vector**: with no cut-off and no limit it returned all ten tools,
+  and the request cost 4,079.
+- Pick **Decision**. It found no tool in three searches, and the model told the customer the order system was unavailable. Drag
+  the threshold down: every recorded search scored between 0.12 and 0.24, and the weather question scored higher than the shop
+  questions.
+- Pick the kettle request and compare **No tool search** with the indexes. Given every tool, the model started a return at once.
+  With search it looked the order up first, saw that the order holds a blender (the stub data says so) and asked which order the
+  kettle came from.
+- Pick the weather question. Regex finds nothing; Lucene returns four unrelated tools. The model declined either way.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+<ProjectTree />
+
+The chat model goes through the OpenAI starter, so any OpenAI-compatible server works. The Ollama starter is there for the
+decision profile, and the tool search starter brings the advisor, its auto-configuration and Lucene:
+
+<CodeFile title="build.gradle" lang="groovy" lines="3,22,28,29,30" code={buildGradle(['spring-ai-starter-model-openai', 'spring-ai-starter-model-ollama', 'spring-ai-starter-tool-search-advisor'], PREVIEW_STACK)} />
+
+The configuration turns tool search on with Lucene and three tools per search, and sets the app's own session key:
+
+<CodeFile title="src/main/resources/application.yaml">
+```yaml {9,12,21,22,24,26}
+spring:
+  application:
+    name: support
+  ai:
+    model:
+      chat: openai
+      # The OpenAI starter also adds embedding and decision models: this app embeds nothing, and decides with Ollama's.
+      embedding: none
+      decision: ollama
+    openai:
+      # Any OpenAI-compatible server. Ollama's is http://localhost:11434/v1, which ignores the key.
+      base-url: http://localhost:11434/v1
+      api-key: ${OPENAI_API_KEY:unused}
+      chat:
+        # llama3.2:3b runs anywhere, but with tool search it found the right tool and then answered without calling it.
+        # The lesson's recordings and SupportChatIT used a 27B model; use one that calls the tools it finds.
+        model: llama3.2:3b
+    chat:
+      client:
+        tool-search-advisor:
+          enabled: true
+          tool-index-type: lucene
+          # Spring AI uses it only when the model doesn't say how many tools it wants; BoundedToolIndex makes it a limit.
+          max-results: 3
+          # The default key is ChatMemory.CONVERSATION_ID, which 2.1 deprecates for removal.
+          session-id-key-name: support_session_id
+```
+</CodeFile>
+
+The decision profile switches the index. It is there so you can measure your own decision model, not to run as it is:
+
+<CodeFile title="src/main/resources/application-decision.yaml">
+```yaml {7,19,23}
+# Run with --spring.profiles.active=decision to let a decision model pick the tools.
+spring:
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      decision:
+        model: d1-omni:600m
+      init:
+        pull-model-strategy: when_missing
+        chat:
+          include: false
+        embedding:
+          include: false
+        decision:
+          include: true
+    chat:
+      client:
+        tool-search-advisor:
+          tool-index-type: decision
+          decision:
+            # The default. d1-omni:600m never scored a recorded search above 0.25, so at 0.5 it found no tool for anything;
+            # measure your decision model on your own requests before you switch.
+            applicability-threshold: 0.5
+```
+</CodeFile>
+
+The ten tools answer from fixed data, so the recordings show which tool ran. Their descriptions are what every index searches:
+
+<CodeFile title="src/main/java/com/example/support/tools/SupportTools.java">
+```java {21,53}
+package com.example.support.tools;
+
+import java.time.LocalDate;
+
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.stereotype.Component;
+
+/**
+ * Ten support tools. Their answers are fixed, so the lesson can show which tool the model found and called; Module 5 builds
+ * real ones on a database. The descriptions are what every tool index searches, so each says what the tool does in a customer's
+ * words.
+ */
+@Component
+public class SupportTools {
+
+    public record Order(String orderId, String status, String items, String carrier, LocalDate expectedDelivery) {}
+
+    public record Stock(String productCode, int inStock, LocalDate nextDelivery) {}
+
+    @Tool(description = "Look up an order: its status, items, carrier and expected delivery date.")
+    public Order findOrder(@ToolParam(description = "Order id, such as A-1042") String orderId) {
+        return new Order(orderId, "SHIPPED", "PB-200 blender", "DHL", LocalDate.of(2026, 11, 21));
+    }
+
+    @Tool(description = "Cancel an order that has not shipped yet.")
+    public String cancelOrder(@ToolParam(description = "Order id") String orderId) {
+        return "Order " + orderId + " is cancelled.";
+    }
+
+    @Tool(description = "Start a return for a delivered item and email the customer a return label.")
+    public String startReturn(@ToolParam(description = "Order id") String orderId,
+            @ToolParam(description = "Why the customer is returning it") String reason) {
+        return "Return R-" + orderId.substring(2) + " started; the label is on its way.";
+    }
+
+    @Tool(description = "Refund an order to the original payment method.")
+    public String refundOrder(@ToolParam(description = "Order id") String orderId) {
+        return "Refund for " + orderId + " requested.";
+    }
+
+    @Tool(description = "Change the delivery address of an order that has not shipped yet.")
+    public String updateDeliveryAddress(@ToolParam(description = "Order id") String orderId,
+            @ToolParam(description = "The new address") String address) {
+        return "Order " + orderId + " will go to " + address + ".";
+    }
+
+    @Tool(description = "Search the product catalogue by name or description.")
+    public String searchProducts(@ToolParam(description = "Words to search for") String query) {
+        return "PB-200 blender, KT-10 kettle";
+    }
+
+    @Tool(description = "Check whether a product is in stock, and when the next delivery arrives.")
+    public Stock checkStock(@ToolParam(description = "Product code, such as PB-200") String productCode) {
+        return new Stock(productCode, 0, LocalDate.of(2026, 11, 28));
+    }
+
+    @Tool(description = "Check whether an item is still under warranty.")
+    public String warrantyStatus(@ToolParam(description = "Order id") String orderId) {
+        return "Under warranty until 2028-03-02.";
+    }
+
+    @Tool(description = "Apply a discount voucher code to an order.")
+    public String applyVoucher(@ToolParam(description = "Order id") String orderId,
+            @ToolParam(description = "Voucher code") String code) {
+        return "Voucher " + code + " is not valid for " + orderId + ".";
+    }
+
+    @Tool(description = "Open a ticket for a person on the support team to follow up.")
+    public String openTicket(@ToolParam(description = "What the customer needs") String summary) {
+        return "Ticket T-5521 opened.";
+    }
+}
+```
+</CodeFile>
+
+The chat client gets all ten tools; the advisor decides which the model sees. A bean post-processor wraps whichever index the
+auto-configuration created, so `tool-index-type` still chooses it:
+
+<CodeFile title="src/main/java/com/example/support/chat/ChatConfig.java">
+```java {26,32,38}
+package com.example.support.chat;
+
+import com.example.support.tools.SupportTools;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.tool.toolsearch.ToolIndex;
+import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+
+/**
+ * The chat client with all ten tools. With tool search enabled in application.yaml, the auto-configured builder uses
+ * ToolSearchToolCallingAdvisor instead of ToolCallingAdvisor, so the model sees only the tools its searches find.
+ */
+@Configuration
+class ChatConfig {
+
+    @Bean
+    ChatClient supportChatClient(ChatClient.Builder builder, SupportTools tools) {
+        return builder
+                .defaultSystem("""
+                        You are the support assistant of an online shop. Use the tools to look things up and to act.
+                        Never invent order details. Answer in at most two sentences.""")
+                .defaultTools(tools)
+                .build();
+    }
+
+    /** Bounds whichever tool index the auto-configuration chose (tool-index-type) by the advisor's own max-results. */
+    @Bean
+    static BeanPostProcessor boundedToolIndex(Environment environment) {
+        int maxResults = Binder.get(environment).bind("spring.ai.chat.client.tool-search-advisor.max-results", Integer.class)
+                .orElse(5);
+        return new BeanPostProcessor() {
+            @Override
+            public Object postProcessAfterInitialization(Object bean, String beanName) {
+                return bean instanceof ToolIndex index ? new BoundedToolIndex(index, maxResults) : bean;
+            }
+        };
+    }
+}
+```
+</CodeFile>
+
+`BoundedToolIndex` turns `max-results` into a limit. It also stops a request for zero tools from reaching Lucene, which throws on
+it:
+
+<CodeFile title="src/main/java/com/example/support/chat/BoundedToolIndex.java">
+```java {20}
+package com.example.support.chat;
+
+import java.util.List;
+
+import org.springframework.ai.tool.toolsearch.ToolIndex;
+import org.springframework.ai.tool.toolsearch.ToolReference;
+import org.springframework.ai.tool.toolsearch.ToolSearchRequest;
+import org.springframework.ai.tool.toolsearch.ToolSearchResponse;
+
+/**
+ * Keeps every search between one and {@code maxResults} tools. The model chooses how many tools a search returns, and the
+ * advisor's max-results applies only when it doesn't: a model that asks for 10 gets 10, and one that asks for 0 fails the
+ * request with the Lucene index (Spring AI 2.1.0-RC2).
+ */
+record BoundedToolIndex(ToolIndex delegate, int maxResults) implements ToolIndex {
+
+    @Override
+    public ToolSearchResponse search(ToolSearchRequest request) {
+        Integer asked = request.maxResults();
+        int limit = asked == null || asked < 1 ? maxResults : Math.min(asked, maxResults);
+        return delegate.search(new ToolSearchRequest(request.sessionId(), request.query(), limit, request.categoryFilter()));
+    }
+
+    @Override
+    public void indexTool(String sessionId, ToolReference toolReference) {
+        delegate.indexTool(sessionId, toolReference);
+    }
+
+    @Override
+    public void indexTools(String sessionId, List<ToolReference> toolReferences) {
+        delegate.indexTools(sessionId, toolReferences);
+    }
+
+    @Override
+    public void clearIndex(String sessionId) {
+        delegate.clearIndex(sessionId);
+    }
+}
+```
+</CodeFile>
+
+The service passes the session id on every request. Use the conversation's id, so the index is built once per conversation:
+
+<CodeFile title="src/main/java/com/example/support/chat/SupportChatService.java">
+```java {11,22}
+package com.example.support.chat;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.stereotype.Service;
+
+/** Answers a customer through the chat client; tool search keeps one tool index per session. */
+@Service
+public class SupportChatService {
+
+    /** The context key the tool search advisor reads the session from (application.yaml sets it). */
+    public static final String SESSION_ID = "support_session_id";
+
+    private final ChatClient supportChatClient;
+
+    public SupportChatService(ChatClient supportChatClient) {
+        this.supportChatClient = supportChatClient;
+    }
+
+    public String answer(String sessionId, String question) {
+        return supportChatClient.prompt()
+                .user(question)
+                .advisors(a -> a.param(SESSION_ID, sessionId))
+                .call()
+                .content();
+    }
+}
+```
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/SupportApplication.java">
+```java {7}
+package com.example.support;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+
+@SpringBootApplication
+@ConfigurationPropertiesScan
+public class SupportApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(SupportApplication.class, args);
+    }
+}
+```
+</CodeFile>
+
+The wiring test replaces the chat model with a script: search, call the tool found, answer. It runs the real advisor and the
+Lucene index, so it pins what each call carries, the limit and the session check without any model server:
+
+<CodeFile title="src/test/java/com/example/support/chat/ToolSearchWiringTest.java">
+```java {49,50,55,61,69}
+package com.example.support.chat;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.model.tool.ToolCallingChatOptions;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+
+/**
+ * The app's tool search wiring, with a scripted chat model in place of the real one: it searches, calls the tool it found, then
+ * answers. The tool index is the Lucene one application.yaml configures, so this runs without any model server.
+ */
+@SpringBootTest
+class ToolSearchWiringTest {
+
+    @Autowired
+    SupportChatService service;
+
+    @Autowired
+    ChatClient supportChatClient;
+
+    @BeforeEach
+    void reset() {
+        ScriptedChatModel.TOOLS_SENT.clear();
+        ScriptedChatModel.search = "{\"query\":\"cancel order\"}";
+    }
+
+    @Test
+    void theFirstCallCarriesOnlyTheSearchToolAndTheNextOneTheThreeToolsItFound() {
+        String answer = service.answer("c-1", "Please cancel order A-1077.");
+
+        assertThat(answer).isEqualTo("Order A-1077 is cancelled.");
+        assertThat(ScriptedChatModel.TOOLS_SENT.get(0)).containsExactly("toolSearchTool");
+        assertThat(ScriptedChatModel.TOOLS_SENT.get(1)).contains("cancelOrder", "toolSearchTool").hasSize(4);
+    }
+
+    @Test
+    void aSearchNeverReturnsMoreToolsThanMaxResultsNorFailsOnZero() {
+        for (String search : List.of("{\"query\":\"order\",\"maxResults\":10}", "{\"query\":\"cancel order\",\"maxResults\":0}")) {
+            ScriptedChatModel.TOOLS_SENT.clear();
+            ScriptedChatModel.search = search;
+
+            service.answer("c-2", "Please cancel order A-1077.");
+
+            assertThat(ScriptedChatModel.TOOLS_SENT.get(1)).hasSize(4);
+        }
+    }
+
+    @Test
+    void aRequestWithoutASessionIdFails() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> supportChatClient.prompt().user("Please cancel order A-1077.").call().content())
+                .withMessageContaining(SupportChatService.SESSION_ID);
+    }
+
+    @TestConfiguration
+    static class ScriptedChatModel {
+
+        static final List<List<String>> TOOLS_SENT = new ArrayList<>();
+        static String search;
+
+        @Bean
+        @Primary
+        ChatModel scriptedChatModel() {
+            return new ChatModel() {
+                @Override
+                public ChatOptions getOptions() {
+                    return ToolCallingChatOptions.builder().build();
+                }
+
+                @Override
+                public ChatResponse call(Prompt prompt) {
+                    TOOLS_SENT.add(((ToolCallingChatOptions) prompt.getOptions()).getToolCallbacks().stream()
+                            .map(c -> c.getToolDefinition().name()).toList());
+                    AssistantMessage reply = switch (TOOLS_SENT.size()) {
+                        case 1 -> toolCall("toolSearchTool", search);
+                        case 2 -> toolCall("cancelOrder", "{\"orderId\":\"A-1077\"}");
+                        default -> AssistantMessage.builder().content("Order A-1077 is cancelled.").build();
+                    };
+                    return new ChatResponse(List.of(new Generation(reply)));
+                }
+            };
+        }
+
+        private static AssistantMessage toolCall(String name, String arguments) {
+            return AssistantMessage.builder()
+                    .toolCalls(List.of(new AssistantMessage.ToolCall("call-" + name, "function", name, arguments)))
+                    .build();
+        }
+    }
+}
+```
+</CodeFile>
+
+The integration test asks the configured chat model a stock question. A plausible answer proves nothing, because a model can
+answer "out of stock" without any tool, so the test checks that `checkStock` ran:
+
+<CodeFile title="src/test/java/com/example/support/chat/SupportChatIT.java">
+```java {27,34}
+package com.example.support.chat;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
+
+import com.example.support.tools.SupportTools;
+
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+
+/**
+ * The whole path against the chat model application.yaml points at. The answer alone proves nothing: when a search found no
+ * tool, llama3.2:3b still said "out of stock". So the test checks that the stock tool really ran. It passed 3 times out of 3
+ * with a 27B Qwen 3 model; llama3.2:3b found checkStock and answered without calling it, 5 times out of 5.
+ */
+@Tag("ollama")
+@SpringBootTest
+class SupportChatIT {
+
+    @Autowired
+    SupportChatService service;
+
+    @MockitoSpyBean
+    SupportTools tools;
+
+    @Test
+    void theModelFindsTheStockToolAndAnswersFromIt() {
+        String answer = service.answer("it-1", "Is the PB-200 blender in stock?");
+
+        verify(tools).checkStock(anyString());
+        assertThat(answer).containsIgnoringCase("out of stock");
+    }
+}
+```
+</CodeFile>
+
+## 4. Production gotchas & security
+
+<Gotcha kind="reliability" title="The decision index found no tool for any request">
+With `d1-omni:600m`, `any_tool_applies` scored 0.07 to 0.31 on every search we made, below the default 0.5, so the index returned
+nothing and the model told customers the system was down. No threshold would have worked: the weather questions scored higher
+than the shop questions. The best tool also leaned toward whichever tool came first. Reversing the tool order changed it for 5 of
+12 queries. Measure a decision model on your own requests before you switch to it.
+</Gotcha>
+
+<Gotcha kind="cost" title="Ten tools don't need a search">
+The first call costs about 573 prompt tokens with search and 1,290 with all ten tools, but a search adds a model call and returns
+tools of its own. Over the six recorded requests, sending every tool took 17,171 prompt tokens. Unlimited searches took 21,886 to
+23,399, and Lucene with three results 15,780. Tool search pays off with dozens of tools, and only when each search returns few.
+</Gotcha>
+
+<Gotcha kind="reliability" title="The model decides how many tools come back">
+The model passes `maxResults` itself, and `max-results` applies only when it doesn't. The model asked for 5 and 10 in the
+recordings. A smaller model once asked for none, and the Lucene index threw `numHits must be > 0`. The advisor then read the error
+message as a list of tool names and failed the request with `IllegalStateException`. `BoundedToolIndex` keeps every search
+between one and `max-results`.
+</Gotcha>
+
+<Gotcha kind="reliability" title="A small model searches, then answers without the tool">
+`llama3.2:3b` on Ollama found `checkStock` and answered without calling it in 5 runs out of 5. A system-message suffix telling it
+to call what it found changed nothing. Given all ten tools, it called `checkStock` 3 times out of 3. When the search found nothing,
+it still answered "out of stock". Test that the tool ran, as `SupportChatIT` does, and use a model that finishes the lookup. The
+27B model did in every recorded request.
+</Gotcha>
+
+<Gotcha kind="reliability" title="The descriptions are the search">
+Every index matches the model's query against tool names and descriptions. Asked when the PB-200 would be back in stock,
+`llama3.2:3b` searched for a restock date. Lucene returned only `findOrder`, because the stock tool's description says "next
+delivery". Write descriptions in the words customers and models use, and keep names and descriptions distinct.
+</Gotcha>
+
+<Gotcha kind="security" title="Every tool is one search away">
+Tool search hides tool definitions from the prompt. It doesn't take tools away from the model. A model that searches for
+"refund" gets `refundOrder`, whatever the system prompt says. Keep tools that change things behind the checks Module 5 builds:
+the customer from the tool context, and confirmation before anything happens.
+</Gotcha>
+
+<Gotcha kind="migration" title="Written against a release candidate">
+`DecisionToolIndex` is new in Spring AI 2.1, and this lesson was checked against 2.1.0-RC2. The default session key is the value
+of `ChatMemory.CONVERSATION_ID`, which 2.1 deprecates for removal, so the app sets its own. Names and defaults can still change
+before the release. The lesson moves to the release when it's out.
+</Gotcha>
+
+## Recap
+
+- `tool-search-advisor.enabled: true` sends the model `toolSearchTool` and adds the tools its searches find. Every request needs a
+  session id.
+- `regex` is the default, `lucene` scores, `vector` always returns the limit, and `decision` returns nothing below its
+  applicability threshold.
+- The model chooses how many tools a search returns. Bound it, or `max-results` is only a suggestion.
+- With a handful of tools, plain tool calling is cheaper. Measure before you switch.
+- With `d1-omni:600m` the decision index found no tool for any request, and `llama3.2:3b` didn't call the tools it found.

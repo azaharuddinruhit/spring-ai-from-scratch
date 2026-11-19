@@ -72,7 +72,8 @@ export const CURRICULUM: Module[] = [
     slug: '05-tools-mcp-agents',
     number: 5,
     title: 'Tool Calling, MCP & Agents',
-    summary: 'Letting the model call your Java methods, connecting MCP servers and clients, and agent workflow patterns.',
+    summary:
+      'Letting the model call your Java methods, connecting MCP servers and clients, agent workflow patterns, and searching a large tool catalogue.',
     lessons: [
       { slug: 'tool-calling', title: 'Tool Calling & ToolCallingAdvisor' },
       { slug: 'model-context-protocol', title: 'Model Context Protocol (MCP)' },

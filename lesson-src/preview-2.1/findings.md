@@ -162,6 +162,56 @@ with a 27B Qwen 3 reasoning model. Checked 2026-11-19 by running the probes in `
   With the default threshold, `d1-omni:600m` found no tool for any request, and its best tool was right once in three. Each
   search took about 1.5 s.
 
+## Lesson 5.4 tool search (bytecode, `ToolSearchFactsProbe`, `ToolSearchRecordingProbe`, `ToolSearchWiringTest`, `SupportChatIT`)
+
+- 2.0.2 already had `ToolSearchToolCallingAdvisor` with the regex, Lucene and vector indexes; 2.1 adds `DecisionToolIndex`.
+- Auto-configuration: `spring.ai.chat.client.tool-search-advisor.enabled` (default false) replaces the `ToolCallingAdvisor.Builder`
+  bean, so every auto-configured `ChatClient` searches (order `HIGHEST_PRECEDENCE + 300`, like `ToolCallingAdvisor`).
+  `tool-index-type` defaults to `regex` (the only `matchIfMissing`); each index bean is `@ConditionalOnMissingBean(ToolIndex)`, so
+  an app's own `ToolIndex` bean wins. `vector` needs a `VectorStore` bean, `decision` a `DecisionModel` bean. Other defaults:
+  `max-results` unset, `session-id-key-name` `chat_memory_conversation_id` (the value of `ChatMemory.CONVERSATION_ID`, deprecated
+  for removal in 2.1), `reference-tool-name-accumulation` true, `lucene.min-score-threshold` 0.25, `decision.applicability-threshold`
+  0.5, `decision.minimum-relevance` 0, `eviction.lru-max-sessions` 1000.
+- The advisor indexes the request's tools per session (re-indexing when their names or descriptions change), sends only
+  `toolSearchTool` plus a system-prompt suffix ("You have access to a special tool called `toolSearchTool`...") on the first call,
+  and adds the tools named in earlier `toolSearchTool` results to later calls. A new request starts again with `toolSearchTool`
+  only, even in the same session (seen with a scripted model). A request without the session key fails with
+  `IllegalArgumentException: context must contain a non-null value for '<key>'`.
+- `toolSearchTool(query, maxResults, categoryFilter)`: the model's `maxResults` wins; the advisor's `max-results` is used only when
+  the model leaves it out, and the indexes then fall back to 10. Lucene throws `IllegalArgumentException: numHits must be > 0` for
+  `maxResults` 0 or below; the exception message becomes the tool result, the advisor parses it as a JSON list and the request fails
+  with `IllegalStateException: Conversion from JSON to java.util.List<java.lang.String> failed` (seen once with llama3.2:3b,
+  reproduced with a scripted model). The lesson's `BoundedToolIndex` clamps every search to 1..max-results.
+- Indexes: regex drops about 95 stop words, ORs the rest into a case-insensitive pattern (200 characters at most) over name and
+  description; Lucene uses `StandardAnalyzer` over name and description with a 0.25 minimum score and logs every hit at INFO
+  (`Score: 1.64, name: checkStock`); vector embeds name and description into the `VectorStore` (3.3 s for ten tools with
+  nomic-embed-text) and has no threshold, so it always returns the limit; `VectorToolIndex` ignores `categoryFilter` with a WARN.
+- `DecisionToolIndex` with several tools makes one decision call: `best_tool` (a `ChoiceQuestion` over the tools) and
+  `any_tool_applies`. Below the threshold (`isYes`, inclusive) it returns nothing; otherwise the chosen tool and every other
+  option with probability above 0 and at least `minimum-relevance`, up to the limit. One tool: a single yes/no question.
+- `d1-omni:600m` as the decision model, ten tools: `any_tool_applies` was 0.07–0.31 for every query (the weather questions
+  0.19–0.29, above most real requests), so at 0.5 it returned no tool for any request. The best tool favoured the first listed
+  tool: reversing the list changed it for 5 of 12 queries (`findOrder` won "cancel order" and "return item" when it came first).
+  The same query scored differently between runs (0.170, 0.234, 0.165). Each search took about 2 s (10 s for the first).
+- Recording (`probes/tool-search-recording.json`): six requests through the 27B Qwen 3 model, each index, and once without tool
+  search (all ten tools on every call). Regex, Lucene and vector found the tools all five shop requests needed and the model
+  answered from their results (for the kettle it looked the order up first, saw that the stub order holds a blender and asked
+  which order the kettle came from; without search it started the return straight away). The decision index found nothing in 26
+  searches and the model told customers the system was unavailable. The first call costs about
+  573 prompt tokens with search and 1,290 with all ten tools, but searches without a limit returned 5–10 tools and added a call:
+  totals over the six requests were 17,171 prompt tokens without search, 22,117 regex, 23,399 Lucene, 21,886 vector. With
+  `max-results: 3` (`probes/tool-search-max3.json`), Lucene took 15,780 and 17 calls (12 without search).
+- The model once sent the tool name `"toolSearchTool` (a stray quote); the request failed with `No ToolCallback found for tool name`
+  (`probes/tool-search-malformed-name.json`).
+- llama3.2:3b on Ollama's `/v1`: with tool search it searched (Lucene found `checkStock`) and answered without calling it in 5 of 5
+  runs; a `system-message-suffix` telling it to call the tool it found changed nothing (0 of 5); with all ten tools it called
+  `checkStock` 3 of 3. With the decision profile the search found nothing and it still answered "out of stock". `SupportChatIT`
+  therefore verifies the tool call with a Mockito spy; it passed 3 of 3 against the 27B model. Asked "When will the PB-200 be back
+  in stock?", it searched for a restock date and Lucene returned only `findOrder` (the stock tool's description says "next
+  delivery", not "restock").
+- The lesson's build needs `spring-ai-starter-model-openai`, `spring-ai-starter-model-ollama` (the decision profile) and
+  `spring-ai-starter-tool-search-advisor` (which brings Lucene); all its tests pass on that classpath.
+
 ## Message parts (`PartsFactsProbe`, through `probes/logging-proxy.py`)
 
 - `OpenAiChatModel` against the OpenAI-compatible server: a tool-call turn comes back as `[ReasoningPart, ToolCallPart]`, finish

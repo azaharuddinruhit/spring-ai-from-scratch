@@ -1,0 +1,23 @@
+# Run with --spring.profiles.active=decision to let a decision model pick the tools.
+spring:
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      decision:
+        model: d1-omni:600m
+      init:
+        pull-model-strategy: when_missing
+        chat:
+          include: false
+        embedding:
+          include: false
+        decision:
+          include: true
+    chat:
+      client:
+        tool-search-advisor:
+          tool-index-type: decision
+          decision:
+            # The default. d1-omni:600m never scored a recorded search above 0.25, so at 0.5 it found no tool for anything;
+            # measure your decision model on your own requests before you switch.
+            applicability-threshold: 0.5

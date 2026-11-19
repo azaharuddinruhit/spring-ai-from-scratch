@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: support
+  ai:
+    model:
+      chat: openai
+      # The OpenAI starter also adds embedding and decision models: this app embeds nothing, and decides with Ollama's.
+      embedding: none
+      decision: ollama
+    openai:
+      # Any OpenAI-compatible server. Ollama's is http://localhost:11434/v1, which ignores the key.
+      base-url: http://localhost:11434/v1
+      api-key: ${OPENAI_API_KEY:unused}
+      chat:
+        # llama3.2:3b runs anywhere, but with tool search it found the right tool and then answered without calling it.
+        # The lesson's recordings and SupportChatIT used a 27B model; use one that calls the tools it finds.
+        model: llama3.2:3b
+    chat:
+      client:
+        tool-search-advisor:
+          enabled: true
+          tool-index-type: lucene
+          # Spring AI uses it only when the model doesn't say how many tools it wants; BoundedToolIndex makes it a limit.
+          max-results: 3
+          # The default key is ChatMemory.CONVERSATION_ID, which 2.1 deprecates for removal.
+          session-id-key-name: support_session_id

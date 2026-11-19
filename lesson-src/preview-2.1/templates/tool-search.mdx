@@ -1,0 +1,213 @@
+---
+description: Send the model one search tool instead of every tool, compare the regex, Lucene, vector and decision indexes on recorded requests, and bound what a search returns.
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import ToolSearchLab from '@/components/islands/ToolSearchLab';
+import ProjectTree from '@/components/ProjectTree.astro';
+import { buildGradle } from '@/data/snippets';
+import { PREVIEW_STACK } from '@/data/versions';
+
+**You'll need:** an OpenAI-compatible chat model that calls tools; this lesson's recordings used a 27B Qwen 3 reasoning model.
+For the decision profile, Ollama with `d1-omni:600m`. Lesson 2.3 introduces decision models. This lesson is its own small project.
+
+Every tool definition goes with every model call. This lesson's ten tools cost about 720 prompt tokens more per call than a
+single search tool, and a catalogue of a hundred would cost ten times that, while making it harder for the model to pick the
+right one.
+`ToolSearchToolCallingAdvisor` sends the model a single `toolSearchTool` instead and adds the tools its searches find. Spring AI
+2.0 already had it with regex, Lucene and vector indexes; 2.1 adds `DecisionToolIndex`, which asks a decision model which tool
+fits. This lesson runs six customer requests through all four indexes and through plain tool calling, then sets the app up from
+what we measured.
+
+## 1. Spring mental model
+
+Tool search is a lazy lookup, like resolving a bean by name only when the code asks for it: the model starts with a directory
+and looks up the tools it needs.
+
+<Mermaid
+  caption="One request with tool search: three model calls instead of two."
+  code={`
+sequenceDiagram
+  participant C as ChatClient
+  participant A as ToolSearchToolCallingAdvisor
+  participant I as ToolIndex
+  participant M as Chat model
+  C->>A: question, ten tools, session id
+  A->>I: index the ten tools for this session
+  A->>M: call 1: toolSearchTool only
+  M->>A: toolSearchTool("track order status")
+  A->>I: search
+  I-->>A: findOrder, applyVoucher, cancelOrder
+  A->>M: call 2: toolSearchTool + the three tools found
+  M->>A: findOrder("A-1042")
+  A->>M: call 3: the tool result
+  M-->>C: the answer
+`}
+/>
+
+`spring.ai.chat.client.tool-search-advisor.enabled: true` replaces the auto-configured `ToolCallingAdvisor.Builder`, so every
+`ChatClient` built from the injected builder searches. `tool-index-type` picks the index:
+
+| Index | How it matches the model's query | Cut-off | Needs |
+| --- | --- | --- | --- |
+| `regex` (default) | the words minus stop words, as a case-insensitive pattern over names and descriptions | any match | nothing |
+| `lucene` | full-text scoring over names and descriptions | score 0.25 | nothing (Lucene comes with the starter) |
+| `vector` | embedding similarity in a `VectorStore` | none | a `VectorStore` bean |
+| `decision` | one decision-model call: the best tool, and whether any tool applies | applicability 0.5 | a `DecisionModel` bean |
+
+These rules come from the 2.1.0-RC2 classes and from running them:
+
+- The advisor keeps one index per session and reads the session from the request context, under
+  `chat_memory_conversation_id` unless you set `session-id-key-name`. A request without it fails with
+  `IllegalArgumentException: context must contain a non-null value for 'chat_memory_conversation_id'`.
+- Every request starts again with `toolSearchTool` alone, even in the same session. Tools found earlier come back only when the
+  conversation history that named them is part of the prompt.
+- The model chooses `maxResults`. The advisor's `max-results` is used only when the model leaves it out, and without either the
+  indexes return up to 10 tools.
+- `DecisionToolIndex` returns nothing unless `any_tool_applies` reaches `applicability-threshold`. If it does, it returns every
+  tool with a probability above zero, best first, up to the limit.
+
+## 2. Interactive sandbox
+
+<ToolSearchLab client:visible />
+
+The sandbox shows recordings: each request answered once per index, once with Lucene limited to three results, and once with all
+ten tools and no search. The chat model was a 27B Qwen 3 reasoning model; the decision index used `d1-omni:600m`. Another model
+will search and answer differently.
+
+Things to try:
+
+- Keep "Where is my order A-1042?" on **Lucene, 3 results**: the model searches, calls `findOrder`, then answers, in 2,616 prompt
+  tokens against 2,693 for sending all ten tools. Switch to **Vector**: with no cut-off and no limit it returned all ten tools,
+  and the request cost 4,079.
+- Pick **Decision**. It found no tool in three searches, and the model told the customer the order system was unavailable. Drag
+  the threshold down: every recorded search scored between 0.12 and 0.24, and the weather question scored higher than the shop
+  questions.
+- Pick the kettle request and compare **No tool search** with the indexes. Given every tool, the model started a return at once.
+  With search it looked the order up first, saw that the order holds a blender (the stub data says so) and asked which order the
+  kettle came from.
+- Pick the weather question. Regex finds nothing; Lucene returns four unrelated tools. The model declined either way.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+<ProjectTree />
+
+The chat model goes through the OpenAI starter, so any OpenAI-compatible server works. The Ollama starter is there for the
+decision profile, and the tool search starter brings the advisor, its auto-configuration and Lucene:
+
+<CodeFile title="build.gradle" lang="groovy" lines="3,22,28,29,30" code={buildGradle(['spring-ai-starter-model-openai', 'spring-ai-starter-model-ollama', 'spring-ai-starter-tool-search-advisor'], PREVIEW_STACK)} />
+
+The configuration turns tool search on with Lucene and three tools per search, and sets the app's own session key:
+
+<CodeFile title="src/main/resources/application.yaml">
+@@CODE main-resources/application.yaml | decision: ollama; base-url: http://localhost:11434/v1; enabled: true; tool-index-type; max-results; session-id-key-name@@
+</CodeFile>
+
+The decision profile switches the index. It is there so you can measure your own decision model, not to run as it is:
+
+<CodeFile title="src/main/resources/application-decision.yaml">
+@@CODE main-resources/application-decision.yaml | model: d1-omni:600m; tool-index-type: decision; applicability-threshold@@
+</CodeFile>
+
+The ten tools answer from fixed data, so the recordings show which tool ran. Their descriptions are what every index searches:
+
+<CodeFile title="src/main/java/com/example/support/tools/SupportTools.java">
+@@CODE main/com/example/support/tools/SupportTools.java | @Tool\(description = "Look up; @Tool\(description = "Check whether a product@@
+</CodeFile>
+
+The chat client gets all ten tools; the advisor decides which the model sees. A bean post-processor wraps whichever index the
+auto-configuration created, so `tool-index-type` still chooses it:
+
+<CodeFile title="src/main/java/com/example/support/chat/ChatConfig.java">
+@@CODE main/com/example/support/chat/ChatConfig.java | \.defaultTools\(tools\); static BeanPostProcessor; new BoundedToolIndex@@
+</CodeFile>
+
+`BoundedToolIndex` turns `max-results` into a limit. It also stops a request for zero tools from reaching Lucene, which throws on
+it:
+
+<CodeFile title="src/main/java/com/example/support/chat/BoundedToolIndex.java">
+@@CODE main/com/example/support/chat/BoundedToolIndex.java | int limit@@
+</CodeFile>
+
+The service passes the session id on every request. Use the conversation's id, so the index is built once per conversation:
+
+<CodeFile title="src/main/java/com/example/support/chat/SupportChatService.java">
+@@CODE main/com/example/support/chat/SupportChatService.java | SESSION_ID = ; a.param\(SESSION_ID@@
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/SupportApplication.java">
+@@CODE main/com/example/support/SupportApplication.java | SpringBootApplication$@@
+</CodeFile>
+
+The wiring test replaces the chat model with a script: search, call the tool found, answer. It runs the real advisor and the
+Lucene index, so it pins what each call carries, the limit and the session check without any model server:
+
+<CodeFile title="src/test/java/com/example/support/chat/ToolSearchWiringTest.java">
+@@CODE test/com/example/support/chat/ToolSearchWiringTest.java | containsExactly\("toolSearchTool"\); hasSize\(4\); maxResults\\":0; withMessageContaining@@
+</CodeFile>
+
+The integration test asks the configured chat model a stock question. A plausible answer proves nothing, because a model can
+answer "out of stock" without any tool, so the test checks that `checkStock` ran:
+
+<CodeFile title="src/test/java/com/example/support/chat/SupportChatIT.java">
+@@CODE test/com/example/support/chat/SupportChatIT.java | @MockitoSpyBean; verify\(tools\)@@
+</CodeFile>
+
+## 4. Production gotchas & security
+
+<Gotcha kind="reliability" title="The decision index found no tool for any request">
+With `d1-omni:600m`, `any_tool_applies` scored 0.07 to 0.31 on every search we made, below the default 0.5, so the index returned
+nothing and the model told customers the system was down. No threshold would have worked: the weather questions scored higher
+than the shop questions. The best tool also leaned toward whichever tool came first. Reversing the tool order changed it for 5 of
+12 queries. Measure a decision model on your own requests before you switch to it.
+</Gotcha>
+
+<Gotcha kind="cost" title="Ten tools don't need a search">
+The first call costs about 573 prompt tokens with search and 1,290 with all ten tools, but a search adds a model call and returns
+tools of its own. Over the six recorded requests, sending every tool took 17,171 prompt tokens. Unlimited searches took 21,886 to
+23,399, and Lucene with three results 15,780. Tool search pays off with dozens of tools, and only when each search returns few.
+</Gotcha>
+
+<Gotcha kind="reliability" title="The model decides how many tools come back">
+The model passes `maxResults` itself, and `max-results` applies only when it doesn't. The model asked for 5 and 10 in the
+recordings. A smaller model once asked for none, and the Lucene index threw `numHits must be > 0`. The advisor then read the error
+message as a list of tool names and failed the request with `IllegalStateException`. `BoundedToolIndex` keeps every search
+between one and `max-results`.
+</Gotcha>
+
+<Gotcha kind="reliability" title="A small model searches, then answers without the tool">
+`llama3.2:3b` on Ollama found `checkStock` and answered without calling it in 5 runs out of 5. A system-message suffix telling it
+to call what it found changed nothing. Given all ten tools, it called `checkStock` 3 times out of 3. When the search found nothing,
+it still answered "out of stock". Test that the tool ran, as `SupportChatIT` does, and use a model that finishes the lookup. The
+27B model did in every recorded request.
+</Gotcha>
+
+<Gotcha kind="reliability" title="The descriptions are the search">
+Every index matches the model's query against tool names and descriptions. Asked when the PB-200 would be back in stock,
+`llama3.2:3b` searched for a restock date. Lucene returned only `findOrder`, because the stock tool's description says "next
+delivery". Write descriptions in the words customers and models use, and keep names and descriptions distinct.
+</Gotcha>
+
+<Gotcha kind="security" title="Every tool is one search away">
+Tool search hides tool definitions from the prompt. It doesn't take tools away from the model. A model that searches for
+"refund" gets `refundOrder`, whatever the system prompt says. Keep tools that change things behind the checks Module 5 builds:
+the customer from the tool context, and confirmation before anything happens.
+</Gotcha>
+
+<Gotcha kind="migration" title="Written against a release candidate">
+`DecisionToolIndex` is new in Spring AI 2.1, and this lesson was checked against 2.1.0-RC2. The default session key is the value
+of `ChatMemory.CONVERSATION_ID`, which 2.1 deprecates for removal, so the app sets its own. Names and defaults can still change
+before the release. The lesson moves to the release when it's out.
+</Gotcha>
+
+## Recap
+
+- `tool-search-advisor.enabled: true` sends the model `toolSearchTool` and adds the tools its searches find. Every request needs a
+  session id.
+- `regex` is the default, `lucene` scores, `vector` always returns the limit, and `decision` returns nothing below its
+  applicability threshold.
+- The model chooses how many tools a search returns. Bound it, or `max-results` is only a suggestion.
+- With a handful of tools, plain tool calling is cheaper. Measure before you switch.
+- With `d1-omni:600m` the decision index found no tool for any request, and `llama3.2:3b` didn't call the tools it found.

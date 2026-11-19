@@ -7,6 +7,7 @@ import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
 import ToolLoopLab from '@/components/islands/ToolLoopLab';
 import ProjectTree from '@/components/ProjectTree.astro';
+import { lessonHref } from '@/lib/course';
 
 The support assistant answers from the knowledge base, but it can't see a customer's orders. "Where is my order 1042?" needs
 data that lives in your database. With tool calling, the model asks your application to run a method, reads the result and then
@@ -227,7 +228,8 @@ what a real question takes, and keep tool results small: return a record with th
 Every tool definition goes with every model call. With dozens of tools, consider `ToolSearchToolCallingAdvisor`
 (`spring-ai-starter-tool-search-advisor`, enabled with `spring.ai.chat.client.tool-search-advisor.enabled=true`). It sends only a
 `toolSearchTool` at first, then adds the tools the model's searches find. In our test, a scripted model searched for "order" and the next
-call carried `findOrder` and `toolSearchTool`. It needs `ChatMemory.CONVERSATION_ID` on the request, and fails without it.
+call carried `findOrder` and `toolSearchTool`. It needs `ChatMemory.CONVERSATION_ID` on the request, and fails without it. The
+<a href={lessonHref('05-tools-mcp-agents/tool-search')}>Tool Search</a> preview lesson measures its indexes on Spring AI 2.1.
 </Gotcha>
 
 <Gotcha kind="security" title="Keep tools that change things out of the model's reach">

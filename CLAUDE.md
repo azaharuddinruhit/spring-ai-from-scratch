@@ -163,6 +163,17 @@ passages scored at or above `minimumScore`, has no `topK` by default, and on tim
 still counted in `topK`). With `d1-omni:600m` the defaults kept nearly every passage as CONFLICTING and the injection question missed
 both planted passages; the lesson sets contradiction 1.0, reranker top 3 at 0.4, fail closed. `ScreeningLab` replays
 `src/data/recorded-rag.json` (from `probes/rag-to-sandbox.py`) with the filter's rule order; update them together.
+Tool search (Lesson 5.4, verified on RC2; 2.0.2 had the advisor and the regex, Lucene and vector indexes, 2.1 adds
+`DecisionToolIndex`): `tool-search-advisor.enabled` replaces the `ToolCallingAdvisor.Builder`; `tool-index-type` defaults to regex;
+the session key defaults to `chat_memory_conversation_id` (`ChatMemory.CONVERSATION_ID`, deprecated for removal) and a missing one
+throws `IllegalArgumentException`; every request starts with `toolSearchTool` only; the model's `maxResults` wins over `max-results`
+(fallback 10), and 0 makes Lucene throw and the advisor fail the request (the app's `BoundedToolIndex` clamps it); Lucene drops
+scores under 0.25 and logs every hit at INFO; vector has no cut-off. `DecisionToolIndex` asks `best_tool` and `any_tool_applies`,
+returns nothing below `applicability-threshold` (0.5) and otherwise every option above 0; with `d1-omni:600m` it scored 0.07-0.31
+and found no tool, favoured the first listed tool and varied between runs. With ten tools, unlimited searches cost more prompt
+tokens than sending all tools (17,171 vs 21,886-23,399 over six requests; Lucene with 3 results 15,780). `llama3.2:3b` found
+the tool and didn't call it (0 of 5), so `SupportChatIT` checks the call with a spy and passed with the 27B model. `ToolSearchLab`
+replays `src/data/recorded-tool-search.json` (from `probes/tool-search-to-sandbox.py`); update them together.
 Observability (Module 6 Lesson 2, verified): `spring-boot-starter-opentelemetry` alone exports traces and metrics over OTLP (no
 actuator); sampling defaults to 0.1; traces export only once `management.opentelemetry.tracing.export.otlp.endpoint` is set;
 spans are `spring.ai.chat.client`, `spring.ai.advisor`, `gen_ai.client.operation`, `db.vector.client.operation`, `spring.ai.tool`;

@@ -1,0 +1,26 @@
+[
+  {
+    "request": "I moved house. Can order A-1077 go to 12 Elm Road, Leeds instead?",
+    "index": "lucene",
+    "error": "IllegalStateException: No ToolCallback found for tool name: \"toolSearchTool",
+    "millis": 4741,
+    "calls": [
+      {
+        "millis": 4705,
+        "toolsSent": [
+          "toolSearchTool"
+        ],
+        "toolCalls": [
+          {
+            "arguments": "{\"query\": \"update order shipping address customer order address change\"}",
+            "name": "\"toolSearchTool"
+          }
+        ],
+        "text": "",
+        "promptTokens": 585,
+        "completionTokens": 88
+      }
+    ],
+    "searches": []
+  }
+]
