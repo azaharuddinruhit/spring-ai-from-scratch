@@ -1,0 +1,324 @@
+stty: /dev/tty: No such device or address
+09:43:54.001 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.example.support.SupportApplication for test class com.example.support.TraceRecordingProbe
+09:43:54.159 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.example.support.SupportApplication for test class com.example.support.TraceRecordingProbe
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.2)
+
+2026-11-19T09:43:54.961+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] c.example.support.TraceRecordingProbe    : Starting TraceRecordingProbe using Java 25.0.1 with PID 2484 (started by Ruhit in D:\Projects\zombie\spring-ai-from-scratch\lesson-src\module-6)
+2026-11-19T09:43:54.966+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] c.example.support.TraceRecordingProbe    : The following 1 profile is active: "it"
+Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (C:\Users\ruhit\.m2\repository\net\bytebuddy\byte-buddy-agent\1.18.15\byte-buddy-agent-1.18.15.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+Java HotSpot(TM) 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+2026-11-19T09:43:59.711+06:00  WARN 2484 --- [support-assistant] [           main] [                                                 ] trationDelegate$BeanPostProcessorChecker : Bean 'org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerAutoConfiguration' of type [org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerAutoConfiguration] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [serverAnnotatedMethodBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-11-19T09:43:59.924+06:00  WARN 2484 --- [support-assistant] [           main] [                                                 ] trationDelegate$BeanPostProcessorChecker : Bean 'serverAnnotatedBeanRegistry' of type [org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerAutoConfiguration$ServerMcpAnnotatedBeans] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [serverAnnotatedMethodBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-11-19T09:43:59.941+06:00  WARN 2484 --- [support-assistant] [           main] [                                                 ] trationDelegate$BeanPostProcessorChecker : Bean 'spring.ai.mcp.server.annotation-scanner-org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerProperties' of type [org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerProperties] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [serverAnnotatedMethodBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-11-19T09:44:00.088+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] org.testcontainers.images.PullPolicy     : Image pull policy will be performed by: DefaultPullPolicy()
+2026-11-19T09:44:00.089+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] o.t.utility.ImageNameSubstitutor         : Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+2026-11-19T09:44:00.106+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] org.testcontainers.DockerClientFactory   : Testcontainers version: 2.0.5
+2026-11-19T09:44:00.580+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] o.t.d.DockerClientProviderStrategy       : Loaded org.testcontainers.dockerclient.NpipeSocketClientProviderStrategy from ~/.testcontainers.properties, will try it first
+2026-11-19T09:44:01.473+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] o.t.d.DockerClientProviderStrategy       : Found Docker environment with local Npipe socket (npipe:////./pipe/docker_engine)
+2026-11-19T09:44:01.474+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] org.testcontainers.DockerClientFactory   : Docker host IP address is 127.0.0.1
+2026-11-19T09:44:01.497+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] org.testcontainers.DockerClientFactory   : Connected to docker: 
+  Server Version: 29.8.2
+  API Version: 1.56
+  Operating System: Docker Desktop
+  Total Memory: 7811 MB
+  Labels: 
+    com.docker.desktop.address=npipe://\\.\pipe\docker_cli
+2026-11-19T09:44:01.508+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] org.testcontainers.DockerClientFactory   : Checking the system...
+2026-11-19T09:44:01.509+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] org.testcontainers.DockerClientFactory   : ✔︎ Docker server version should be at least 1.6.0
+2026-11-19T09:44:01.632+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] tc.ollama/ollama:0.40.16                 : Creating container for image: ollama/ollama:0.40.16
+2026-11-19T09:44:01.833+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] o.t.utility.RegistryAuthLocator          : Credential helper/store (docker-credential-desktop) does not have credentials for https://index.docker.io/v1/
+2026-11-19T09:44:02.047+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] tc.ollama/ollama:0.40.16                 : Reusing container with ID: 6429f91d5b910129c77948db88178fb492aadbfc331643b37faf6f223e6fe188 and hash: 56d44480b10bd2a530f3b857e11c72eacf63a5c0
+2026-11-19T09:44:02.048+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] tc.ollama/ollama:0.40.16                 : Reusing existing container (6429f91d5b910129c77948db88178fb492aadbfc331643b37faf6f223e6fe188) and not creating a new one
+2026-11-19T09:44:02.278+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] tc.ollama/ollama:0.40.16                 : Container ollama/ollama:0.40.16 started in PT0.6461554S
+2026-11-19T09:44:02.278+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] tc.pgvector/pgvector:pg17                : Creating container for image: pgvector/pgvector:pg17
+2026-11-19T09:44:02.279+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] tc.testcontainers/ryuk:0.14.0            : Creating container for image: testcontainers/ryuk:0.14.0
+2026-11-19T09:44:02.378+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] tc.testcontainers/ryuk:0.14.0            : Container testcontainers/ryuk:0.14.0 is starting: 318bcb746254c67aa8b7573a155f640531612f9bdcf1689da6cab5d34d74d6e9
+2026-11-19T09:44:02.815+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] tc.testcontainers/ryuk:0.14.0            : Container testcontainers/ryuk:0.14.0 started in PT0.5355109S
+2026-11-19T09:44:02.951+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] tc.pgvector/pgvector:pg17                : Container pgvector/pgvector:pg17 is starting: 75de98726ce8f3ca6e33957ca51c6422737ae9ad78976c8cd9b6eace3fa01786
+2026-11-19T09:44:04.939+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] tc.pgvector/pgvector:pg17                : Container pgvector/pgvector:pg17 started in PT2.6611348S
+2026-11-19T09:44:04.940+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] tc.pgvector/pgvector:pg17                : Container is started (JDBC URL: jdbc:postgresql://127.0.0.1:59641/test?loggerLevel=OFF)
+2026-11-19T09:44:05.697+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] i.m.c.instrument.push.PushMeterRegistry  : Publishing metrics for OtlpMeterRegistry every 1m to http://localhost:4318/v1/metrics with resource attributes {service.name=support-assistant}
+2026-11-19T09:44:05.820+06:00  WARN 2484 --- [support-assistant] [           main] [                                                 ] m.c.o.a.ChatObservationAutoConfiguration : You have enabled logging out the prompt content with the risk of exposing sensitive or private information. Please, be careful!
+2026-11-19T09:44:05.824+06:00  WARN 2484 --- [support-assistant] [           main] [                                                 ] m.c.o.a.ChatObservationAutoConfiguration : You have enabled logging out the completion content with the risk of exposing sensitive or private information. Please, be careful!
+2026-11-19T09:44:05.832+06:00  WARN 2484 --- [support-assistant] [           main] [                                                 ] o.s.a.m.t.a.ToolCallingAutoConfiguration : You have enabled the inclusion of the tool call arguments and result in the observations, with the risk of exposing sensitive or private information. Please, be careful!
+2026-11-19T09:44:07.476+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-11-19T09:44:07.781+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@6f2d0d25
+2026-11-19T09:44:07.785+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-11-19T09:44:08.271+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] o.s.a.v.pgvector.PgVectorStore           : Using the vector table name: vector_store. Is empty: false
+2026-11-19T09:44:08.275+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] o.s.a.v.pgvector.PgVectorStore           : Initializing PGVectorStore schema for table: vector_store in schema: public
+2026-11-19T09:44:08.275+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] o.s.a.v.pgvector.PgVectorStore           : vectorTableValidationsEnabled false
+2026-11-19T09:44:09.659+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] o.s.a.m.s.c.a.McpServerAutoConfiguration : Enable tools capabilities, notification: true
+2026-11-19T09:44:09.670+06:00  WARN 2484 --- [support-assistant] [           main] [                                                 ] o.s.a.m.s.c.a.ToolCallbackUtils          : Found MCP Clients. The MCP Client tools will not be exposed by the MCP Server. If you would like to expose the tools, set spring.ai.mcp.server.expose-mcp-client-tools=true.
+2026-11-19T09:44:09.680+06:00  WARN 2484 --- [support-assistant] [           main] [                                                 ] o.s.a.m.a.p.tool.SyncMcpToolProvider     : No tool methods found in the provided tool objects: []
+2026-11-19T09:44:09.680+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] o.s.a.m.s.c.a.McpServerAutoConfiguration : Enable resources capabilities, notification: true
+2026-11-19T09:44:09.684+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] o.s.a.m.s.c.a.McpServerAutoConfiguration : Enable resources templates capabilities, notification: true
+2026-11-19T09:44:09.684+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] o.s.a.m.s.c.a.McpServerAutoConfiguration : Enable prompts capabilities, notification: true
+2026-11-19T09:44:09.684+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] o.s.a.m.s.c.a.McpServerAutoConfiguration : Enable completions capabilities
+2026-11-19T09:44:10.391+06:00  WARN 2484 --- [support-assistant] [           main] [                                                 ] o.s.a.m.a.p.s.SyncMcpSamplingProvider    : No sampling methods found
+2026-11-19T09:44:10.396+06:00  WARN 2484 --- [support-assistant] [           main] [                                                 ] o.s.a.m.a.p.e.SyncMcpElicitationProvider : No elicitation methods found
+2026-11-19T09:44:10.472+06:00  INFO 2484 --- [support-assistant] [           main] [                                                 ] c.example.support.TraceRecordingProbe    : Started TraceRecordingProbe in 16.195 seconds (process running for 21.401)
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::loadLibrary has been called by io.netty.util.internal.NativeLibraryUtil in an unnamed module (file:/C:/Users/ruhit/.m2/repository/io/netty/netty-common/4.2.19.Final/netty-common-4.2.19.Final.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+2026-11-19T09:44:12.012+06:00  WARN 2484 --- [support-assistant] [           main] [                                                 ] c.e.support.mcp.BestEffortToolCallbacks  : MCP tools unavailable, answering without them: java.lang.RuntimeException: Client failed to initialize listing tools
+2026-11-19T09:44:15.645+06:00  INFO 2484 --- [support-assistant] [           main] [0edf61f6d52403032d23b8d9879a9ef1-477f3cddd4f301e3] .o.ChatModelCompletionObservationHandler : Chat Model Completion:
+[]
+2026-11-19T09:44:15.646+06:00  INFO 2484 --- [support-assistant] [           main] [0edf61f6d52403032d23b8d9879a9ef1-477f3cddd4f301e3] ChatModelPromptContentObservationHandler : Chat Model Prompt Content:
+["You are the support assistant for Acme Cloud.
+Answer questions about policies, prices and shipping only from the context you are given. If it
+doesn't hold the answer, say you don't know and offer to pass the question to a support agent.
+Use the tools for questions about the customer's own orders and refunds.
+Answer in English.", "Where is my order 1042?"]
+2026-11-19T09:44:15.664+06:00  WARN 2484 --- [support-assistant] [           main] [0edf61f6d52403032d23b8d9879a9ef1-42fb887659b803c5] c.example.support.cost.TokenCostMeter    : No price for model llama3.2:3b, so its calls are missing from support.ai.cost
+2026-11-19T09:44:18.735+06:00 ERROR 2484 --- [support-assistant] [alhost:4318/...] [                                                 ] i.o.exporter.internal.http.HttpExporter  : Failed to export spans. The request could not be executed.
+
+java.net.ConnectException: Failed to connect to localhost/[0:0:0:0:0:0:0:1]:4318
+	at okhttp3.internal.connection.RealConnection.connectSocket(RealConnection.kt:297) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.connection.RealConnection.connect(RealConnection.kt:207) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.connection.ExchangeFinder.findConnection(ExchangeFinder.kt:226) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.connection.ExchangeFinder.findHealthyConnection(ExchangeFinder.kt:106) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.connection.ExchangeFinder.find(ExchangeFinder.kt:74) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.connection.RealCall.initExchange$okhttp(RealCall.kt:255) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.connection.ConnectInterceptor.intercept(ConnectInterceptor.kt:32) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:109) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.cache.CacheInterceptor.intercept(CacheInterceptor.kt:95) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:109) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.http.BridgeInterceptor.intercept(BridgeInterceptor.kt:83) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:109) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(RetryAndFollowUpInterceptor.kt:76) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:109) ~[okhttp-4.12.0.jar:na]
+	at io.opentelemetry.exporter.sender.okhttp.internal.RetryInterceptor.intercept(RetryInterceptor.java:96) ~[opentelemetry-exporter-sender-okhttp-1.62.0.jar:1.62.0]
+	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:109) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp(RealCall.kt:201) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:517) ~[okhttp-4.12.0.jar:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+	Suppressed: java.net.ConnectException: Failed to connect to localhost/127.0.0.1:4318
+		... 21 common frames omitted
+	Caused by: java.net.ConnectException: Connection refused: getsockopt
+		at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+		at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639)
+		at java.base/sun.nio.ch.NioSocketImpl.timedFinishConnect(NioSocketImpl.java:543)
+		at java.base/sun.nio.ch.NioSocketImpl.connect(NioSocketImpl.java:594)
+		at java.base/java.net.SocksSocketImpl.connect(SocksSocketImpl.java:284)
+		at java.base/java.net.Socket.connect(Socket.java:659)
+		at okhttp3.internal.platform.Platform.connectSocket(Platform.kt:128)
+		at okhttp3.internal.connection.RealConnection.connectSocket(RealConnection.kt:295)
+		... 20 common frames omitted
+Caused by: java.net.ConnectException: Connection refused: getsockopt
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method) ~[na:na]
+	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639) ~[na:na]
+	at java.base/sun.nio.ch.NioSocketImpl.timedFinishConnect(NioSocketImpl.java:543) ~[na:na]
+	at java.base/sun.nio.ch.NioSocketImpl.connect(NioSocketImpl.java:594) ~[na:na]
+	at java.base/java.net.SocksSocketImpl.connect(SocksSocketImpl.java:284) ~[na:na]
+	at java.base/java.net.Socket.connect(Socket.java:659) ~[na:na]
+	at okhttp3.internal.platform.Platform.connectSocket(Platform.kt:128) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.connection.RealConnection.connectSocket(RealConnection.kt:295) ~[okhttp-4.12.0.jar:na]
+	... 20 common frames omitted
+
+2026-11-19T09:44:19.557+06:00  INFO 2484 --- [support-assistant] [           main] [0edf61f6d52403032d23b8d9879a9ef1-ff8ff361592af25d] .o.ChatModelCompletionObservationHandler : Chat Model Completion:
+["Your order number 1042 is currently in the shipped status. The order was placed on November 2, 2026, and the total cost is $59.90. You can track the order using the tracking number 1Z999AA10123456784."]
+2026-11-19T09:44:19.557+06:00  INFO 2484 --- [support-assistant] [           main] [0edf61f6d52403032d23b8d9879a9ef1-ff8ff361592af25d] ChatModelPromptContentObservationHandler : Chat Model Prompt Content:
+["You are the support assistant for Acme Cloud.
+Answer questions about policies, prices and shipping only from the context you are given. If it
+doesn't hold the answer, say you don't know and offer to pass the question to a support agent.
+Use the tools for questions about the customer's own orders and refunds.
+Answer in English.", "Where is my order 1042?", "", ""]
+2026-11-19T09:44:19.557+06:00  WARN 2484 --- [support-assistant] [           main] [0edf61f6d52403032d23b8d9879a9ef1-870240a6322025e0] c.example.support.cost.TokenCostMeter    : No price for model llama3.2:3b, so its calls are missing from support.ai.cost
+2026-11-19T09:44:20.137+06:00  WARN 2484 --- [support-assistant] [           main] [                                                 ] c.e.support.mcp.BestEffortToolCallbacks  : MCP tools unavailable, answering without them: java.lang.RuntimeException: Client failed to initialize listing tools
+2026-11-19T09:44:30.894+06:00  INFO 2484 --- [support-assistant] [           main] [44f9ab9a86ced2f7a35211721c0270fb-865d2529705e08d1] .o.ChatModelCompletionObservationHandler : Chat Model Completion:
+["How long does it typically take for a refund to be processed and reach my bank account?"]
+2026-11-19T09:44:30.894+06:00  INFO 2484 --- [support-assistant] [           main] [44f9ab9a86ced2f7a35211721c0270fb-865d2529705e08d1] ChatModelPromptContentObservationHandler : Chat Model Prompt Content:
+["Given the following conversation history and a follow-up query, your task is to synthesize
+a concise, standalone query that incorporates the context from the history.
+Ensure the standalone query is clear, specific, and maintains the user's intent.
+
+Conversation history:
+USER: Where is my order 1042?
+ASSISTANT: Your order number 1042 is currently in the shipped status. The order was placed on November 2, 2026, and the total cost is $59.90. You can track the order using the tracking number 1Z999AA10123456784.
+USER: How long does a refund take to reach my card?
+
+Follow-up query:
+How long does a refund take to reach my card?
+
+Standalone query:
+"]
+2026-11-19T09:44:30.894+06:00  WARN 2484 --- [support-assistant] [           main] [44f9ab9a86ced2f7a35211721c0270fb-57487c611b718be0] c.example.support.cost.TokenCostMeter    : No price for model qwen2.5:1.5b, so its calls are missing from support.ai.cost
+2026-11-19T09:44:31.909+06:00 ERROR 2484 --- [support-assistant] [alhost:4318/...] [                                                 ] i.o.exporter.internal.http.HttpExporter  : Failed to export spans. The request could not be executed.
+
+java.net.ConnectException: Failed to connect to localhost/[0:0:0:0:0:0:0:1]:4318
+	at okhttp3.internal.connection.RealConnection.connectSocket(RealConnection.kt:297) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.connection.RealConnection.connect(RealConnection.kt:207) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.connection.ExchangeFinder.findConnection(ExchangeFinder.kt:226) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.connection.ExchangeFinder.findHealthyConnection(ExchangeFinder.kt:106) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.connection.ExchangeFinder.find(ExchangeFinder.kt:74) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.connection.RealCall.initExchange$okhttp(RealCall.kt:255) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.connection.ConnectInterceptor.intercept(ConnectInterceptor.kt:32) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:109) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.cache.CacheInterceptor.intercept(CacheInterceptor.kt:95) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:109) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.http.BridgeInterceptor.intercept(BridgeInterceptor.kt:83) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:109) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(RetryAndFollowUpInterceptor.kt:76) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:109) ~[okhttp-4.12.0.jar:na]
+	at io.opentelemetry.exporter.sender.okhttp.internal.RetryInterceptor.intercept(RetryInterceptor.java:96) ~[opentelemetry-exporter-sender-okhttp-1.62.0.jar:1.62.0]
+	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:109) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp(RealCall.kt:201) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:517) ~[okhttp-4.12.0.jar:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+	Suppressed: java.net.ConnectException: Failed to connect to localhost/127.0.0.1:4318
+		... 21 common frames omitted
+	Caused by: java.net.ConnectException: Connection refused: getsockopt
+		at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+		at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639)
+		at java.base/sun.nio.ch.NioSocketImpl.timedFinishConnect(NioSocketImpl.java:543)
+		at java.base/sun.nio.ch.NioSocketImpl.connect(NioSocketImpl.java:594)
+		at java.base/java.net.SocksSocketImpl.connect(SocksSocketImpl.java:284)
+		at java.base/java.net.Socket.connect(Socket.java:659)
+		at okhttp3.internal.platform.Platform.connectSocket(Platform.kt:128)
+		at okhttp3.internal.connection.RealConnection.connectSocket(RealConnection.kt:295)
+		... 20 common frames omitted
+Caused by: java.net.ConnectException: Connection refused: getsockopt
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method) ~[na:na]
+	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639) ~[na:na]
+	at java.base/sun.nio.ch.NioSocketImpl.timedFinishConnect(NioSocketImpl.java:543) ~[na:na]
+	at java.base/sun.nio.ch.NioSocketImpl.connect(NioSocketImpl.java:594) ~[na:na]
+	at java.base/java.net.SocksSocketImpl.connect(SocksSocketImpl.java:284) ~[na:na]
+	at java.base/java.net.Socket.connect(Socket.java:659) ~[na:na]
+	at okhttp3.internal.platform.Platform.connectSocket(Platform.kt:128) ~[okhttp-4.12.0.jar:na]
+	at okhttp3.internal.connection.RealConnection.connectSocket(RealConnection.kt:295) ~[okhttp-4.12.0.jar:na]
+	... 20 common frames omitted
+
+2026-11-19T09:44:38.565+06:00  INFO 2484 --- [support-assistant] [           main] [44f9ab9a86ced2f7a35211721c0270fb-5b413441f955f4c0] .o.ChatModelCompletionObservationHandler : Chat Model Completion:
+[]
+2026-11-19T09:44:38.565+06:00  INFO 2484 --- [support-assistant] [           main] [44f9ab9a86ced2f7a35211721c0270fb-5b413441f955f4c0] ChatModelPromptContentObservationHandler : Chat Model Prompt Content:
+["You are the support assistant for Acme Cloud.
+Answer questions about policies, prices and shipping only from the context you are given. If it
+doesn't hold the answer, say you don't know and offer to pass the question to a support agent.
+Use the tools for questions about the customer's own orders and refunds.
+Answer in English.", "Where is my order 1042?", "Your order number 1042 is currently in the shipped status. The order was placed on November 2, 2026, and the total cost is $59.90. You can track the order using the tracking number 1Z999AA10123456784.", "Context information is below.
+
+---------------------
+You can ask for a refund within 30 days of purchase. We send the money back to the card you paid with.Refunds reach your card 5 to 7 business days after we approve them. Your bank may take a little longer to show the credit.
+We ship every order within two business days. Standard delivery takes 3 to 5 business days inside the EU.Every shipped order has a tracking number. Open the order in your account to follow the parcel.
+---------------------
+
+Given the context information and no prior knowledge, answer the query.
+
+Follow these rules:
+
+1. If the answer is not in the context, just say that you don't know.
+2. Avoid statements like "Based on the context..." or "The provided information...".
+
+Query: How long does a refund take to reach my card?
+
+Answer:
+"]
+2026-11-19T09:44:38.565+06:00  WARN 2484 --- [support-assistant] [           main] [44f9ab9a86ced2f7a35211721c0270fb-28aa14d13b5407eb] c.example.support.cost.TokenCostMeter    : No price for model llama3.2:3b, so its calls are missing from support.ai.cost
+2026-11-19T09:44:43.298+06:00  INFO 2484 --- [support-assistant] [           main] [44f9ab9a86ced2f7a35211721c0270fb-89e0af10370dc950] .o.ChatModelCompletionObservationHandler : Chat Model Completion:
+["Refunds reach your card 5 to 7 business days after we approve them."]
+2026-11-19T09:44:43.298+06:00  INFO 2484 --- [support-assistant] [           main] [44f9ab9a86ced2f7a35211721c0270fb-89e0af10370dc950] ChatModelPromptContentObservationHandler : Chat Model Prompt Content:
+["You are the support assistant for Acme Cloud.
+Answer questions about policies, prices and shipping only from the context you are given. If it
+doesn't hold the answer, say you don't know and offer to pass the question to a support agent.
+Use the tools for questions about the customer's own orders and refunds.
+Answer in English.", "Where is my order 1042?", "Your order number 1042 is currently in the shipped status. The order was placed on November 2, 2026, and the total cost is $59.90. You can track the order using the tracking number 1Z999AA10123456784.", "Context information is below.
+
+---------------------
+You can ask for a refund within 30 days of purchase. We send the money back to the card you paid with.Refunds reach your card 5 to 7 business days after we approve them. Your bank may take a little longer to show the credit.
+We ship every order within two business days. Standard delivery takes 3 to 5 business days inside the EU.Every shipped order has a tracking number. Open the order in your account to follow the parcel.
+---------------------
+
+Given the context information and no prior knowledge, answer the query.
+
+Follow these rules:
+
+1. If the answer is not in the context, just say that you don't know.
+2. Avoid statements like "Based on the context..." or "The provided information...".
+
+Query: How long does a refund take to reach my card?
+
+Answer:
+", "", ""]
+2026-11-19T09:44:43.299+06:00  WARN 2484 --- [support-assistant] [           main] [44f9ab9a86ced2f7a35211721c0270fb-1a6db30ec38f3301] c.example.support.cost.TokenCostMeter    : No price for model llama3.2:3b, so its calls are missing from support.ai.cost
+WROTE D:\Projects\zombie\spring-ai-from-scratch\lesson-src\module-6\probes\trace-after.json
+
+Test run finished after 50112 ms
+[         2 containers found      ]
+[         0 containers skipped    ]
+[         2 containers started    ]
+[         0 containers aborted    ]
+[         2 containers successful ]
+[         0 containers failed     ]
+[         1 tests found           ]
+[         0 tests skipped         ]
+[         1 tests started         ]
+[         0 tests aborted         ]
+[         1 tests successful      ]
+[         0 tests failed          ]
+
+2026-11-19T09:44:44.732+06:00  WARN 2484 --- [support-assistant] [ionShutdownHook] [                                                 ] i.m.registry.otlp.OtlpMeterRegistry      : Failed to publish metrics to OTLP receiver (context: url=http://localhost:4318/v1/metrics, resource-attributes={service.name=support-assistant})
+
+java.lang.Exception: java.net.ConnectException
+	at io.micrometer.registry.otlp.OtlpHttpMetricsSender.send(OtlpHttpMetricsSender.java:64) ~[micrometer-registry-otlp-1.17.2.jar:1.17.2]
+	at io.micrometer.registry.otlp.OtlpMeterRegistry.publish(OtlpMeterRegistry.java:194) ~[micrometer-registry-otlp-1.17.2.jar:1.17.2]
+	at io.micrometer.core.instrument.push.PushMeterRegistry.publishSafelyOrSkipIfInProgress(PushMeterRegistry.java:63) ~[micrometer-core-1.17.2.jar:1.17.2]
+	at io.micrometer.core.instrument.push.PushMeterRegistry.close(PushMeterRegistry.java:144) ~[micrometer-core-1.17.2.jar:1.17.2]
+	at io.micrometer.registry.otlp.OtlpMeterRegistry.close(OtlpMeterRegistry.java:321) ~[micrometer-registry-otlp-1.17.2.jar:1.17.2]
+	at org.springframework.boot.micrometer.metrics.autoconfigure.MeterRegistryCloser.onApplicationEvent(MeterRegistryCloser.java:58) ~[spring-boot-micrometer-metrics-4.1.2.jar:4.1.2]
+	at org.springframework.boot.micrometer.metrics.autoconfigure.MeterRegistryCloser.onApplicationEvent(MeterRegistryCloser.java:28) ~[spring-boot-micrometer-metrics-4.1.2.jar:4.1.2]
+	at org.springframework.context.event.SimpleApplicationEventMulticaster.doInvokeListener(SimpleApplicationEventMulticaster.java:180) ~[spring-context-7.0.10.jar:7.0.10]
+	at org.springframework.context.event.SimpleApplicationEventMulticaster.invokeListener(SimpleApplicationEventMulticaster.java:173) ~[spring-context-7.0.10.jar:7.0.10]
+	at org.springframework.context.event.SimpleApplicationEventMulticaster.multicastEvent(SimpleApplicationEventMulticaster.java:151) ~[spring-context-7.0.10.jar:7.0.10]
+	at org.springframework.context.support.AbstractApplicationContext.publishEvent(AbstractApplicationContext.java:448) ~[spring-context-7.0.10.jar:7.0.10]
+	at org.springframework.context.support.AbstractApplicationContext.publishEvent(AbstractApplicationContext.java:381) ~[spring-context-7.0.10.jar:7.0.10]
+	at org.springframework.context.support.AbstractApplicationContext.doClose(AbstractApplicationContext.java:1190) ~[spring-context-7.0.10.jar:7.0.10]
+	at org.springframework.context.support.AbstractApplicationContext.close(AbstractApplicationContext.java:1153) ~[spring-context-7.0.10.jar:7.0.10]
+	at org.springframework.boot.SpringApplicationShutdownHook.closeAndWait(SpringApplicationShutdownHook.java:135) ~[spring-boot-4.1.2.jar:4.1.2]
+	at java.base/java.lang.Iterable.forEach(Iterable.java:75) ~[na:na]
+	at org.springframework.boot.SpringApplicationShutdownHook.run(SpringApplicationShutdownHook.java:104) ~[spring-boot-4.1.2.jar:4.1.2]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:923) ~[java.net.http:na]
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:133) ~[java.net.http:na]
+	at org.springframework.boot.micrometer.metrics.autoconfigure.export.otlp.JdkClientHttpSender.send(JdkClientHttpSender.java:71) ~[spring-boot-micrometer-metrics-4.1.2.jar:4.1.2]
+	at io.micrometer.core.ipc.http.HttpSender$Request$Builder.send(HttpSender.java:306) ~[micrometer-core-1.17.2.jar:1.17.2]
+	at io.micrometer.registry.otlp.OtlpHttpMetricsSender.send(OtlpHttpMetricsSender.java:61) ~[micrometer-registry-otlp-1.17.2.jar:1.17.2]
+	... 17 common frames omitted
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1070) ~[java.net.http:na]
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:223) ~[java.net.http:na]
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.checkRetryConnect(PlainHttpConnection.java:277) ~[java.net.http:na]
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$0(PlainHttpConnection.java:235) ~[java.net.http:na]
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:955) ~[na:na]
+	at java.base/java.util.concurrent.CompletableFuture$UniHandle.tryFire(CompletableFuture.java:932) ~[na:na]
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:531) ~[na:na]
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1794) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	... 1 common frames omitted
+Caused by: java.nio.channels.ClosedChannelException
+	at java.base/sun.nio.ch.SocketChannelImpl.ensureOpen(SocketChannelImpl.java:204) ~[na:na]
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:942) ~[na:na]
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:211) ~[java.net.http:na]
+	... 9 common frames omitted
+
+2026-11-19T09:44:44.766+06:00  INFO 2484 --- [support-assistant] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-11-19T09:44:44.776+06:00  INFO 2484 --- [support-assistant] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.

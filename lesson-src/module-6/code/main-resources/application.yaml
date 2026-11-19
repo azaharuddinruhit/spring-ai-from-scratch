@@ -1,5 +1,7 @@
 # The support app's application.yaml, as Modules 3 to 5 build it (here so the full app can start in tests).
 spring:
+  application:
+    name: support-assistant   # every span and metric carries it as service.name, else "unknown_service"
   datasource:
     url: jdbc:postgresql://localhost:5432/support
     username: support
@@ -7,6 +9,8 @@ spring:
   ai:
     openai:
       api-key: ${OPENAI_API_KEY:}
+      chat:
+        model: gpt-5-mini   # the default, named here because prices are looked up by name
       embedding:
         model: text-embedding-3-small
         metadata-mode: none
@@ -53,6 +57,26 @@ spring:
         jwt:
           issuer-uri: https://login.example.com
 
+management:
+  tracing:
+    sampling:
+      probability: 1.0   # the default 0.1 keeps one request in ten
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: http://localhost:4318/v1/traces   # your OpenTelemetry collector; no endpoint, no trace export
+  otlp:
+    metrics:
+      export:
+        url: http://localhost:4318/v1/metrics   # the default
+
 support:
   mcp:
     allowed-tools: track_shipment
+  knowledge:
+    rewrite-model: gpt-5-nano
+  cost:
+    prices:   # USD per million tokens, OpenAI Standard tier list prices on 19 November 2026
+      gpt-5-mini: {input: 0.25, cached-input: 0.025, output: 2.00}
+      gpt-5-nano: {input: 0.05, cached-input: 0.005, output: 0.40}

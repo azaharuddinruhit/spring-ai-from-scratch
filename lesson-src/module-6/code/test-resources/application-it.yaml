@@ -7,6 +7,8 @@ spring:
       init:
         pull-model-strategy: when_missing
         timeout: 15m   # the default 5m is too short for a first download
+        chat:
+          additional-models: qwen2.5:1.5b
       chat:
         model: llama3.2:3b
         temperature: 0.0
@@ -21,3 +23,7 @@ spring:
         repository:
           jdbc:
             initialize-schema: always
+
+support:
+  knowledge:
+    rewrite-model: qwen2.5:1.5b

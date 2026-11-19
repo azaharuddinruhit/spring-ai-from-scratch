@@ -1,0 +1,885 @@
+[ {
+  "answer" : "Your order number 1042 is currently in the shipped status. The order was placed on November 2, 2026, and the total cost is $59.90. You can track the order using the tracking number 1Z999AA10123456784.",
+  "question" : "Where is my order 1042?",
+  "spans" : [ {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "73ed3412b88f603a",
+    "parentId" : "c872f6b752aaa3f3",
+    "sampled" : true,
+    "name" : "http.client.requests",
+    "contextualName" : "http post",
+    "startNanos" : 698937801951400,
+    "endNanos" : 698937931843600,
+    "low" : {
+      "client.name" : "127.0.0.1",
+      "exception" : "none",
+      "method" : "POST",
+      "outcome" : "SUCCESS",
+      "status" : "200",
+      "uri" : "/api/embed"
+    },
+    "high" : {
+      "http.url" : "http://127.0.0.1:51206/api/embed"
+    }
+  }, {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "c872f6b752aaa3f3",
+    "parentId" : "f2c9e4e25abc051a",
+    "sampled" : true,
+    "name" : "gen_ai.client.operation",
+    "contextualName" : "embedding",
+    "startNanos" : 698937801181300,
+    "endNanos" : 698937932893600,
+    "low" : {
+      "gen_ai.operation.name" : "embedding",
+      "gen_ai.request.model" : "none",
+      "gen_ai.response.model" : "nomic-embed-text",
+      "gen_ai.system" : "ollama"
+    },
+    "high" : {
+      "gen_ai.usage.input_tokens" : "9",
+      "gen_ai.usage.total_tokens" : "9"
+    }
+  }, {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "f2c9e4e25abc051a",
+    "parentId" : "294923291b8b7dd3",
+    "sampled" : true,
+    "name" : "db.vector.client.operation",
+    "contextualName" : "pg_vector query",
+    "startNanos" : 698937799483200,
+    "endNanos" : 698937940047000,
+    "low" : {
+      "db.operation.name" : "query",
+      "db.system" : "pg_vector",
+      "spring.ai.kind" : "vector_store"
+    },
+    "high" : {
+      "db.collection.name" : "vector_store",
+      "db.namespace" : "public",
+      "db.search.similarity_metric" : "cosine",
+      "db.vector.dimension_count" : "768",
+      "db.vector.query.content" : "Where is my order 1042?",
+      "db.vector.query.filter" : "Expression[type=AND, left=Expression[type=EQ, left=Key[key=audience], right=Value[value=CUSTOMER]], right=Expression[type=EQ, left=Key[key=product], right=Value[value=billing]]]",
+      "db.vector.query.similarity_threshold" : "0.5",
+      "db.vector.query.top_k" : "5"
+    }
+  }, {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "d14f0067b67e6e1a",
+    "parentId" : "477f3cddd4f301e3",
+    "sampled" : true,
+    "name" : "http.client.requests",
+    "contextualName" : "http post",
+    "startNanos" : 698937998747800,
+    "endNanos" : 698941279969600,
+    "low" : {
+      "client.name" : "127.0.0.1",
+      "exception" : "none",
+      "method" : "POST",
+      "outcome" : "SUCCESS",
+      "status" : "200",
+      "uri" : "/api/chat"
+    },
+    "high" : {
+      "http.url" : "http://127.0.0.1:51206/api/chat"
+    }
+  }, {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "477f3cddd4f301e3",
+    "parentId" : "42fb887659b803c5",
+    "sampled" : true,
+    "name" : "gen_ai.client.operation",
+    "contextualName" : "chat llama3.2:3b",
+    "startNanos" : 698937995280100,
+    "endNanos" : 698941306356300,
+    "low" : {
+      "gen_ai.operation.name" : "chat",
+      "gen_ai.request.model" : "llama3.2:3b",
+      "gen_ai.response.model" : "llama3.2:3b",
+      "gen_ai.system" : "ollama"
+    },
+    "high" : {
+      "gen_ai.request.temperature" : "0.0",
+      "gen_ai.response.finish_reasons" : "[\"stop\"]",
+      "gen_ai.usage.input_tokens" : "412",
+      "gen_ai.usage.output_tokens" : "15",
+      "gen_ai.usage.total_tokens" : "427",
+      "spring.ai.model.request.tool.names" : "[\"recentOrders\", \"findOrder\", \"proposeRefund\"]"
+    }
+  }, {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "42fb887659b803c5",
+    "parentId" : "0fc2f049ef3bb677",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "call",
+    "startNanos" : 698937970583900,
+    "endNanos" : 698941308734900,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "call",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "2147483647"
+    }
+  }, {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "0fc2f049ef3bb677",
+    "parentId" : "7850d3436f71b220",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "simple_logger",
+    "startNanos" : 698937970216200,
+    "endNanos" : 698941309332900,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "SimpleLoggerAdvisor",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "0"
+    }
+  }, {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "7cc37823303340d7",
+    "parentId" : "7850d3436f71b220",
+    "sampled" : true,
+    "name" : "spring.ai.tool",
+    "contextualName" : "execute_tool findOrder",
+    "startNanos" : 698941318686500,
+    "endNanos" : 698941354095000,
+    "low" : {
+      "gen_ai.operation.name" : "execute_tool",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.kind" : "tool_call",
+      "spring.ai.tool.definition.name" : "findOrder",
+      "spring.ai.tool.type" : "function"
+    },
+    "high" : {
+      "spring.ai.tool.call.arguments" : "{\"orderNumber\":\"1042\"}",
+      "spring.ai.tool.call.id" : "call_05i9gtve",
+      "spring.ai.tool.call.result" : "{\"number\":\"1042\",\"status\":\"SHIPPED\",\"total\":59.90,\"placedOn\":\"2026-11-02\",\"trackingNumber\":\"1Z999AA10123456784\"}",
+      "spring.ai.tool.definition.description" : "Find one of the signed-in customer's orders by its order number",
+      "spring.ai.tool.definition.schema" : "{\r\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\r\n  \"type\" : \"object\",\r\n  \"properties\" : {\r\n    \"orderNumber\" : {\r\n      \"type\" : \"string\",\r\n      \"description\" : \"The order number, such as 1042\"\r\n    }\r\n  },\r\n  \"required\" : [ \"orderNumber\" ],\r\n  \"additionalProperties\" : false\r\n}"
+    }
+  }, {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "b93ab295e8e8f3d7",
+    "parentId" : "ff8ff361592af25d",
+    "sampled" : true,
+    "name" : "http.client.requests",
+    "contextualName" : "http post",
+    "startNanos" : 698941358318200,
+    "endNanos" : 698945198365700,
+    "low" : {
+      "client.name" : "127.0.0.1",
+      "exception" : "none",
+      "method" : "POST",
+      "outcome" : "SUCCESS",
+      "status" : "200",
+      "uri" : "/api/chat"
+    },
+    "high" : {
+      "http.url" : "http://127.0.0.1:51206/api/chat"
+    }
+  }, {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "ff8ff361592af25d",
+    "parentId" : "870240a6322025e0",
+    "sampled" : true,
+    "name" : "gen_ai.client.operation",
+    "contextualName" : "chat llama3.2:3b",
+    "startNanos" : 698941357633800,
+    "endNanos" : 698945199135500,
+    "low" : {
+      "gen_ai.operation.name" : "chat",
+      "gen_ai.request.model" : "llama3.2:3b",
+      "gen_ai.response.model" : "llama3.2:3b",
+      "gen_ai.system" : "ollama"
+    },
+    "high" : {
+      "gen_ai.request.temperature" : "0.0",
+      "gen_ai.response.finish_reasons" : "[\"stop\"]",
+      "gen_ai.usage.input_tokens" : "201",
+      "gen_ai.usage.output_tokens" : "56",
+      "gen_ai.usage.total_tokens" : "257",
+      "spring.ai.model.request.tool.names" : "[\"recentOrders\", \"findOrder\", \"proposeRefund\"]"
+    }
+  }, {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "870240a6322025e0",
+    "parentId" : "dae98e0181364b33",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "call",
+    "startNanos" : 698941356541500,
+    "endNanos" : 698945199456900,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "call",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "2147483647"
+    }
+  }, {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "dae98e0181364b33",
+    "parentId" : "7850d3436f71b220",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "simple_logger",
+    "startNanos" : 698941356352300,
+    "endNanos" : 698945199725800,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "SimpleLoggerAdvisor",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "0"
+    }
+  }, {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "7850d3436f71b220",
+    "parentId" : "f4485f1596af2965",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "tool _calling ",
+    "startNanos" : 698937967812700,
+    "endNanos" : 698945200059700,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "Tool Calling Advisor",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "-2147483348"
+    }
+  }, {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "f4485f1596af2965",
+    "parentId" : "294923291b8b7dd3",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "answer_language",
+    "startNanos" : 698937947047700,
+    "endNanos" : 698945200384300,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "AnswerLanguageAdvisor",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "-2147483398"
+    }
+  }, {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "294923291b8b7dd3",
+    "parentId" : "6a048387384dedd0",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "retrieval_augmentation",
+    "startNanos" : 698937775174200,
+    "endNanos" : 698945200708000,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "RetrievalAugmentationAdvisor",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "-2147483423"
+    }
+  }, {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "6a048387384dedd0",
+    "parentId" : "7b5f22c91ad177d2",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "message_chat_memory",
+    "startNanos" : 698937751483300,
+    "endNanos" : 698945213294900,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "MessageChatMemoryAdvisor",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "-2147483448"
+    }
+  }, {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "7b5f22c91ad177d2",
+    "parentId" : "8a19cf533d0a8b6c",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "pii_redaction",
+    "startNanos" : 698937750230400,
+    "endNanos" : 698945213785900,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "PiiRedactionAdvisor",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "-2147483548"
+    }
+  }, {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "8a19cf533d0a8b6c",
+    "parentId" : "10e2f6ed9a2375ec",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "token_budget",
+    "startNanos" : 698937748662900,
+    "endNanos" : 698945225626000,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "TokenBudgetAdvisor",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "-2147483598"
+    }
+  }, {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "10e2f6ed9a2375ec",
+    "parentId" : "515f8ffa937099fd",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "safe_guard",
+    "startNanos" : 698937747775800,
+    "endNanos" : 698945225933300,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "SafeGuardAdvisor",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "-2147483623"
+    }
+  }, {
+    "traceId" : "0edf61f6d52403032d23b8d9879a9ef1",
+    "spanId" : "515f8ffa937099fd",
+    "parentId" : null,
+    "sampled" : true,
+    "name" : "spring.ai.chat.client",
+    "contextualName" : "spring_ai chat_client",
+    "startNanos" : 698937735494700,
+    "endNanos" : 698945226312600,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.chat.client.stream" : "false",
+      "spring.ai.kind" : "chat_client"
+    },
+    "high" : {
+      "spring.ai.chat.client.advisors" : "[\"SafeGuardAdvisor\", \"TokenBudgetAdvisor\", \"PiiRedactionAdvisor\", \"MessageChatMemoryAdvisor\", \"RetrievalAugmentationAdvisor\", \"AnswerLanguageAdvisor\", \"Tool Calling Advisor\", \"SimpleLoggerAdvisor\", \"call\"]",
+      "spring.ai.chat.client.conversation.id" : "bd6b5758-19ce-3834-af9f-488ddcfb70f6",
+      "spring.ai.chat.client.tool.names" : "[\"findOrder\", \"proposeRefund\", \"recentOrders\"]"
+    }
+  } ]
+}, {
+  "answer" : "Refunds reach your card 5 to 7 business days after we approve them.",
+  "question" : "How long does a refund take to reach my card?",
+  "spans" : [ {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "b2147364bceab499",
+    "parentId" : "865d2529705e08d1",
+    "sampled" : true,
+    "name" : "http.client.requests",
+    "contextualName" : "http post",
+    "startNanos" : 698945875949100,
+    "endNanos" : 698956535232400,
+    "low" : {
+      "client.name" : "127.0.0.1",
+      "exception" : "none",
+      "method" : "POST",
+      "outcome" : "SUCCESS",
+      "status" : "200",
+      "uri" : "/api/chat"
+    },
+    "high" : {
+      "http.url" : "http://127.0.0.1:51206/api/chat"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "865d2529705e08d1",
+    "parentId" : "57487c611b718be0",
+    "sampled" : true,
+    "name" : "gen_ai.client.operation",
+    "contextualName" : "chat qwen2.5:1.5b",
+    "startNanos" : 698945875240900,
+    "endNanos" : 698956536990700,
+    "low" : {
+      "gen_ai.operation.name" : "chat",
+      "gen_ai.request.model" : "qwen2.5:1.5b",
+      "gen_ai.response.model" : "qwen2.5:1.5b",
+      "gen_ai.system" : "ollama"
+    },
+    "high" : {
+      "gen_ai.request.temperature" : "0.0",
+      "gen_ai.response.finish_reasons" : "[\"stop\"]",
+      "gen_ai.usage.input_tokens" : "199",
+      "gen_ai.usage.output_tokens" : "19",
+      "gen_ai.usage.total_tokens" : "218"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "57487c611b718be0",
+    "parentId" : "05805ca246894c09",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "call",
+    "startNanos" : 698945874823200,
+    "endNanos" : 698956537606900,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "call",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "2147483647"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "05805ca246894c09",
+    "parentId" : "3d0a4bcaf435dd49",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "tool _calling ",
+    "startNanos" : 698945874530200,
+    "endNanos" : 698956538193200,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "Tool Calling Advisor",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "-2147483348"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "3d0a4bcaf435dd49",
+    "parentId" : "4c4bd922a1033d89",
+    "sampled" : true,
+    "name" : "spring.ai.chat.client",
+    "contextualName" : "spring_ai chat_client",
+    "startNanos" : 698945874282000,
+    "endNanos" : 698956538704300,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.chat.client.stream" : "false",
+      "spring.ai.kind" : "chat_client"
+    },
+    "high" : {
+      "spring.ai.chat.client.advisors" : "[\"Tool Calling Advisor\", \"call\"]"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "28a43aa827132f66",
+    "parentId" : "5b5de35688fe383f",
+    "sampled" : true,
+    "name" : "http.client.requests",
+    "contextualName" : "http post",
+    "startNanos" : 698956544138100,
+    "endNanos" : 698956902093600,
+    "low" : {
+      "client.name" : "127.0.0.1",
+      "exception" : "none",
+      "method" : "POST",
+      "outcome" : "SUCCESS",
+      "status" : "200",
+      "uri" : "/api/embed"
+    },
+    "high" : {
+      "http.url" : "http://127.0.0.1:51206/api/embed"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "5b5de35688fe383f",
+    "parentId" : "0f0c6ad766d2b7bf",
+    "sampled" : true,
+    "name" : "gen_ai.client.operation",
+    "contextualName" : "embedding",
+    "startNanos" : 698956543343200,
+    "endNanos" : 698956903265000,
+    "low" : {
+      "gen_ai.operation.name" : "embedding",
+      "gen_ai.request.model" : "none",
+      "gen_ai.response.model" : "nomic-embed-text",
+      "gen_ai.system" : "ollama"
+    },
+    "high" : {
+      "gen_ai.usage.input_tokens" : "21",
+      "gen_ai.usage.total_tokens" : "21"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "0f0c6ad766d2b7bf",
+    "parentId" : "4c4bd922a1033d89",
+    "sampled" : true,
+    "name" : "db.vector.client.operation",
+    "contextualName" : "pg_vector query",
+    "startNanos" : 698956542555100,
+    "endNanos" : 698956934455100,
+    "low" : {
+      "db.operation.name" : "query",
+      "db.system" : "pg_vector",
+      "spring.ai.kind" : "vector_store"
+    },
+    "high" : {
+      "db.collection.name" : "vector_store",
+      "db.namespace" : "public",
+      "db.search.similarity_metric" : "cosine",
+      "db.vector.dimension_count" : "768",
+      "db.vector.query.content" : "How long does it typically take for a refund to be processed and reach my bank account?",
+      "db.vector.query.filter" : "Expression[type=AND, left=Expression[type=EQ, left=Key[key=audience], right=Value[value=CUSTOMER]], right=Expression[type=EQ, left=Key[key=product], right=Value[value=billing]]]",
+      "db.vector.query.similarity_threshold" : "0.5",
+      "db.vector.query.top_k" : "5"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "d64e3d7a32a217ae",
+    "parentId" : "5b413441f955f4c0",
+    "sampled" : true,
+    "name" : "http.client.requests",
+    "contextualName" : "http post",
+    "startNanos" : 698956939007500,
+    "endNanos" : 698964205809300,
+    "low" : {
+      "client.name" : "127.0.0.1",
+      "exception" : "none",
+      "method" : "POST",
+      "outcome" : "SUCCESS",
+      "status" : "200",
+      "uri" : "/api/chat"
+    },
+    "high" : {
+      "http.url" : "http://127.0.0.1:51206/api/chat"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "5b413441f955f4c0",
+    "parentId" : "28aa14d13b5407eb",
+    "sampled" : true,
+    "name" : "gen_ai.client.operation",
+    "contextualName" : "chat llama3.2:3b",
+    "startNanos" : 698956938479700,
+    "endNanos" : 698964207176800,
+    "low" : {
+      "gen_ai.operation.name" : "chat",
+      "gen_ai.request.model" : "llama3.2:3b",
+      "gen_ai.response.model" : "llama3.2:3b",
+      "gen_ai.system" : "ollama"
+    },
+    "high" : {
+      "gen_ai.request.temperature" : "0.0",
+      "gen_ai.response.finish_reasons" : "[\"stop\"]",
+      "gen_ai.usage.input_tokens" : "654",
+      "gen_ai.usage.output_tokens" : "21",
+      "gen_ai.usage.total_tokens" : "675",
+      "spring.ai.model.request.tool.names" : "[\"recentOrders\", \"findOrder\", \"proposeRefund\"]"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "28aa14d13b5407eb",
+    "parentId" : "7876cbb225c11db4",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "call",
+    "startNanos" : 698956937621900,
+    "endNanos" : 698964207944400,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "call",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "2147483647"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "7876cbb225c11db4",
+    "parentId" : "0329295fd0e6d2ac",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "simple_logger",
+    "startNanos" : 698956937492900,
+    "endNanos" : 698964208477400,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "SimpleLoggerAdvisor",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "0"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "80dda246477f6dcc",
+    "parentId" : "0329295fd0e6d2ac",
+    "sampled" : true,
+    "name" : "spring.ai.tool",
+    "contextualName" : "execute_tool proposeRefund",
+    "startNanos" : 698964209271000,
+    "endNanos" : 698964252607300,
+    "low" : {
+      "gen_ai.operation.name" : "execute_tool",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.kind" : "tool_call",
+      "spring.ai.tool.definition.name" : "proposeRefund",
+      "spring.ai.tool.type" : "function"
+    },
+    "high" : {
+      "spring.ai.tool.call.arguments" : "{\"orderNumber\":\"1042\",\"reason\":\"None\"}",
+      "spring.ai.tool.call.id" : "call_i0t1m2pi",
+      "spring.ai.tool.call.result" : "{\"id\":\"150de992-5717-4a6b-b6b5-c4cfe8ae3b8c\",\"customerId\":\"alice\",\"orderNumber\":\"1042\",\"amount\":59.90,\"reason\":\"None\",\"status\":\"PENDING\",\"expiresAt\":\"2026-11-19T03:59:38.599118200Z\"}",
+      "spring.ai.tool.definition.description" : "Propose a refund of a whole order. Nothing is refunded until the customer confirms it in the app within 15 minutes, so tell them to look for the confirmation button.",
+      "spring.ai.tool.definition.schema" : "{\r\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\r\n  \"type\" : \"object\",\r\n  \"properties\" : {\r\n    \"orderNumber\" : {\r\n      \"type\" : \"string\",\r\n      \"description\" : \"The order number, such as 1042\"\r\n    },\r\n    \"reason\" : {\r\n      \"type\" : \"string\",\r\n      \"description\" : \"The customer's reason, in their words\"\r\n    }\r\n  },\r\n  \"required\" : [ \"orderNumber\", \"reason\" ],\r\n  \"additionalProperties\" : false\r\n}"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "61d7885ba7f4423d",
+    "parentId" : "89e0af10370dc950",
+    "sampled" : true,
+    "name" : "http.client.requests",
+    "contextualName" : "http post",
+    "startNanos" : 698964255592600,
+    "endNanos" : 698968939185600,
+    "low" : {
+      "client.name" : "127.0.0.1",
+      "exception" : "none",
+      "method" : "POST",
+      "outcome" : "SUCCESS",
+      "status" : "200",
+      "uri" : "/api/chat"
+    },
+    "high" : {
+      "http.url" : "http://127.0.0.1:51206/api/chat"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "89e0af10370dc950",
+    "parentId" : "1a6db30ec38f3301",
+    "sampled" : true,
+    "name" : "gen_ai.client.operation",
+    "contextualName" : "chat llama3.2:3b",
+    "startNanos" : 698964255113500,
+    "endNanos" : 698968940442600,
+    "low" : {
+      "gen_ai.operation.name" : "chat",
+      "gen_ai.request.model" : "llama3.2:3b",
+      "gen_ai.response.model" : "llama3.2:3b",
+      "gen_ai.system" : "ollama"
+    },
+    "high" : {
+      "gen_ai.request.temperature" : "0.0",
+      "gen_ai.response.finish_reasons" : "[\"stop\"]",
+      "gen_ai.usage.input_tokens" : "484",
+      "gen_ai.usage.output_tokens" : "18",
+      "gen_ai.usage.total_tokens" : "502",
+      "spring.ai.model.request.tool.names" : "[\"recentOrders\", \"findOrder\", \"proposeRefund\"]"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "1a6db30ec38f3301",
+    "parentId" : "8bffe3db0806322f",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "call",
+    "startNanos" : 698964254084100,
+    "endNanos" : 698968941365100,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "call",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "2147483647"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "8bffe3db0806322f",
+    "parentId" : "0329295fd0e6d2ac",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "simple_logger",
+    "startNanos" : 698964253753500,
+    "endNanos" : 698968941927100,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "SimpleLoggerAdvisor",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "0"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "0329295fd0e6d2ac",
+    "parentId" : "3bdaefeecadc14b2",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "tool _calling ",
+    "startNanos" : 698956937258500,
+    "endNanos" : 698968942848200,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "Tool Calling Advisor",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "-2147483348"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "3bdaefeecadc14b2",
+    "parentId" : "4c4bd922a1033d89",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "answer_language",
+    "startNanos" : 698956936852900,
+    "endNanos" : 698968943468000,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "AnswerLanguageAdvisor",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "-2147483398"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "4c4bd922a1033d89",
+    "parentId" : "c6952b68c1fcd500",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "retrieval_augmentation",
+    "startNanos" : 698945794597500,
+    "endNanos" : 698968944109600,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "RetrievalAugmentationAdvisor",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "-2147483423"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "c6952b68c1fcd500",
+    "parentId" : "2e11a2e0189eb94d",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "message_chat_memory",
+    "startNanos" : 698945781938900,
+    "endNanos" : 698968954536000,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "MessageChatMemoryAdvisor",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "-2147483448"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "2e11a2e0189eb94d",
+    "parentId" : "bd64b31c55d3b954",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "pii_redaction",
+    "startNanos" : 698945781652600,
+    "endNanos" : 698968954989200,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "PiiRedactionAdvisor",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "-2147483548"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "bd64b31c55d3b954",
+    "parentId" : "8224ab2c8790c1b8",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "token_budget",
+    "startNanos" : 698945781432700,
+    "endNanos" : 698968955413600,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "TokenBudgetAdvisor",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "-2147483598"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "8224ab2c8790c1b8",
+    "parentId" : "9e031b43cc0db406",
+    "sampled" : true,
+    "name" : "spring.ai.advisor",
+    "contextualName" : "safe_guard",
+    "startNanos" : 698945781273500,
+    "endNanos" : 698968955777600,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.advisor.name" : "SafeGuardAdvisor",
+      "spring.ai.kind" : "advisor"
+    },
+    "high" : {
+      "spring.ai.advisor.order" : "-2147483623"
+    }
+  }, {
+    "traceId" : "44f9ab9a86ced2f7a35211721c0270fb",
+    "spanId" : "9e031b43cc0db406",
+    "parentId" : null,
+    "sampled" : true,
+    "name" : "spring.ai.chat.client",
+    "contextualName" : "spring_ai chat_client",
+    "startNanos" : 698945781066300,
+    "endNanos" : 698968956273200,
+    "low" : {
+      "gen_ai.operation.name" : "framework",
+      "gen_ai.system" : "spring_ai",
+      "spring.ai.chat.client.stream" : "false",
+      "spring.ai.kind" : "chat_client"
+    },
+    "high" : {
+      "spring.ai.chat.client.advisors" : "[\"SafeGuardAdvisor\", \"TokenBudgetAdvisor\", \"PiiRedactionAdvisor\", \"MessageChatMemoryAdvisor\", \"RetrievalAugmentationAdvisor\", \"AnswerLanguageAdvisor\", \"Tool Calling Advisor\", \"SimpleLoggerAdvisor\", \"call\"]",
+      "spring.ai.chat.client.conversation.id" : "bd6b5758-19ce-3834-af9f-488ddcfb70f6",
+      "spring.ai.chat.client.tool.names" : "[\"findOrder\", \"proposeRefund\", \"recentOrders\"]"
+    }
+  } ]
+} ]

@@ -105,3 +105,48 @@ and one untagged JUnit 6 test (`scratchpad` project, not kept):
   `evalTest(Test)` with `useJUnitPlatform { includeTags 'eval' }` runs only the tagged one.
 - Without `testClassesDirs = sourceSets.test.output.classesDirs` and `classpath = sourceSets.test.runtimeClasspath`, the
   registered task reports `NO-SOURCE`, runs nothing, and the build still succeeds: a CI job stays green with no eval run.
+
+## Observability (Lesson 2)
+
+Verified by reading the 2.0.2 and Boot 4.1.2 classes and by recording the support app (`code/test/.../TraceRecordingProbe.java`,
+`probes/trace-before.json`, `probes/trace-after.json`, `probes/trace-run-after.log`; `probes/trace-to-sandbox.py` turns them into
+`src/data/recorded-traces.json` for `TraceLab`).
+
+- `spring-boot-starter-opentelemetry` (Boot 4.1.2) alone brings the OpenTelemetry SDK, `micrometer-tracing-bridge-otel`,
+  `micrometer-registry-otlp` and the OTLP exporters. The recordings ran without the actuator.
+- Observation names: `spring.ai.chat.client`, `spring.ai.advisor`, `gen_ai.client.operation` (chat and embedding),
+  `db.vector.client.operation`, `spring.ai.tool`. Model calls nest under the `call` advisor, tools under `tool_calling`, the
+  embedding under the vector query.
+- Metrics: `gen_ai.client.operation` (timer) and `gen_ai.client.token.usage` (counter, `gen_ai.token.type` input/output/total,
+  tagged with the observation's low-cardinality values: operation name, system, request and response model).
+- Cache tokens: `Usage.getCacheReadInputTokens()` / `getCacheWriteInputTokens()` (2.0.0+); OpenAI fills the read count from
+  `prompt_tokens_details.cached_tokens` and its prompt count includes them. They appear only as span attributes
+  `gen_ai.usage.cache_read.input_tokens` / `cache_creation.input_tokens`, not in the token metric.
+- Content switches (all default false): `spring.ai.chat.observations.log-prompt` / `log-completion` (log at INFO; with a tracer
+  the line carries `[traceId-spanId]`, nothing goes into the span), `spring.ai.chat.client.observations.log-prompt` /
+  `log-completion`, `spring.ai.tools.observations.include-content` (adds `spring.ai.tool.call.arguments` and `.result` span
+  attributes), `spring.ai.vectorstore.observations.log-query-response`. Each logs a WARN at startup when on.
+- `db.vector.query.content` is always a span attribute (`DefaultVectorStoreObservationConvention.queryContent`).
+- Boot: `management.tracing.sampling.probability` defaults to 0.1. The OTLP trace connection exists only when
+  `management.opentelemetry.tracing.export.otlp.endpoint` is set (`management.otlp.tracing.endpoint` is deprecated since 4.0 at
+  error level). `management.otlp.metrics.export.url` defaults to `http://localhost:4318/v1/metrics`; without a collector the
+  registry logs "Failed to publish metrics" and the trace exporter "Failed to export spans". Without `spring.application.name`
+  the resource is `service.name=unknown_service`.
+- Boot adds a plain `ObservationHandler` bean to the registry (the probe's recording handler and `TokenCostMeter` both ran).
+
+What the recordings showed (llama3.2:3b, CPU only):
+
+- `CompressionQueryTransformer.transform` calls the model for every query, with no empty-history check, and
+  `RetrievalAugmentationAdvisor` passes the whole prompt as history (system message and the current question included), so it is
+  never empty. On "Where is my order 1042?" the rewrite returned "Can you please provide the follow-up query to synthesize into a
+  concise query?" and pgvector searched for that. Fix: rewrite only when the history holds an assistant message, on a cheaper
+  model (`builder.clone().defaultOptions(ChatOptions.builder().model(...))`; the trace shows `chat qwen2.5:1.5b` for the rewrite).
+- With include-content on, the second turn ("How long does a refund take to reach my card?") showed
+  `proposeRefund({"orderNumber":"1042","reason":"None"})` creating a PENDING refund nobody asked for. The Module 5 confirmation
+  step keeps it harmless; without content the trace only shows that the tool ran.
+- The rewrite on `qwen2.5:1.5b` took 10.7 s in the recording. A cold `qwen2.5:1.5b` call measured alone spent 2.83 s of 3.54 s
+  in `load_duration`, so most of it is Ollama loading a second model on CPU.
+- llama3.2's Ollama template renders tool definitions only into a prompt whose last message is a user message: the same
+  question cost 169 prompt tokens with one tool, 33 without; after a tool result, 100. So the call after a tool reports fewer
+  input tokens (412 then 201). Ollama reported the same count warm and cold (no cache discount).
+- The orders fixture had no `refunds` table, so `proposeRefund` failed with SQL errors; `orders.sql` now creates it.

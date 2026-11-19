@@ -1,0 +1,199 @@
+---
+description: Trace every ChatClient call, advisor, model call, vector search and tool with OpenTelemetry, keep prompts and tool data out of your traces, and turn token usage into dollars per model.
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import TraceLab from '@/components/islands/TraceLab';
+
+**You'll need:** the support app from Module 5. The recordings in this lesson come from Lesson 1's Testcontainers setup.
+
+A customer says the assistant gave a wrong answer. Your logs hold the question and the reply. Between them were an advisor
+chain, a query rewrite, an embedding call, a vector search, two or three model calls and a tool, and none of it left a trace.
+Spring AI already measures every one of those steps. This lesson exports them as OpenTelemetry traces and metrics, then puts a
+price on each model call. The first trace we recorded found a bug in the support app that no test had caught.
+
+## 1. Spring mental model
+
+Spring AI wraps each step in a Micrometer observation. With a tracer on the classpath, each observation becomes a span, nested
+the way the calls nest:
+
+| Span | One per | Attributes you'll use |
+| --- | --- | --- |
+| `spring.ai.chat.client` | `ChatClient` call | the advisors, the tool names, the conversation id |
+| `spring.ai.advisor` | advisor in the chain | the advisor's name and order |
+| `gen_ai.client.operation` | model call, chat or embedding | request and response model, input and output tokens, finish reason |
+| `db.vector.client.operation` | vector store call | the query text, top-k, threshold, filter |
+| `spring.ai.tool` | tool execution | the tool's name; its arguments and result only if you switch them on |
+
+<Mermaid
+  caption="The first support question as one trace (advisor spans left out). The tool loop adds one model call per tool call."
+  code={`
+flowchart LR
+  C["spring.ai.chat.client<br/>7.5 s"] --> V["db.vector.client.operation<br/>pg_vector query"]
+  V --> E["gen_ai.client.operation<br/>embedding"]
+  C --> M1["gen_ai.client.operation<br/>chat, 412 tokens in"]
+  M1 -->|"tool call"| T["spring.ai.tool<br/>findOrder"]
+  T --> M2["gen_ai.client.operation<br/>chat, 201 tokens in"]
+`}
+/>
+
+These rules come from the 2.0.2 and Boot 4.1.2 classes and from running the support app:
+
+- Boot 4 has one starter for this: `spring-boot-starter-opentelemetry`. It brings the OpenTelemetry SDK, the Micrometer tracing
+  bridge and OTLP exporters for traces and metrics. The actuator isn't needed.
+- Every model call also feeds two metrics: the `gen_ai.client.operation` timer and the `gen_ai.client.token.usage` counter, split
+  by `gen_ai.token.type` (`input`, `output`, `total`) and tagged with the operation, the provider and the request and response
+  model.
+- Boot samples one trace in ten by default (`management.tracing.sampling.probability: 0.1`). Traces are exported only once you
+  set `management.opentelemetry.tracing.export.otlp.endpoint`. Metrics go to `http://localhost:4318/v1/metrics` by default.
+- Content stays out by default. `spring.ai.chat.observations.log-prompt` and `log-completion` log the messages at INFO, with
+  the trace and span id on the log line, not in the span. `spring.ai.tools.observations.include-content` puts each tool's
+  arguments and result into the span.
+- One piece of content is always recorded: the vector span's `db.vector.query.content` holds the text that was searched for.
+
+## 2. Interactive sandbox
+
+<TraceLab client:visible />
+
+Both versions are real recordings of the same two-question chat. With the Module 5 config, open `pg_vector query` on the first
+question: the vector store searched for the rewrite model's reply, not the customer's question. The answer still came out right,
+because the order question needed a tool rather than documents. Then switch to this lesson's config, turn the content switches on and open `execute_tool proposeRefund` on the second question.
+Only the tool's arguments show that the model proposed a refund nobody asked for.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+One dependency exports traces and metrics:
+
+<CodeFile
+  title="build.gradle (addition)"
+  lang="groovy"
+  code={`dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
+}`}
+/>
+
+Name the service, keep every trace, point the exporters at your OpenTelemetry collector, and add the settings for this lesson's
+two changes:
+
+<CodeFile
+  title="src/main/resources/application.yaml (additions)"
+  lang="yaml"
+  lines="3,7,12,17,25,28,29"
+  code={`spring:
+  application:
+    name: support-assistant   # every span and metric carries it as service.name, else "unknown_service"
+  ai:
+    openai:
+      chat:
+        model: gpt-5-mini   # the default, named here because prices are looked up by name
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0   # the default 0.1 keeps one request in ten
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: http://localhost:4318/v1/traces   # your OpenTelemetry collector; no endpoint, no trace export
+  otlp:
+    metrics:
+      export:
+        url: http://localhost:4318/v1/metrics   # the default
+
+support:
+  knowledge:
+    rewrite-model: gpt-5-nano
+  cost:
+    prices:   # USD per million tokens, OpenAI Standard tier list prices on 19 November 2026
+      gpt-5-mini: {input: 0.25, cached-input: 0.025, output: 2.00}
+      gpt-5-nano: {input: 0.05, cached-input: 0.005, output: 0.40}`}
+/>
+
+For a support assistant, keeping every trace is usually affordable: each request already costs seconds of model time, and the
+request a customer complains about is the one you need. Lower it when your trace bill says so.
+
+The trace found the problem in `KnowledgeRagConfig`. `CompressionQueryTransformer` makes a model call for every question, a first
+question too. It has nothing to compress then, and a small model can turn the question into nonsense. The `Query` history it
+receives is the whole prompt, system message and current question included, so it is never empty. A follow-up is a question
+that comes after an answer. Rewrite only those, and on a cheaper model, because rewriting a question is a small job:
+
+<CodeFile title="src/main/java/com/example/support/knowledge/KnowledgeRagConfig.java">
+@@CODE main/com/example/support/knowledge/KnowledgeRagConfig.java | rewriteModel; isFollowUp\(query\) \?; anyMatch@@
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/knowledge/KnowledgeProperties.java">
+@@CODE main/com/example/support/knowledge/KnowledgeProperties.java | record@@
+</CodeFile>
+
+Spring AI counts tokens; finance wants dollars. Prices live in configuration, keyed by the model name the request uses:
+
+<CodeFile title="src/main/java/com/example/support/cost/CostProperties.java">
+@@CODE main/com/example/support/cost/CostProperties.java | getCacheReadInputTokens; cachedInput.multiply@@
+</CodeFile>
+
+A cost meter is one more `ObservationHandler`. It sees every model call, the rewrite and each round of the tool loop included,
+and tags the spend with the same `gen_ai.request.model` as Spring AI's token metric:
+
+<CodeFile title="src/main/java/com/example/support/cost/TokenCostMeter.java">
+@@CODE main/com/example/support/cost/TokenCostMeter.java | getRequest\(\).getOptions; Counter.builder; gen_ai.request.model@@
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/cost/CostConfig.java">
+@@CODE main/com/example/support/cost/CostConfig.java | TokenCostMeter tokenCostMeter@@
+</CodeFile>
+
+The test calls the handler directly with the context a model call produces. The comment shows what the cached-token split is
+worth:
+
+<CodeFile title="src/test/java/com/example/support/cost/TokenCostMeterTest.java">
+@@CODE test/com/example/support/cost/TokenCostMeterTest.java | 8_000L; isCloseTo@@
+</CodeFile>
+
+`KnowledgeRagAdvisorTest` from Module 4 gains two checks: a first question makes no rewrite call, and a follow-up's rewrite asks
+for `gpt-5-nano`. To see your own traces locally, run any OpenTelemetry collector with a trace viewer on port 4318.
+
+## 4. Production gotchas & security
+
+<Gotcha kind="cost" title="A query rewrite you didn't know you were paying for">
+`CompressionQueryTransformer` calls the model for every question. In our recording that was one call in three, and on the first
+question it searched for the model's reply, "Can you please provide the follow-up query to synthesize into a concise query?",
+instead of the question. Look at a trace of each `ChatClient` you build: advisors and transformers can make model calls of their
+own, and they show up as nested `spring.ai.chat.client` spans.
+</Gotcha>
+
+<Gotcha kind="security" title="The content switches send customer data to your trace backend">
+With `include-content`, the `findOrder` span held the order's total, date and tracking number, and the `proposeRefund` span the
+refund. `log-prompt` and `log-completion` write the whole conversation into your logs. Turn them on to debug, in one environment,
+for a short time. The vector span's query text is recorded whatever you set. The question is redacted by then, because
+`PiiRedactionAdvisor` runs before retrieval; Lesson 3 covers the rest.
+</Gotcha>
+
+<Gotcha kind="reliability" title="Traces you never get">
+Out of the box, Boot keeps one trace in ten, exports none until you set the trace endpoint, and names every service
+`unknown_service` until you set `spring.application.name`. When nothing listens on the endpoint, the app logs "Failed to export
+spans" and keeps serving.
+</Gotcha>
+
+<Gotcha kind="cost" title="The token metric prices cached input as new input">
+OpenAI's prompt-token count includes the tokens it read from its prompt cache, which cost a tenth as much. Spring AI reports those
+only as the span attribute `gen_ai.usage.cache_read.input_tokens`, not in `gen_ai.client.token.usage`. Dollars computed from the
+token metric overstate a cached prompt. `TokenCostMeter` reads `Usage.getCacheReadInputTokens()` instead.
+</Gotcha>
+
+<Gotcha kind="cost" title="Read the token counts, don't estimate them">
+The same tool loop sent 412 input tokens to the model, then 201 after the tool ran, although the second prompt was longer:
+llama3.2's chat template puts the tool definitions only into a prompt that ends with a user message. Templates, tokenizers and
+providers all count differently. Budget from `gen_ai.client.token.usage`, not from the length of your prompts.
+</Gotcha>
+
+## Recap
+
+- `spring-boot-starter-opentelemetry` turns Spring AI's observations into spans, and its token usage into metrics, exported over
+  OTLP. Set the service name, the trace endpoint and the sampling probability.
+- One trace shows the advisor chain, every model call with its tokens, the vector search with its query, and each tool.
+- Content is off by default. Switch it on to debug, briefly, and remember the vector query text is always there.
+- Look for model calls you didn't ask for: the RAG rewrite ran on every question. Rewrite only follow-ups, on a cheaper model.
+- An `ObservationHandler` prices each call by model, with cached input at the cached rate, so dashboards show dollars per model.

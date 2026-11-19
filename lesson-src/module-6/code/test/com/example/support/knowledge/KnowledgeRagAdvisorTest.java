@@ -23,6 +23,7 @@ import org.springframework.ai.vectorstore.SimpleVectorStore;
 class KnowledgeRagAdvisorTest {
 
     private final List<String> answerPrompts = new ArrayList<>();
+    private final List<String> rewriteModels = new ArrayList<>();
     private final ChatMemory chatMemory = MessageWindowChatMemory.builder().build();
     private final SimpleVectorStore vectorStore = SimpleVectorStore.builder(new KeywordEmbeddingModel()).build();
 
@@ -30,6 +31,7 @@ class KnowledgeRagAdvisorTest {
     private final ChatModel model = prompt -> {
         String text = prompt.getUserMessage().getText();
         if (text.contains("Standalone query:")) {
+            rewriteModels.add(prompt.getOptions().getModel());
             return reply(text.contains("gift cards?") ? "How long do gift card refunds take?" : "How long do refunds take?");
         }
         answerPrompts.add(text);
@@ -39,7 +41,8 @@ class KnowledgeRagAdvisorTest {
     private final ChatClient chatClient = ChatClient.builder(model)
             .defaultAdvisors(
                     MessageChatMemoryAdvisor.builder(chatMemory).build(),
-                    new KnowledgeRagConfig().knowledgeRagAdvisor(ChatClient.builder(model), vectorStore))
+                    new KnowledgeRagConfig().knowledgeRagAdvisor(ChatClient.builder(model), vectorStore,
+                            new KnowledgeProperties("gpt-5-nano")))
             .build();
 
     KnowledgeRagAdvisorTest() {
@@ -59,6 +62,13 @@ class KnowledgeRagAdvisorTest {
     }
 
     @Test
+    void aFirstQuestionIsSearchedAsAsked() {
+        ask("How long do refunds take?");
+
+        assertThat(rewriteModels).isEmpty();
+    }
+
+    @Test
     void memoryStoresTheQuestionNotTheAugmentedPrompt() {
         ask("How long do refunds take?");
 
@@ -75,6 +85,7 @@ class KnowledgeRagAdvisorTest {
         assertThat(answerPrompts.getLast())
                 .contains("Gift card refunds take 10 business days.")
                 .contains("Query: And for gift cards?");
+        assertThat(rewriteModels).containsExactly("gpt-5-nano");
     }
 
     private void ask(String question) {

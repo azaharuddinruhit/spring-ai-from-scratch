@@ -1,0 +1,139 @@
+stty: /dev/tty: No such device or address
+09:34:31.149 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.example.support.SupportApplication for test class com.example.support.TraceRecordingProbe
+09:34:31.249 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.example.support.SupportApplication for test class com.example.support.TraceRecordingProbe
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.2)
+
+2026-11-19T09:34:31.978+06:00  INFO 18944 --- [           main] [                                                 ] c.example.support.TraceRecordingProbe    : Starting TraceRecordingProbe using Java 25.0.1 with PID 18944 (started by Ruhit in D:\Projects\zombie\spring-ai-from-scratch\lesson-src\module-6)
+2026-11-19T09:34:31.981+06:00  INFO 18944 --- [           main] [                                                 ] c.example.support.TraceRecordingProbe    : The following 1 profile is active: "it"
+Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (C:\Users\ruhit\.m2\repository\net\bytebuddy\byte-buddy-agent\1.18.15\byte-buddy-agent-1.18.15.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+Java HotSpot(TM) 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+2026-11-19T09:34:35.999+06:00  WARN 18944 --- [           main] [                                                 ] trationDelegate$BeanPostProcessorChecker : Bean 'org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerAutoConfiguration' of type [org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerAutoConfiguration] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [serverAnnotatedMethodBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-11-19T09:34:36.249+06:00  WARN 18944 --- [           main] [                                                 ] trationDelegate$BeanPostProcessorChecker : Bean 'serverAnnotatedBeanRegistry' of type [org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerAutoConfiguration$ServerMcpAnnotatedBeans] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [serverAnnotatedMethodBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-11-19T09:34:36.265+06:00  WARN 18944 --- [           main] [                                                 ] trationDelegate$BeanPostProcessorChecker : Bean 'spring.ai.mcp.server.annotation-scanner-org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerProperties' of type [org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerProperties] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [serverAnnotatedMethodBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-11-19T09:34:36.434+06:00  INFO 18944 --- [           main] [                                                 ] org.testcontainers.images.PullPolicy     : Image pull policy will be performed by: DefaultPullPolicy()
+2026-11-19T09:34:36.438+06:00  INFO 18944 --- [           main] [                                                 ] o.t.utility.ImageNameSubstitutor         : Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+2026-11-19T09:34:36.452+06:00  INFO 18944 --- [           main] [                                                 ] org.testcontainers.DockerClientFactory   : Testcontainers version: 2.0.5
+2026-11-19T09:34:37.010+06:00  INFO 18944 --- [           main] [                                                 ] o.t.d.DockerClientProviderStrategy       : Loaded org.testcontainers.dockerclient.NpipeSocketClientProviderStrategy from ~/.testcontainers.properties, will try it first
+2026-11-19T09:34:37.915+06:00  INFO 18944 --- [           main] [                                                 ] o.t.d.DockerClientProviderStrategy       : Found Docker environment with local Npipe socket (npipe:////./pipe/docker_engine)
+2026-11-19T09:34:37.917+06:00  INFO 18944 --- [           main] [                                                 ] org.testcontainers.DockerClientFactory   : Docker host IP address is 127.0.0.1
+2026-11-19T09:34:37.941+06:00  INFO 18944 --- [           main] [                                                 ] org.testcontainers.DockerClientFactory   : Connected to docker: 
+  Server Version: 29.8.2
+  API Version: 1.56
+  Operating System: Docker Desktop
+  Total Memory: 7811 MB
+  Labels: 
+    com.docker.desktop.address=npipe://\\.\pipe\docker_cli
+2026-11-19T09:34:37.954+06:00  INFO 18944 --- [           main] [                                                 ] org.testcontainers.DockerClientFactory   : Checking the system...
+2026-11-19T09:34:37.954+06:00  INFO 18944 --- [           main] [                                                 ] org.testcontainers.DockerClientFactory   : ✔︎ Docker server version should be at least 1.6.0
+2026-11-19T09:34:38.087+06:00  INFO 18944 --- [           main] [                                                 ] tc.ollama/ollama:0.40.16                 : Creating container for image: ollama/ollama:0.40.16
+2026-11-19T09:34:38.295+06:00  INFO 18944 --- [           main] [                                                 ] o.t.utility.RegistryAuthLocator          : Credential helper/store (docker-credential-desktop) does not have credentials for https://index.docker.io/v1/
+2026-11-19T09:34:38.482+06:00  INFO 18944 --- [           main] [                                                 ] tc.ollama/ollama:0.40.16                 : Reusing container with ID: 6429f91d5b910129c77948db88178fb492aadbfc331643b37faf6f223e6fe188 and hash: 56d44480b10bd2a530f3b857e11c72eacf63a5c0
+2026-11-19T09:34:38.483+06:00  INFO 18944 --- [           main] [                                                 ] tc.ollama/ollama:0.40.16                 : Reusing existing container (6429f91d5b910129c77948db88178fb492aadbfc331643b37faf6f223e6fe188) and not creating a new one
+2026-11-19T09:34:38.729+06:00  INFO 18944 --- [           main] [                                                 ] tc.ollama/ollama:0.40.16                 : Container ollama/ollama:0.40.16 started in PT0.6424269S
+2026-11-19T09:34:38.730+06:00  INFO 18944 --- [           main] [                                                 ] tc.pgvector/pgvector:pg17                : Creating container for image: pgvector/pgvector:pg17
+2026-11-19T09:34:38.731+06:00  INFO 18944 --- [           main] [                                                 ] tc.testcontainers/ryuk:0.14.0            : Creating container for image: testcontainers/ryuk:0.14.0
+2026-11-19T09:34:38.815+06:00  INFO 18944 --- [           main] [                                                 ] tc.testcontainers/ryuk:0.14.0            : Container testcontainers/ryuk:0.14.0 is starting: e2be039172bd708d9e5a20c63357c411a7aa0ad04f4e324dd6f5f172bcf2725b
+2026-11-19T09:34:39.249+06:00  INFO 18944 --- [           main] [                                                 ] tc.testcontainers/ryuk:0.14.0            : Container testcontainers/ryuk:0.14.0 started in PT0.518493S
+2026-11-19T09:34:39.340+06:00  INFO 18944 --- [           main] [                                                 ] tc.pgvector/pgvector:pg17                : Container pgvector/pgvector:pg17 is starting: 4c5e2fb6ae9f84aa2579ea49c5cd74d0d80ecb3e32263ab332ea8263d93cc67d
+2026-11-19T09:34:41.214+06:00  INFO 18944 --- [           main] [                                                 ] tc.pgvector/pgvector:pg17                : Container pgvector/pgvector:pg17 started in PT2.4842472S
+2026-11-19T09:34:41.216+06:00  INFO 18944 --- [           main] [                                                 ] tc.pgvector/pgvector:pg17                : Container is started (JDBC URL: jdbc:postgresql://127.0.0.1:53919/test?loggerLevel=OFF)
+2026-11-19T09:34:41.808+06:00  INFO 18944 --- [           main] [                                                 ] i.m.c.instrument.push.PushMeterRegistry  : Publishing metrics for OtlpMeterRegistry every 1m to http://localhost:4318/v1/metrics with resource attributes {service.name=unknown_service}
+2026-11-19T09:34:43.650+06:00  INFO 18944 --- [           main] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-11-19T09:34:43.935+06:00  INFO 18944 --- [           main] [                                                 ] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@32b273c1
+2026-11-19T09:34:43.937+06:00  INFO 18944 --- [           main] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-11-19T09:34:44.329+06:00  INFO 18944 --- [           main] [                                                 ] o.s.a.v.pgvector.PgVectorStore           : Using the vector table name: vector_store. Is empty: false
+2026-11-19T09:34:44.331+06:00  INFO 18944 --- [           main] [                                                 ] o.s.a.v.pgvector.PgVectorStore           : Initializing PGVectorStore schema for table: vector_store in schema: public
+2026-11-19T09:34:44.331+06:00  INFO 18944 --- [           main] [                                                 ] o.s.a.v.pgvector.PgVectorStore           : vectorTableValidationsEnabled false
+2026-11-19T09:34:45.538+06:00  INFO 18944 --- [           main] [                                                 ] o.s.a.m.s.c.a.McpServerAutoConfiguration : Enable tools capabilities, notification: true
+2026-11-19T09:34:45.547+06:00  WARN 18944 --- [           main] [                                                 ] o.s.a.m.s.c.a.ToolCallbackUtils          : Found MCP Clients. The MCP Client tools will not be exposed by the MCP Server. If you would like to expose the tools, set spring.ai.mcp.server.expose-mcp-client-tools=true.
+2026-11-19T09:34:45.557+06:00  WARN 18944 --- [           main] [                                                 ] o.s.a.m.a.p.tool.SyncMcpToolProvider     : No tool methods found in the provided tool objects: []
+2026-11-19T09:34:45.557+06:00  INFO 18944 --- [           main] [                                                 ] o.s.a.m.s.c.a.McpServerAutoConfiguration : Enable resources capabilities, notification: true
+2026-11-19T09:34:45.563+06:00  INFO 18944 --- [           main] [                                                 ] o.s.a.m.s.c.a.McpServerAutoConfiguration : Enable resources templates capabilities, notification: true
+2026-11-19T09:34:45.565+06:00  INFO 18944 --- [           main] [                                                 ] o.s.a.m.s.c.a.McpServerAutoConfiguration : Enable prompts capabilities, notification: true
+2026-11-19T09:34:45.568+06:00  INFO 18944 --- [           main] [                                                 ] o.s.a.m.s.c.a.McpServerAutoConfiguration : Enable completions capabilities
+2026-11-19T09:34:46.408+06:00  WARN 18944 --- [           main] [                                                 ] o.s.a.m.a.p.s.SyncMcpSamplingProvider    : No sampling methods found
+2026-11-19T09:34:46.410+06:00  WARN 18944 --- [           main] [                                                 ] o.s.a.m.a.p.e.SyncMcpElicitationProvider : No elicitation methods found
+2026-11-19T09:34:46.492+06:00  INFO 18944 --- [           main] [                                                 ] c.example.support.TraceRecordingProbe    : Started TraceRecordingProbe in 15.092 seconds (process running for 18.162)
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::loadLibrary has been called by io.netty.util.internal.NativeLibraryUtil in an unnamed module (file:/C:/Users/ruhit/.m2/repository/io/netty/netty-common/4.2.19.Final/netty-common-4.2.19.Final.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+2026-11-19T09:34:48.106+06:00  WARN 18944 --- [           main] [                                                 ] c.e.support.mcp.BestEffortToolCallbacks  : MCP tools unavailable, answering without them: java.lang.RuntimeException: Client failed to initialize listing tools
+2026-11-19T09:34:58.581+06:00  WARN 18944 --- [           main] [                                                 ] c.e.support.mcp.BestEffortToolCallbacks  : MCP tools unavailable, answering without them: java.lang.RuntimeException: Client failed to initialize listing tools
+WROTE D:\Projects\zombie\spring-ai-from-scratch\lesson-src\module-6\probes\trace-before.json
+
+Test run finished after 43486 ms
+[         2 containers found      ]
+[         0 containers skipped    ]
+[         2 containers started    ]
+[         0 containers aborted    ]
+[         2 containers successful ]
+[         0 containers failed     ]
+[         1 tests found           ]
+[         0 tests skipped         ]
+[         1 tests started         ]
+[         0 tests aborted         ]
+[         1 tests successful      ]
+[         0 tests failed          ]
+
+2026-11-19T09:35:15.436+06:00  WARN 18944 --- [ionShutdownHook] [                                                 ] i.m.registry.otlp.OtlpMeterRegistry      : Failed to publish metrics to OTLP receiver (context: url=http://localhost:4318/v1/metrics, resource-attributes={service.name=unknown_service})
+
+java.lang.Exception: java.net.ConnectException
+	at io.micrometer.registry.otlp.OtlpHttpMetricsSender.send(OtlpHttpMetricsSender.java:64) ~[micrometer-registry-otlp-1.17.2.jar:1.17.2]
+	at io.micrometer.registry.otlp.OtlpMeterRegistry.publish(OtlpMeterRegistry.java:194) ~[micrometer-registry-otlp-1.17.2.jar:1.17.2]
+	at io.micrometer.core.instrument.push.PushMeterRegistry.publishSafelyOrSkipIfInProgress(PushMeterRegistry.java:63) ~[micrometer-core-1.17.2.jar:1.17.2]
+	at io.micrometer.core.instrument.push.PushMeterRegistry.close(PushMeterRegistry.java:144) ~[micrometer-core-1.17.2.jar:1.17.2]
+	at io.micrometer.registry.otlp.OtlpMeterRegistry.close(OtlpMeterRegistry.java:321) ~[micrometer-registry-otlp-1.17.2.jar:1.17.2]
+	at org.springframework.boot.micrometer.metrics.autoconfigure.MeterRegistryCloser.onApplicationEvent(MeterRegistryCloser.java:58) ~[spring-boot-micrometer-metrics-4.1.2.jar:4.1.2]
+	at org.springframework.boot.micrometer.metrics.autoconfigure.MeterRegistryCloser.onApplicationEvent(MeterRegistryCloser.java:28) ~[spring-boot-micrometer-metrics-4.1.2.jar:4.1.2]
+	at org.springframework.context.event.SimpleApplicationEventMulticaster.doInvokeListener(SimpleApplicationEventMulticaster.java:180) ~[spring-context-7.0.10.jar:7.0.10]
+	at org.springframework.context.event.SimpleApplicationEventMulticaster.invokeListener(SimpleApplicationEventMulticaster.java:173) ~[spring-context-7.0.10.jar:7.0.10]
+	at org.springframework.context.event.SimpleApplicationEventMulticaster.multicastEvent(SimpleApplicationEventMulticaster.java:151) ~[spring-context-7.0.10.jar:7.0.10]
+	at org.springframework.context.support.AbstractApplicationContext.publishEvent(AbstractApplicationContext.java:448) ~[spring-context-7.0.10.jar:7.0.10]
+	at org.springframework.context.support.AbstractApplicationContext.publishEvent(AbstractApplicationContext.java:381) ~[spring-context-7.0.10.jar:7.0.10]
+	at org.springframework.context.support.AbstractApplicationContext.doClose(AbstractApplicationContext.java:1190) ~[spring-context-7.0.10.jar:7.0.10]
+	at org.springframework.context.support.AbstractApplicationContext.close(AbstractApplicationContext.java:1153) ~[spring-context-7.0.10.jar:7.0.10]
+	at org.springframework.boot.SpringApplicationShutdownHook.closeAndWait(SpringApplicationShutdownHook.java:135) ~[spring-boot-4.1.2.jar:4.1.2]
+	at java.base/java.lang.Iterable.forEach(Iterable.java:75) ~[na:na]
+	at org.springframework.boot.SpringApplicationShutdownHook.run(SpringApplicationShutdownHook.java:104) ~[spring-boot-4.1.2.jar:4.1.2]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:923) ~[java.net.http:na]
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:133) ~[java.net.http:na]
+	at org.springframework.boot.micrometer.metrics.autoconfigure.export.otlp.JdkClientHttpSender.send(JdkClientHttpSender.java:71) ~[spring-boot-micrometer-metrics-4.1.2.jar:4.1.2]
+	at io.micrometer.core.ipc.http.HttpSender$Request$Builder.send(HttpSender.java:306) ~[micrometer-core-1.17.2.jar:1.17.2]
+	at io.micrometer.registry.otlp.OtlpHttpMetricsSender.send(OtlpHttpMetricsSender.java:61) ~[micrometer-registry-otlp-1.17.2.jar:1.17.2]
+	... 17 common frames omitted
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1070) ~[java.net.http:na]
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:223) ~[java.net.http:na]
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.checkRetryConnect(PlainHttpConnection.java:277) ~[java.net.http:na]
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$0(PlainHttpConnection.java:235) ~[java.net.http:na]
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:955) ~[na:na]
+	at java.base/java.util.concurrent.CompletableFuture$UniHandle.tryFire(CompletableFuture.java:932) ~[na:na]
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:531) ~[na:na]
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1794) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	... 1 common frames omitted
+Caused by: java.nio.channels.ClosedChannelException
+	at java.base/sun.nio.ch.SocketChannelImpl.ensureOpen(SocketChannelImpl.java:204) ~[na:na]
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:942) ~[na:na]
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:211) ~[java.net.http:na]
+	... 9 common frames omitted
+
+2026-11-19T09:35:15.474+06:00  INFO 18944 --- [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-11-19T09:35:15.482+06:00  INFO 18944 --- [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
