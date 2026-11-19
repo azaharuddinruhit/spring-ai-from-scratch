@@ -132,10 +132,21 @@ nothing:
 @@CODE lesson1/ModelSafeToolErrors.java | case ToolRefusalException; yield@@
 </CodeFile>
 
-Register the tools on the support client from Module 4:
+Register the tools on the support client from Module 4. The system prompt now says which questions the documents answer and
+which the tools answer:
 
 <CodeFile title="src/main/java/com/example/support/chat/SupportChatConfig.java">
-@@CODE lesson1/SupportChatConfig.java | OrderTools orderTools\); defaultTools@@
+@@CODE lesson1/SupportChatConfig.java | OrderTools orderTools\); only from the context; Use the tools; defaultTools@@
+</CodeFile>
+
+The RAG advisor needs one change too. "Where is my order 1042?" matches no knowledge document, and with no documents the default
+`ContextualQueryAugmenter` replaces the question with "The user query is outside your knowledge base. Politely inform the user
+that you can't answer it." The model never sees the order number and never calls a tool. Module 4 chose that refusal on purpose,
+when the assistant could only answer from documents. With tools, pass the question through, and keep the rule against made-up
+policies in the system prompt above:
+
+<CodeFile title="src/main/java/com/example/support/knowledge/KnowledgeRagConfig.java">
+@@CODE main/com/example/support/knowledge/KnowledgeRagConfig.java | queryAugmenter@@
 </CodeFile>
 
 The service sets the tool context and reads the finish reason. Without that check, a customer whose question hit the limit reads

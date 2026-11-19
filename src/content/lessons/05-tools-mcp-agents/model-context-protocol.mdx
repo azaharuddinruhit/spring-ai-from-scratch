@@ -628,7 +628,7 @@ public class BestEffortToolCallbacks implements ToolCallbackProvider {
 Register the MCP tools next to the order tools:
 
 <CodeFile title="src/main/java/com/example/support/chat/SupportChatConfig.java">
-```java {27,41}
+```java {27,45}
 package com.example.support.chat;
 
 import java.time.Clock;
@@ -657,7 +657,11 @@ class SupportChatConfig {
                                 RetrievalAugmentationAdvisor knowledgeRagAdvisor, OrderTools orderTools,
                                 SyncMcpToolCallbackProvider mcpTools) {
         return builder
-                .defaultSystem("You are the support assistant for Acme Cloud.")
+                .defaultSystem("""
+                        You are the support assistant for Acme Cloud.
+                        Answer questions about policies, prices and shipping only from the context you are given. If it
+                        doesn't hold the answer, say you don't know and offer to pass the question to a support agent.
+                        Use the tools for questions about the customer's own orders and refunds.""")
                 .defaultAdvisors(
                         SafeGuardAdvisor.builder()
                                 .sensitiveWords(List.of("internal only", "api_key"))

@@ -132,7 +132,7 @@ defaults to `never` and `init.timeout` to 5m; `OllamaContainer` requests a GPU w
 on Docker Desktop/WSL without one; `RelevancyEvaluator` and `FactCheckingEvaluator` pass only on a bare "yes" (case and surrounding
 space ignored); `FactCheckingEvaluator` never sends the question; the RAG advisor puts retrieved documents in the `ChatResponse`
 metadata under `DOCUMENT_CONTEXT`; a registered Gradle `Test` task without `testClassesDirs`/`classpath` is `NO-SOURCE` and green.
-The first full-app run found that the Module 5 app refused order questions (empty-context augmenter), fixed in Module 6 with
+The first full-app run found that the Module 5 app refused order questions (empty-context augmenter), fixed in Module 5 Tool Calling with
 `allowEmptyContext(true)` plus a system-prompt rule; `qwen2.5:1.5b` never calls tools, `llama3.2:3b` does. Module 6 code lives in
 `lesson-src/module-6` (same workflow as Module 5; `// probe-only` lines are left out of lessons). `AnswerCheckLab` shows recorded
 `llama3.2:3b` answers and 3B-judge replies, nothing invented.

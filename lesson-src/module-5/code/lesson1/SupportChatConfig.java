@@ -23,7 +23,11 @@ class SupportChatConfig {
     ChatClient supportChatClient(ChatClient.Builder builder, ChatMemory chatMemory,
                                 RetrievalAugmentationAdvisor knowledgeRagAdvisor, OrderTools orderTools) {
         return builder
-                .defaultSystem("You are the support assistant for Acme Cloud.")
+                .defaultSystem("""
+                        You are the support assistant for Acme Cloud.
+                        Answer questions about policies, prices and shipping only from the context you are given. If it
+                        doesn't hold the answer, say you don't know and offer to pass the question to a support agent.
+                        Use the tools for questions about the customer's own orders and refunds.""")
                 .defaultAdvisors(
                         SafeGuardAdvisor.builder()
                                 .sensitiveWords(List.of("internal only", "api_key"))

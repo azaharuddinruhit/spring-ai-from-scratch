@@ -283,10 +283,11 @@ class ModelSafeToolErrors implements ToolExecutionExceptionProcessor {
 ```
 </CodeFile>
 
-Register the tools on the support client from Module 4:
+Register the tools on the support client from Module 4. The system prompt now says which questions the documents answer and
+which the tools answer:
 
 <CodeFile title="src/main/java/com/example/support/chat/SupportChatConfig.java">
-```java {24,38}
+```java {24,28,30,42}
 package com.example.support.chat;
 
 import java.time.Clock;
@@ -312,7 +313,11 @@ class SupportChatConfig {
     ChatClient supportChatClient(ChatClient.Builder builder, ChatMemory chatMemory,
                                 RetrievalAugmentationAdvisor knowledgeRagAdvisor, OrderTools orderTools) {
         return builder
-                .defaultSystem("You are the support assistant for Acme Cloud.")
+                .defaultSystem("""
+                        You are the support assistant for Acme Cloud.
+                        Answer questions about policies, prices and shipping only from the context you are given. If it
+                        doesn't hold the answer, say you don't know and offer to pass the question to a support agent.
+                        Use the tools for questions about the customer's own orders and refunds.""")
                 .defaultAdvisors(
                         SafeGuardAdvisor.builder()
                                 .sensitiveWords(List.of("internal only", "api_key"))
@@ -333,6 +338,54 @@ class SupportChatConfig {
         return builder
                 .defaultSystem("Answer questions about Acme Cloud plans and billing.")
                 .defaultAdvisors(new PiiRedactionAdvisor(), new SemanticCacheAdvisor(vectorStore, 0.92))
+                .build();
+    }
+}
+```
+</CodeFile>
+
+The RAG advisor needs one change too. "Where is my order 1042?" matches no knowledge document, and with no documents the default
+`ContextualQueryAugmenter` replaces the question with "The user query is outside your knowledge base. Politely inform the user
+that you can't answer it." The model never sees the order number and never calls a tool. Module 4 chose that refusal on purpose,
+when the assistant could only answer from documents. With tools, pass the question through, and keep the rule against made-up
+policies in the system prompt above:
+
+<CodeFile title="src/main/java/com/example/support/knowledge/KnowledgeRagConfig.java">
+```java {31}
+package com.example.support.knowledge;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import org.springframework.ai.rag.generation.augmentation.ContextualQueryAugmenter;
+import org.springframework.ai.rag.preretrieval.query.transformation.CompressionQueryTransformer;
+import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+
+@Configuration(proxyBeanMethods = false)
+class KnowledgeRagConfig {
+
+    @Bean
+    RetrievalAugmentationAdvisor knowledgeRagAdvisor(ChatClient.Builder builder, VectorStore vectorStore) {
+        return RetrievalAugmentationAdvisor.builder()
+                // Turns a follow-up such as "and for gift cards?" into a standalone question, using the history.
+                .queryTransformers(CompressionQueryTransformer.builder()
+                        .chatClientBuilder(builder)
+                        .build())
+                .documentRetriever(VectorStoreDocumentRetriever.builder()
+                        .vectorStore(vectorStore)
+                        .topK(5)
+                        .similarityThreshold(0.5)
+                        .filterExpression(KnowledgeFilters.customerDocuments()) // when a call passes no filter
+                        .build())
+                // An order question finds no documents. The default would then replace it with a refusal, and the model
+                // would never call a tool. The system prompt keeps policy answers to the documents instead.
+                .queryAugmenter(ContextualQueryAugmenter.builder().allowEmptyContext(true).build())
+                // After memory (+ 200), so memory stores the question rather than the augmented prompt,
+                // and before tool calling (+ 300), so it retrieves once per question.
+                .order(Ordered.HIGHEST_PRECEDENCE + 225)
                 .build();
     }
 }

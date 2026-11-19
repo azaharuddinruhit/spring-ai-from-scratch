@@ -51,7 +51,8 @@ sources and running the code in `code/` against Docker 29.8 (Docker Desktop on W
   `findOrder`, and answered "I'm sorry, but I can't assist with that." Module 4 warned about the trade-off; Module 5 added tools to
   the same `ChatClient` and the 63 unit tests (scripted model, no real RAG) could not see it. Fix in `KnowledgeRagConfig`:
   `.queryAugmenter(ContextualQueryAugmenter.builder().allowEmptyContext(true).build())`, with the "only from the context" rule
-  moved into the system prompt. `SupportChatIT` passes after the fix.
+  moved into the system prompt. `SupportChatIT` passes after the fix. The fix went into Module 5 (Tool Calling lesson and
+  `lesson-src/module-5/code`, 63 tests still pass), where tools first join the RAG client.
 - **Small models skip tools.** With the same two tool definitions and temperature 0, `qwen2.5:1.5b` asked for the order number
   instead of calling `findOrder` (direct `/api/chat` call and the full app); `llama3.2:3b` called `findOrder({"orderNumber": "1042"})`.
   The tests use `llama3.2:3b`.

@@ -9,11 +9,12 @@ import AnswerCheckLab from '@/components/islands/AnswerCheckLab';
 
 **You'll need:** JUnit 5 and Testcontainers basics, and the support app from Module 5.
 
-The support app has 63 tests, and all of them pass. Then we started the whole app for the first time, with a real model and real
-pgvector, and asked "Where is my order 1042?". It answered "I'm sorry, but I can't assist with that." The question had found no
-knowledge documents, so the RAG advisor replaced it with a refusal before the model saw it. No unit test could catch that,
-because none ran real retrieval and tools together. This lesson adds the two kinds of test that would have: integration tests
-against real containers, and evals that grade the answers themselves.
+The support app had 63 tests, and all of them passed. Then, while writing this module, we started the whole app for the first
+time, with a real model and real pgvector, and asked "Where is my order 1042?". It answered "I'm sorry, but I can't assist with
+that." The question had found no knowledge documents, so the RAG advisor replaced it with a refusal before the model saw it. No
+unit test could catch that, because none ran real retrieval and tools together. The fix is now in Module 5,
+in the Tool Calling lesson. This lesson adds the two kinds of test that catch bugs like it:
+integration tests against real containers, and evals that grade the answers themselves.
 
 ## 1. Spring mental model
 
@@ -122,19 +123,11 @@ Retrieval and the audience filter, against real embeddings in real PostgreSQL. T
 @@CODE test/com/example/support/knowledge/KnowledgeSearchIT.java | first\(\)\.isEqualTo; doesNotContain@@
 </CodeFile>
 
-This test caught the refusal from the introduction. The spy proves that the tool ran with the customer from the `ToolContext`, and
+This is the test that caught the refusal from the introduction. The spy proves that the tool ran with the customer from the `ToolContext`, and
 the tracking number can only come from the tool's result:
 
 <CodeFile title="src/test/java/com/example/support/chat/SupportChatIT.java">
 @@CODE test/com/example/support/chat/SupportChatIT.java | verify\(orders\); contains\(@@
-</CodeFile>
-
-The fix passes the question through when nothing is retrieved. The rule against made-up policies moves into the system prompt:
-"Answer questions about policies, prices and shipping only from the context you are given. If it doesn't hold the answer, say you
-don't know and offer to pass the question to a support agent."
-
-<CodeFile title="src/main/java/com/example/support/knowledge/KnowledgeRagConfig.java">
-@@CODE main/com/example/support/knowledge/KnowledgeRagConfig.java | queryAugmenter@@
 </CodeFile>
 
 An eval grades an answer against the documents the model was given, so the service now returns them with the text. The controller
