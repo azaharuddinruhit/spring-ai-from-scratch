@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { CodeView, LabFrame } from './LabFrame';
+import { CodeView, LabFrame, Slider } from './LabFrame';
 import recorded from '../../data/recorded-decisions.json';
 
 /*
@@ -85,45 +85,6 @@ function RouteBadge({ value }: { value: Route }) {
 
 function Label({ children }: { children: ReactNode }) {
   return <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{children}</p>;
-}
-
-function Slider({
-  id,
-  label,
-  value,
-  onChange,
-  note,
-}: {
-  id: string;
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-  note: string;
-}) {
-  return (
-    <div>
-      <div className="flex items-baseline justify-between gap-2">
-        <label htmlFor={id} className="text-xs font-medium text-slate-600 dark:text-slate-400">
-          {label}
-        </label>
-        <span className="font-mono text-sm text-slate-900 tabular-nums dark:text-white">{value.toFixed(2)}</span>
-      </div>
-      <input
-        id={id}
-        type="range"
-        min={0.05}
-        max={0.99}
-        step={0.01}
-        value={value}
-        onChange={(e) => onChange(+e.target.value)}
-        aria-describedby={`${id}-note`}
-        className="mt-1 w-full accent-brand-600"
-      />
-      <p id={`${id}-note`} className="text-xs text-slate-500 dark:text-slate-400">
-        {note}
-      </p>
-    </div>
-  );
 }
 
 /** A probability bar with the threshold marked on it. */

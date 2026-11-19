@@ -145,8 +145,8 @@ The first full-app run found that the Module 5 app refused order questions (empt
 `lesson-src/module-6` (same workflow as Module 5; `// probe-only` lines are left out of lessons). `AnswerCheckLab` shows recorded
 `llama3.2:3b` answers and 3B-judge replies, nothing invented.
 2.1 preview lessons (`preview: true` in the curriculum, written for `PREVIEW_STACK`: Spring AI 2.1.0-RC2 on Boot 4.2.0-RC2; plan and
-checklist in `UPGRADE-2.1.md`): code in `lesson-src/preview-2.1/code`, same template workflow as Module 5 (`assemble.py`,
-`run-tests.sh`; `*IT` tests are tagged `ollama` and run only when selected), facts in `lesson-src/preview-2.1/findings.md`. Each preview
+checklist in `UPGRADE-2.1.md`): code in `lesson-src/preview-2.1/code/<lesson>`, same template workflow as Module 5 (`assemble.py`,
+`run-tests.sh <lesson>`; `*IT` tests are tagged `ollama` and run only when selected), facts in `lesson-src/preview-2.1/findings.md`. Each preview
 lesson is its own project. Never put the Qwen server's address, key or model names in the repo; probes read `QWEN_*` env vars and the
 lessons say "a 27B Qwen 3 reasoning model". Decision models (Lesson 2.3, verified on RC2 with `d1-omni:600m` in Ollama 0.40.16):
 `OllamaDecisionModel` calls `/v1/systemone`; `spring.ai.model.decision` defaults to ollama in the Ollama starter and to openai in the
@@ -156,6 +156,13 @@ is inclusive and `DEFAULT_THRESHOLD` is 0.5; `getConfidence()` is reported by th
 took a blatant injection from 0.113 to 0.9998 and a benign mention to 0.794 (the router uses 0.9); a blank text throws
 `IllegalArgumentException: text cannot be null or empty`; no refusal was ever observed. `DecisionLab` replays
 `src/data/recorded-decisions.json` (from `probes/recording-to-sandbox.py`) with `TicketRouter`'s rules; update them together.
+Decision filter and reranker (Lesson 4.4, verified on RC2): `DecisionDocumentFilter` checks injection `>`, contradiction `>`
+(kept as CONFLICTING), relevance `<`, evidence `>` in that order, all strict (`Policy.defaults()` 0.7/0.7/0.45/0.55); its timeout
+(1 min) covers the batch and by default passes unscreened passages through (`failClosed(true)` drops them); the reranker keeps
+passages scored at or above `minimumScore`, has no `topK` by default, and on timeout keeps unscored ones (no score, no minimum check,
+still counted in `topK`). With `d1-omni:600m` the defaults kept nearly every passage as CONFLICTING and the injection question missed
+both planted passages; the lesson sets contradiction 1.0, reranker top 3 at 0.4, fail closed. `ScreeningLab` replays
+`src/data/recorded-rag.json` (from `probes/rag-to-sandbox.py`) with the filter's rule order; update them together.
 Observability (Module 6 Lesson 2, verified): `spring-boot-starter-opentelemetry` alone exports traces and metrics over OTLP (no
 actuator); sampling defaults to 0.1; traces export only once `management.opentelemetry.tracing.export.otlp.endpoint` is set;
 spans are `spring.ai.chat.client`, `spring.ai.advisor`, `gen_ai.client.operation`, `db.vector.client.operation`, `spring.ai.tool`;

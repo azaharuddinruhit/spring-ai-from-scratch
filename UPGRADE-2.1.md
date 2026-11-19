@@ -110,7 +110,8 @@ Probed on 2026-11-19 over plain HTTP from this PC:
 
 - [x] 2.3 Decision Models and the Decision Model & Threshold Simulator (first: the other decision lessons build on it). Shipped in
       1.6; found on the way: the OpenAI starter's `OpenAiDecisionModel` clashes with Ollama's unless `spring.ai.model.decision` is set.
-- [ ] 4.4 Decision Filter & Reranker.
+- [x] 4.4 Decision Filter & Reranker and the screening sandbox. Shipped in 1.6; found on the way: with `d1-omni:600m` the default
+      policy keeps nearly every passage as CONFLICTING, and the reranker keeps passages it couldn't score in time, without a score.
 - [ ] 5.4 Tool Search & DecisionToolIndex.
 - [ ] 1.5 Message Parts & Reasoning.
 

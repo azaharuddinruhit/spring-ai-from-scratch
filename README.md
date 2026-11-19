@@ -32,7 +32,7 @@ These versions are pinned in [`src/data/versions.ts`](src/data/versions.ts), and
 | 1 | Foundations & core abstractions | Published |
 | 2 | Deterministic structured outputs | Published, plus the Decision Models preview |
 | 3 | The Advisors API & chat memory | Published |
-| 4 | RAG & ETL pipelines | Published |
+| 4 | RAG & ETL pipelines | Published, plus the Decision Filter & Reranker preview |
 | 5 | Tool calling, MCP & agents | Published |
 | 6 | Production: testing, observability & security | Published |
 

@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: support
+  ai:
+    model:
+      chat: ollama
+      embedding: ollama
+      decision: ollama
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        model: llama3.2:3b
+      embedding:
+        model: nomic-embed-text
+      decision:
+        model: d1-omni:600m
+      init:
+        pull-model-strategy: when_missing
+        decision:
+          include: true
+
+support:
+  knowledge:
+    top-k: 6
+    # Measured on labelled question-passage pairs with d1-omni:600m (Lesson 4.4). It rated most unrelated passages above 0.7
+    # for "contradicts the question", which the filter keeps as CONFLICTING, so that check is off (no probability is above 1).
+    screening:
+      contradiction: 1.0
+      fail-closed: true
+      timeout: 30s
+    reranking:
+      top-k: 3
+      minimum-score: 0.4

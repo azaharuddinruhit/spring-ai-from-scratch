@@ -1,0 +1,185 @@
+---
+description: Screen and rerank retrieved passages with a local decision model before they reach the prompt, measure what the filter keeps on your own questions, and make it fail closed.
+---
+
+import Mermaid from '@/components/Mermaid.astro';
+import CodeFile from '@/components/CodeFile.astro';
+import Gotcha from '@/components/Gotcha.astro';
+import ScreeningLab from '@/components/islands/ScreeningLab';
+import ProjectTree from '@/components/ProjectTree.astro';
+import { buildGradle } from '@/data/snippets';
+import { PREVIEW_STACK } from '@/data/versions';
+
+**You'll need:** Ollama with `nomic-embed-text`, `d1-omni:600m` and `llama3.2:3b`. This lesson is its own small project; Lesson
+2.3 introduces the decision model.
+
+A vector search returns the passages closest to the question, and close isn't the same as useful. Module 4 sent the top-K
+straight into the prompt, so an off-topic passage, an outdated policy or a passage someone planted with instructions for the
+assistant reached the model with the rest. Spring AI 2.1 adds two document post-processors that ask a decision model about each
+passage before the prompt is built: `DecisionDocumentFilter` drops passages, and `DecisionDocumentReranker` orders what's left.
+This lesson puts both into a RAG pipeline, measures what they do with a small local model, and sets them up from what we
+measured.
+
+## 1. Spring mental model
+
+A `DocumentPostProcessor` runs after retrieval and before augmentation, like a servlet filter between the repository and the
+view. `RetrievalAugmentationAdvisor.documentPostProcessors(...)` runs them in the order you give.
+
+<Mermaid
+  caption="The lesson's pipeline. Each post-processor makes one decision-model call per passage."
+  code={`
+flowchart LR
+  Q["Question"] --> V["Vector search<br/>top 6 by similarity"]
+  V --> F["DecisionDocumentFilter<br/>4 questions per passage"]
+  F -->|"INCLUDED, CONFLICTING"| R["DecisionDocumentReranker<br/>answers_query score"]
+  F -.->|"EXCLUDED"| X["dropped"]
+  R -->|"top 3, score ≥ 0.4"| P["Prompt"]
+`}
+/>
+
+The filter asks four yes/no questions about each passage, over a `FieldsInput` that holds the question and the passage. It
+applies its `Policy` in a fixed order, and the first rule that matches decides:
+
+| Order | Question | Rule (`Policy.defaults()`) | Result |
+| --- | --- | --- | --- |
+| 1 | `contains_prompt_injection` | above 0.7 | `EXCLUDED` |
+| 2 | `contradicts_query_premise` | above 0.7 | kept as `CONFLICTING` |
+| 3 | `is_relevant` | below 0.45 | `EXCLUDED` |
+| 4 | `contains_answer_evidence` | above 0.55 | `INCLUDED`, otherwise `EXCLUDED` |
+
+These rules come from the 2.1.0-RC2 classes and from running them:
+
+- Every comparison is strict: a passage with evidence exactly 0.55 is excluded. (`isYes(threshold)` in Lesson 2.3 is inclusive.)
+- A kept passage carries its class in the metadata key `decision.classification`. A `CONFLICTING` passage is kept, and the
+  contradiction check comes before relevance, so an unrelated passage that "contradicts" the question survives.
+- The reranker asks one question, `answers_query`, stores the probability under `decision.rerank.score` and sorts by it. By
+  default it keeps every passage (no `topK`, `minimumScore` 0).
+- Both run four passages at a time and allow one minute for the whole batch. When the minute runs out, the filter logs
+  `Could not screen N of M documents, passing them through unscreened` and keeps them, unless you set `failClosed(true)`.
+  The reranker has no such switch: it keeps the passages it couldn't score after the scored ones, without a score and without
+  the `minimumScore` check, up to `topK`.
+
+## 2. Interactive sandbox
+
+<ScreeningLab client:visible />
+
+The sandbox replays a recording: three questions against the eight passages of the lesson's knowledge base, two of them planted
+with instructions for an assistant. The numbers are what `d1-omni:600m` returned. The labels come from a 27B Qwen 3 reasoning model
+we asked about every pair, so you can see which passages really answer the question.
+
+Things to try:
+
+- Pick the dishwasher question and press **Spring AI defaults**. All six retrieved passages reach the prompt, both planted ones
+  among them: `d1-omni:600m` rated nearly every unrelated passage above 0.7 for "contradicts the question", so the filter kept
+  them as `CONFLICTING`.
+- Switch to **This lesson**: contradiction at 1.00 (the check never fires), a reranker minimum score of 0.4 and a top 3. Each
+  question keeps at most the one passage that answers it.
+- Pick the address question. Its right passage scored 0.173 for evidence and the planted one 0.208, so no evidence threshold keeps
+  the first without the second. With this lesson's settings the question gets no passages, and the model says it can't answer.
+- Lower the injection threshold until a planted passage is dropped for injection. The right address passage (0.565) goes first.
+
+## 3. Idiomatic Java 25 & Gradle 9 code
+
+<ProjectTree />
+
+The decision post-processors live in `spring-ai-rag`, next to `RetrievalAugmentationAdvisor`; it also brings `SimpleVectorStore`.
+All three models run in Ollama:
+
+<CodeFile title="build.gradle" lang="groovy" lines="3,22,28,29" code={buildGradle(['spring-ai-starter-model-ollama', 'spring-ai-rag'], PREVIEW_STACK)} />
+
+Only the settings this app changes are in the configuration. The record's defaults are Spring AI's own:
+
+<CodeFile title="src/main/resources/application.yaml">
+@@CODE main-resources/application.yaml | decision: ollama; contradiction: 1.0; fail-closed: true; minimum-score@@
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/knowledge/KnowledgeProperties.java">
+@@CODE main/com/example/support/knowledge/KnowledgeProperties.java | @DefaultValue\("1m"\); new DecisionDocumentFilter.Policy@@
+</CodeFile>
+
+The pipeline: a vector search, the filter, then the reranker. `documentPostProcessors` keeps their order:
+
+<CodeFile title="src/main/java/com/example/support/knowledge/KnowledgeConfig.java">
+@@CODE main/com/example/support/knowledge/KnowledgeConfig.java | \.policy\(; \.failClosed\(; \.minimumScore\(; documentPostProcessors@@
+</CodeFile>
+
+The knowledge base is a text file with one passage per line, loaded at startup. The ETL lesson in Module 4 covers real documents:
+
+<CodeFile title="src/main/java/com/example/support/knowledge/KnowledgeLoader.java">
+@@CODE main/com/example/support/knowledge/KnowledgeLoader.java | vectorStore.add@@
+</CodeFile>
+
+<CodeFile title="src/main/java/com/example/support/SupportApplication.java">
+@@CODE main/com/example/support/SupportApplication.java | ConfigurationPropertiesScan$@@
+</CodeFile>
+
+The service reports which passages the answer was built from, and why each passed. The advisor leaves them in the response
+metadata under `DOCUMENT_CONTEXT`:
+
+<CodeFile title="src/main/java/com/example/support/knowledge/KnowledgeChatService.java">
+@@CODE main/com/example/support/knowledge/KnowledgeChatService.java | DOCUMENT_CONTEXT; Double rerankScore; SCORE_METADATA_KEY@@
+</CodeFile>
+
+The unit test replaces the decision model with a lambda that answers from the recorded probabilities. It pins the rules this app
+depends on: what the defaults keep, the strict comparisons, the fail-open timeout and the reranker's cut:
+
+<CodeFile title="src/test/java/com/example/support/knowledge/KnowledgeScreeningTest.java">
+@@CODE test/com/example/support/knowledge/KnowledgeScreeningTest.java | CONFLICTING"\); containsExactly\("returns", "shipping"\); 0\.5501; doesNotContainKey; assertThat\(closed\)@@
+</CodeFile>
+
+The integration test runs the whole path against Ollama. The decision model is deterministic, so a model or policy change that
+lets another passage through fails it:
+
+<CodeFile title="src/test/java/com/example/support/knowledge/KnowledgeChatIT.java">
+@@CODE test/com/example/support/knowledge/KnowledgeChatIT.java | containsExactly\("returns"\); isEmpty\(\); containsExactly\("pb200-care"\)@@
+</CodeFile>
+
+## 4. Production gotchas & security
+
+<Gotcha kind="reliability" title="Measure the filter before you trust it">
+With `Policy.defaults()` and `d1-omni:600m`, the filter kept five of six retrieved passages for the return question and six of six
+for the dishwasher question, almost all as `CONFLICTING`. The policy is a set of thresholds on someone else's model. Label a few
+dozen question-and-passage pairs from your own knowledge base, run them through the filter, and set the policy from what it keeps.
+</Gotcha>
+
+<Gotcha kind="security" title="A timeout passes passages through unscreened">
+The one-minute timeout covers all the passages of a question. On a slow machine or a busy model it runs out, and by default the
+passages that weren't judged go into the prompt as they are, a planted one included. Set `failClosed(true)` and a timeout you have
+measured: screening six passages took about 8 seconds here, filter and reranker together. A reranker timeout is milder, because
+its passages were already screened, but they arrive without a score, so code that reads `decision.rerank.score` must allow null.
+</Gotcha>
+
+<Gotcha kind="security" title="The injection question missed both planted passages">
+`d1-omni:600m` scored the planted return passage 0.223 and the planted address passage 0.320 for injection, and the genuine address
+passage 0.565. The filter dropped the planted ones for low evidence, not as injections. Keep instructions out of the knowledge base
+when you ingest it (Module 4), and make tools check who may do what (Module 5): what reaches the prompt is still untrusted text.
+</Gotcha>
+
+<Gotcha kind="reliability" title="These settings were tuned on three questions">
+A contradiction threshold of 1.0 and a minimum score of 0.4 give the right result for the three recorded questions, and they cost
+one: the address question loses its right passage and gets "can't answer". Turning `CONFLICTING` off also loses a useful label:
+the outdated final-sale passage now reaches the prompt as `INCLUDED` when it is ranked high enough. Fix that one in the knowledge
+base, and re-measure the policy on more questions before you rely on it.
+</Gotcha>
+
+<Gotcha kind="cost" title="One call per passage, per post-processor">
+Six passages cost six filter calls of four questions each, then six reranker calls: about 6 and 2 seconds on this machine's CPU.
+Four calls at a time made no difference, because Ollama answered one request at a time. The 27B model behind the sandbox's labels
+took 6 to 47 seconds per passage, which is why it is the reference here, not the pipeline.
+</Gotcha>
+
+<Gotcha kind="migration" title="Written against a release candidate">
+`DecisionDocumentFilter` and `DecisionDocumentReranker` are new in Spring AI 2.1, and this lesson was checked against 2.1.0-RC2.
+Names and defaults can still change before the release. The lesson moves to the release when it's out.
+</Gotcha>
+
+## Recap
+
+- `DecisionDocumentFilter` and `DecisionDocumentReranker` are `DocumentPostProcessor`s: add them to
+  `RetrievalAugmentationAdvisor.documentPostProcessors(...)`, filter first.
+- The filter checks injection, contradiction, relevance and evidence in that order, with strict thresholds; `CONFLICTING`
+  passages are kept.
+- The reranker scores `answers_query` and keeps everything unless you set `topK` and `minimumScore`.
+- Set `failClosed(true)`: by default a timeout lets unscreened passages through.
+- Measure on your own labelled pairs. With `d1-omni:600m` the defaults kept nearly every passage, and the injection question
+  caught neither planted one.

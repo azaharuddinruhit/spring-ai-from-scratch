@@ -101,6 +101,49 @@ with a 27B Qwen 3 reasoning model. Checked 2026-11-19 by running the probes in `
   passage conflicting. The reranker put the right passage first. The lesson shows these numbers as recorded and says so.
 - Timing: the filter took 5.2 s for five passages one at a time; the reranker 1.5 s with concurrency 4.
 
+## Lesson 4.4 filter and reranker (bytecode, `KnowledgeScreeningTest`, `RagRecordingProbe`, `ScreeningTimeProbe`)
+
+- `DecisionDocumentFilter.classify` checks, in this order: injection `>` policy → EXCLUDED; contradiction `>` policy →
+  CONFLICTING (kept); relevance `<` policy → EXCLUDED; evidence `>` policy → INCLUDED, else EXCLUDED. All comparisons are strict
+  (evidence exactly 0.55 is excluded; `isYes` is inclusive). Because contradiction comes before relevance, an unrelated passage
+  that scores high on contradiction is kept as CONFLICTING.
+- `timeout` (default 1 min) covers the whole batch, not one passage. When it passes, the filter logs `Could not screen N of M
+  documents, passing them through unscreened: timed out after ... ms` and, with `failClosed` false (the default), keeps those
+  passages without a classification. `failClosed(true)` drops them. Pinned with a slow stub model in `KnowledgeScreeningTest`;
+  seen for real when a 2.4B decision model took about 15 s per passage on this machine.
+- `DecisionDocumentReranker` defaults: no `topK` (all passages come back), `minimumScore` 0, concurrency 4, timeout 1 min.
+  A passage is kept when its score is at or above `minimumScore`. On timeout it logs `Could not score N of M documents, keeping
+  them unscored after the scored ones` and does exactly that: the unscored passages have no `decision.rerank.score`, skip the
+  `minimumScore` check and still count toward `topK` (a stub with topK 2, minimum 0.5 and two slow passages returned the 0.9
+  passage, then one unscored passage; the 0.1 passage was dropped). There is no fail-closed switch.
+- The lesson's build needs only `spring-ai-starter-model-ollama` and `spring-ai-rag` (which brings `spring-ai-vector-store` with
+  `SimpleVectorStore`): all 7 tests pass on that classpath. `RetrievalAugmentationAdvisor.DOCUMENT_CONTEXT` still carries the
+  documents, with `decision.classification` and `decision.rerank.score` in their metadata.
+- Recording (`probes/rag-recording.json`): three questions against eight passages in `SimpleVectorStore` with
+  `nomic-embed-text`, the filter (concurrency 1) and reranker on `d1-omni:600m`, and a 27B Qwen 3 reasoning model's own labels
+  (answers? contradicts? instructions to an assistant?) for every pair.
+  - Vector similarity put the right passage first for all three questions (0.831, 0.835, 0.790).
+  - With the default policy the filter kept 5 of 8 passages for the return question, 7 of 8 for the address question and 7 of 8
+    for the dishwasher question, nearly all as CONFLICTING: d1-omni rated most unrelated passages 0.71 to 0.99 for
+    "contradicts the question".
+  - The injected return passage was dropped for low evidence (0.079), not for injection (0.223). The address passage scored
+    0.565 for injection and the injected address passage 0.320; the right address passage scored evidence 0.173, the injected
+    one 0.208, so no policy keeps the first without the second.
+  - The reranker put the right passage first for the return (0.564) and dishwasher (0.563) questions, and fourth for the
+    address question (0.061, after shipping 0.093).
+  - The judge answered "yes, it answers" for the three right passages, for the final-sale passage (which it also marked as
+    contradicting the return question) and for the injected address passage on the address question; it flagged both injected
+    passages as instructions to an assistant on every question, and nothing else. It took 5.9–47.4 s and 150–979 completion
+    tokens per pair.
+  - The lesson's settings (contradiction 1.0, so CONFLICTING never happens; reranker minimum score 0.4, top 3) leave exactly
+    `returns` for the return question, nothing for the address question and `pb200-care` for the dishwasher question.
+    `KnowledgeChatIT` pins that with the real models; llama3.2:3b's answer to the return question contains "30".
+- Timing, model warm, six passages (`ScreeningTimeProbe`): filter 5.7–6.4 s, reranker 1.7–2.0 s, the same at concurrency 1 and
+  4. Ollama ran on the CPU here and answered one request at a time.
+- Other local decision models, for the record (the lesson uses `d1-omni:600m` only): `laya` (421M) ranked the right passage first
+  for all three questions but its default policy excluded two of them; `d3:2b` (2.4B) scored the return question cleanly
+  (injection 0.986 on the injected passage) but took about 15 s per passage and hit the timeout.
+
 ## Tool search (`RagToolFactsProbe`)
 
 - `DecisionToolIndex` asks `best_tool` (a `ChoiceQuestion` over the indexed tool names) and `any_tool_applies` (yes/no) in one

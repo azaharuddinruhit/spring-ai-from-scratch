@@ -5,11 +5,13 @@ DecisionToolIndex) are generated from this folder, on the same workflow as `less
 targets Spring AI 2.1.0-RC2 and Spring Boot 4.2.0-RC2 (`pom.xml`, and `PREVIEW_STACK` in `src/data/versions.ts`). The plan is in
 `UPGRADE-2.1.md`.
 
-- `code/main`, `code/test`, `code/main-resources`, `code/test-resources`: the lesson code and its tests.
+- `code/<lesson>/main`, `test`, `main-resources`, `test-resources`: each preview lesson is its own small project
+  (`decision-models`, `decision-filter`, ...), with its own `application.yaml`. `code/probe-only.properties` holds settings the
+  shared workspace classpath needs and the lessons never show.
 - `templates/*.mdx`: the lesson sources. Generate a lesson with
-  `python lesson-src/preview-2.1/assemble.py <template> <out.mdx> lesson-src/preview-2.1/code`; `@@CODE <file> | <regex>@@`
+  `python lesson-src/preview-2.1/assemble.py <template> <out.mdx> lesson-src/preview-2.1/code/<lesson>`; `@@CODE <file> | <regex>@@`
   lines become fenced code with those lines highlighted.
-- `run-tests.sh`: compiles the code and runs the tests. It needs `cp.arg` (see its header; `cp.arg`, `cp.txt` and `out/` are
+- `run-tests.sh <lesson>`: compiles that lesson's project and runs its tests. It needs `cp.arg` (see its header; `cp.arg`, `cp.txt` and `out/` are
   git-ignored).
 - `findings.md`: every verified fact and recording, with how it was checked.
 - `probes/`: the scripts behind the findings and the sandbox recordings.

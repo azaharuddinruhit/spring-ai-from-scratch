@@ -42,6 +42,54 @@ export function Pill({ active, onClick, children }: { active: boolean; onClick: 
   );
 }
 
+/** A labelled range input with its value and a one-line note under it. Defaults suit a probability threshold. */
+export function Slider({
+  id,
+  label,
+  value,
+  onChange,
+  note,
+  min = 0.05,
+  max = 0.99,
+  step = 0.01,
+  digits = 2,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  note: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  digits?: number;
+}) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2">
+        <label htmlFor={id} className="min-w-0 text-xs font-medium [overflow-wrap:anywhere] text-slate-600 dark:text-slate-400">
+          {label}
+        </label>
+        <span className="font-mono text-sm text-slate-900 tabular-nums dark:text-white">{value.toFixed(digits)}</span>
+      </div>
+      <input
+        id={id}
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(+e.target.value)}
+        aria-describedby={`${id}-note`}
+        className="mt-1 w-full accent-brand-600"
+      />
+      <p id={`${id}-note`} className="text-xs text-slate-500 dark:text-slate-400">
+        {note}
+      </p>
+    </div>
+  );
+}
+
 /** The same icon-only copy button as the lesson code viewer (styles in global.css). */
 export function CopyButton({ label, done, onClick }: { label: string; done: boolean; onClick: () => void }) {
   return (

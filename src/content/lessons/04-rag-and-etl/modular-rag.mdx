@@ -7,6 +7,7 @@ import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
 import RagPipelineLab from '@/components/islands/RagPipelineLab';
 import ProjectTree from '@/components/ProjectTree.astro';
+import { lessonHref } from '@/lib/course';
 
 The knowledge base is loaded and searchable. Now the support assistant should answer from it. `RetrievalAugmentationAdvisor`
 does that inside the advisor chain from Module 3: it runs a search with the user's question and puts the results into the
@@ -400,3 +401,7 @@ confirmation, and treat the answer as untrusted output. Module 6 covers prompt-i
 - `FILTER_EXPRESSION` on a request replaces the retriever's filter, so every request filter must include the access condition.
 - Order it at `HIGHEST_PRECEDENCE + 225`: after memory, so memory stores the question, and before tool calling, so it searches
   once.
+
+The post-processor slot is empty in this lesson. The
+<a href={lessonHref('04-rag-and-etl/decision-filter-and-reranker')}>Decision Filter & Reranker</a> preview lesson fills it
+with a small decision model that drops and reorders retrieved passages, on Spring AI 2.1.
