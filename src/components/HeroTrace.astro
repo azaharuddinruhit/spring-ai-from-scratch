@@ -29,8 +29,8 @@ const STEPS: Step[] = [
     id: 'service',
     label: 'Your service',
     type: '@Service',
-    module: 7,
-    body: 'Your code asks one question through the fluent API. In the capstone it is a support assistant that answers from your documents and your CRM.',
+    module: 1,
+    body: 'Your code asks one question through the fluent API. In this course it is a support assistant that answers from your documents and your order data.',
     code: `Answer answer = chatClient.prompt()
         .user(question)
         .call()
@@ -137,7 +137,7 @@ const answer = steps.find((s) => s.id === 'answer')!;
 
 <div class="trace" data-trace data-loop-from={LOOP_FROM} data-loop-to={LOOP_TO} data-rest={REST_ON}>
   <p class="trace-caption">
-    One request through the support assistant you build in Module 7. Select a step to see what happens there.
+    One request through the support assistant you build across the course. Select a step to see what happens there.
   </p>
 
   <div class="trace-map" role="tablist" aria-label="Steps of one request" style={`--cols: ${route.length + 1}; --loop-from: ${LOOP_FROM}; --loop-to: ${LOOP_TO}`}>

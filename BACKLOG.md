@@ -38,4 +38,4 @@ Tasks, biggest gain first:
   on the shipping server was not in that build.
 - Four merged branches remain on GitHub: `add-claude-md`, `feature-section-reading-time`, `fix-diagram-and-highlighting` and
   `fix-horizontal-diagrams`. Delete them only if the owner says so.
-- Modules 6 and 7 are not started. Don't plan or build them until the owner asks.
+- Optional, not planned: publish the finished support app as a runnable project.

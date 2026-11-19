@@ -38,7 +38,8 @@ links into the official Spring AI reference documentation for depth.
 
 - Static site (Astro, React islands, Tailwind, MDX) deployed to GitHub Pages under `/spring-ai-from-scratch`. No backend, no
   accounts, no analytics, no stored learner progress.
-- Seven modules: six plus a capstone. `src/data/curriculum.ts` is the source of truth; unpublished lessons are listed as
+- Six modules. The owner replaced the capstone in `prompt.md` with a final production module, because the Module 5 app
+  already brings every part together. `src/data/curriculum.ts` is the source of truth; unpublished lessons are listed as
   "soon". Content is released module by module.
 - Lesson anatomy is fixed: Spring mental model, interactive sandbox, idiomatic Java 25 and Gradle 9 code, production gotchas,
   recap.

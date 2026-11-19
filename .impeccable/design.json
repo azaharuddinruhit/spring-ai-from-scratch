@@ -201,7 +201,7 @@
       "kind": "button",
       "refersTo": "button-secondary",
       "description": "Secondary actions: an underlined link whose decoration turns emerald on hover.",
-      "html": "<a class=\"ds-link\" href=\"#\">See all seven modules</a>",
+      "html": "<a class=\"ds-link\" href=\"#\">See all six modules</a>",
       "css": ".ds-link { color: #334155; font: 500 0.875rem 'IBM Plex Sans', system-ui, sans-serif; text-decoration: underline; text-decoration-color: #cbd5e1; text-underline-offset: 4px; } .ds-link:hover { text-decoration-color: #059669; } .ds-link:focus-visible { outline: 2px solid #047857; outline-offset: 2px; }"
     },
     {

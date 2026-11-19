@@ -76,26 +76,12 @@ export const CURRICULUM: Module[] = [
   {
     slug: '06-production-hardening',
     number: 6,
-    title: 'Testing, Evaluation & Production Hardening',
-    summary: 'Testcontainers, LLM-as-a-judge evals, tracing and cost tracking, and guardrails.',
+    title: 'Production: Testing, Observability & Security',
+    summary: 'Tests that survive a changing model, LLM-as-a-judge evals, tracing and cost, tenant isolation and PII.',
     lessons: [
-      { slug: 'testcontainers', title: 'Integration Testing with Testcontainers' },
-      { slug: 'automated-evals', title: 'Automated AI Evals' },
+      { slug: 'testing-and-evals', title: 'Testing & Evals' },
       { slug: 'observability-and-finops', title: 'Observability & FinOps' },
-      { slug: 'security-and-guardrails', title: 'Security & Guardrails' },
-    ],
-  },
-  {
-    slug: '07-capstone',
-    number: 7,
-    title: 'Capstone: Enterprise Support & Knowledge Assistant',
-    summary: 'A multi-tenant assistant that brings every module together: ingestion, secure chat, tools, and evaluation.',
-    lessons: [
-      { slug: 'architecture', title: 'Capstone Architecture' },
-      { slug: 'ingestion-pipeline', title: 'Ingestion Pipeline' },
-      { slug: 'secure-chat-service', title: 'Secure Chat Service' },
-      { slug: 'agentic-tools', title: 'Agentic Tool Execution' },
-      { slug: 'observability-and-testing', title: 'Observability & Testing' },
+      { slug: 'security-and-data-protection', title: 'Security & Data Protection' },
     ],
   },
 ];
