@@ -1,0 +1,13 @@
+---
+/**
+ * Text whose long CamelCase names (RetrievalAugmentationAdvisor) may wrap at their capitals on a narrow screen. A <wbr> adds
+ * a break opportunity and no character, so copying and find-in-page still see the name as written.
+ */
+interface Props {
+  text: string;
+}
+
+const parts = Astro.props.text.split(/(?<=[a-z])(?=[A-Z])/);
+---
+
+{parts.map((part, i) => (i === 0 ? part : <><wbr />{part}</>))}

@@ -18,8 +18,9 @@ const { hasSidebar } = Astro.props;
       hasSidebar && (
         <button
           type="button"
-          data-sidebar-toggle
-          aria-controls="course-sidebar"
+          data-course-menu
+          aria-controls="course-sheet"
+          aria-haspopup="dialog"
           aria-expanded="false"
           class="-ml-1 rounded-md p-1.5 text-slate-600 sm:p-2 hover:bg-slate-100 hover:text-slate-900 lg:hidden dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
           aria-label="Open course navigation"

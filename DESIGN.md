@@ -208,7 +208,7 @@ Small UI labels are Plex.
   sits under the trace, one column on phones and text beside code from 64rem.
 - The course list is one vertical sequence, never a card grid. From the md breakpoint each module row is three columns:
   5rem numeral, up to 22rem title and summary, then the lessons.
-- Lesson pages: a sticky 18rem sidebar from lg (an off-canvas drawer below lg), an article column capped at 48rem, and an
+- Lesson pages: a sticky 18rem sidebar from lg (a bottom sheet below lg), an article column capped at 48rem, and an
   "On this page" list from xl. Lesson h2s get 56px of space above, a top rule, and 32px below the rule. Each h2 has its reading
   time under it ("3 min read", small Ink Quiet) and right-aligned in the "On this page" list ("3 min").
 - Wide tables and code scroll horizontally inside their column; the page itself never scrolls sideways. Table cells have a 9rem floor
@@ -272,6 +272,12 @@ interactive. Gotchas keep a 4px colored left edge because the hue encodes the go
   tabular figures, reading `v1.0.37` on a deploy and `dev` on any other build.
 - **Sidebar:** modules with tabular numbers, lessons in a 1px rail. The current lesson takes an emerald rail segment and emerald
   text. Unwritten lessons are muted with an italic lowercase "soon".
+- **Course sheet (below lg):** the header's menu button opens the sidebar as a bottom sheet on a modal `<dialog>`: paper,
+  a 1px top hairline, 12px top corners, no shadow, a 50% slate-950 scrim, at most 85dvh. A grab bar and "Course contents"
+  with a close button head it; dragging that head down past a quarter of its height (at most 120px) closes it, as do the
+  scrim, Escape and following a section link. Modules are `<details>` and only the current one starts open; rows are 8px
+  taller than on desktop for touch. The current lesson lists its sections with reading times on its emerald rail, so phones
+  get "On this page" too. It slides in over 240ms, not at all under reduced motion.
 
 ### The request trace (signature)
 The home hero (`HeroTrace.astro`), a tab list of the steps of one request. Steps follow the real 2.0.2 default advisor order:
@@ -295,6 +301,8 @@ back as `Answer` at the far end of the return rail.
 - **Do** set numbers in Plex with tabular figures, and only for real sequences.
 - **Do** write every label in sentence case and every link as the thing it opens.
 - **Do** let tables and code scroll inside their column on phones.
+- **Do** render titles (lesson, prev/next, home list, sidebar, gotcha) through `Breakable`, so a long CamelCase name such as
+  `RetrievalAugmentationAdvisor` wraps at its capitals instead of running off a phone screen.
 - Zoom is off on phones by the owner's decision (viewport `user-scalable=no`, `touch-action: pan-x pan-y`, Safari `gesturestart`
   cancelled), although it fails WCAG 1.4.4 for readers who enlarge text. Keep body text at 1rem or more for that reason.
 - **Do** show JSON indented, two spaces, one key per line, everywhere: sandboxes format it through `prettyJson`

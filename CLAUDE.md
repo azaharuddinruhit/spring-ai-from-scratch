@@ -54,7 +54,7 @@ There are no unit tests. `npm run build` is the gate.
 - The site is deployed under the `/spring-ai-from-scratch` base path. Build internal links with `withBase()` / `lessonHref()` from `src/lib/course.ts`.
 - Phones: zoom is off by the owner's decision (viewport `user-scalable=no`, `touch-action: pan-x pan-y` on `html, body`, and an inline
   `gesturestart` handler in `BaseLayout.astro` for Safari). Don't turn it back on unasked. Inline code wraps (`overflow-wrap: anywhere`)
-  so nothing widens the page; check new pages at 320px and 390px for horizontal overflow.
+  and titles render through `Breakable`, which lets long CamelCase names wrap at their capitals, so nothing widens the page; check new pages at 320px and 390px for horizontal overflow.
 - Dark mode is a `dark` class on `<html>`. Shiki uses dual themes through CSS variables in `src/styles/global.css`.
 
 ## Product and design

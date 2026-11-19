@@ -240,7 +240,7 @@
       "name": "Sidebar Navigation",
       "kind": "nav",
       "refersTo": "sidebar",
-      "description": "Course navigation: tabular module numbers, lessons on a 1px rail, current lesson in emerald.",
+      "description": "Course navigation: tabular module numbers, lessons on a 1px rail, current lesson in emerald. Below lg it opens as a bottom sheet with collapsible modules and the current lesson's sections.",
       "html": "<nav class=\"ds-nav\"><p><span>1</span>Foundations & Core Abstractions</p><ul><li><a href=\"#\">Spring AI 2.x Architecture</a></li><li><a href=\"#\" aria-current=\"page\">The ChatClient Fluent API</a></li><li class=\"soon\">Multi-Provider Portability <em>soon</em></li></ul></nav>",
       "css": ".ds-nav { font: 0.875rem 'IBM Plex Sans', system-ui, sans-serif; } .ds-nav p { display: flex; gap: 8px; margin: 0 0 8px; font-weight: 600; color: #0f172a; } .ds-nav p span { width: 1rem; color: #047857; font-variant-numeric: tabular-nums; } .ds-nav ul { list-style: none; margin: 0; padding: 0; border-left: 1px solid #e2e8f0; } .ds-nav a, .ds-nav .soon { display: flex; justify-content: space-between; margin-left: -1px; padding: 4px 8px 4px 12px; border-left: 1px solid transparent; color: #475569; text-decoration: none; } .ds-nav a:hover { border-color: #94a3b8; color: #0f172a; } .ds-nav a[aria-current=page] { border-color: #059669; color: #047857; font-weight: 500; } .ds-nav .soon { color: #94a3b8; } .ds-nav em { font-size: 0.75rem; }"
     },
