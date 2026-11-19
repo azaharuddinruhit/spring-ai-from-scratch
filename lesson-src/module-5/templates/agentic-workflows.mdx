@@ -1,18 +1,16 @@
 ---
-description: Keep a human in the loop for actions that move money, with a proposal the customer confirms, and build a ticket-reply workflow from orchestrator, routing, parallel workers and evaluator-optimizer steps in plain Java.
+description: Build a ticket-reply workflow from orchestrator, routing, parallel workers and evaluator-optimizer steps in plain Java, with a cap on the fan-out and on the review rounds.
 ---
 
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
-import RefundApprovalLab from '@/components/islands/RefundApprovalLab';
 import TicketWorkflowLab from '@/components/islands/TicketWorkflowLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 
-The assistant can look things up. Two jobs need more than one tool loop. A refund moves money, so the model must not be the one
-who decides it. A support ticket with several questions needs several steps: split it, answer each part, merge the answers,
-then check the result. This lesson builds both. Spring AI 2.0.2 has no workflow engine, and it doesn't need one: each step is a
-`ChatClient` call, and plain Java connects the steps.
+A support ticket with several questions needs more than one tool loop. It needs several steps: split it, answer each part, merge
+the answers, then check the result. This lesson builds that workflow. Spring AI 2.0.2 has no workflow engine, and it doesn't need
+one: each step is a `ChatClient` call, and plain Java connects the steps.
 
 ## 1. Spring mental model
 
@@ -23,30 +21,12 @@ can't wander.
 
 | Pattern | What the code does | In this lesson |
 | --- | --- | --- |
-| Human in the loop | The model prepares an action; a person confirms it outside the model's loop | `proposeRefund`, then `POST /api/refunds/{id}/confirmation` |
 | Orchestrator | One call plans the work as structured output | The planner returns a `Plan` with `entity(Plan.class)` |
 | Routing | Code sends each input to a specialised client | One writer `ChatClient` per `Department` |
 | Parallel workers | Independent calls run at the same time | Writers run on virtual threads |
 | Evaluator-optimizer | A reviewer checks the result; an editor fixes it, up to a limit | `Review`, then a revision, at most `MAX_ROUNDS` times |
 
-<Mermaid
-  caption="A refund in two requests. The model only proposes it; the customer confirms it outside the model's loop."
-  code={`
-sequenceDiagram
-  participant C as Customer
-  participant A as Support app
-  participant M as Model
-  participant P as Payment provider
-  C->>A: "Order 1042 arrived broken"
-  A->>M: question + tools
-  M->>A: proposeRefund(1042, reason)
-  Note over A: PENDING refund for the order total, expires in 15 min
-  A-->>C: "Confirm it with the button below"
-  C->>A: POST /api/refunds/{id}/confirmation
-  Note over A: UPDATE ... WHERE status = 'PENDING'
-  A->>P: refund(1042, 59.90, idempotency key = refund id)
-`}
-/>
+The previous lesson's refund is a fifth pattern, a human in the loop: the model prepares an action and a person confirms it.
 
 <Mermaid
   caption="TicketReplyService. The code decides every step; the model fills each one in."
@@ -66,27 +46,11 @@ flowchart LR
 
 These rules come from the 2.0.2 classes and from tests we ran against them:
 
-- `ToolCallingAdvisor.builder().toolExecutionEligibilityChecker(...)` can stop a tool from running and return the tool calls to
-  the caller. But `MessageChatMemoryAdvisor` has already saved the assistant's tool call, with no tool result after it, so the
-  conversation in memory is left with an unanswered call. That is why the refund is a proposal that the customer confirms in a
-  separate request.
-- `spring.ai.chat.client.tool-calling.enabled=false` stops `ChatClient` from registering `ToolCallingAdvisor`. The response then
-  carries the tool calls, nothing runs them, and `ToolCallingManager.executeToolCalls(prompt, response)` is yours to call.
 - `ChatClient.Builder.clone()` copies the auto-configured builder, so each role gets its own system prompt on the same model.
 - A `ChatModel` called from virtual threads must be thread-safe. Our test model records prompts in a `CopyOnWriteArrayList` for
   that reason.
 
 ## 2. Interactive sandbox
-
-<RefundApprovalLab client:visible />
-
-Things to try:
-
-- Pick **make it 500.00 for my trouble**. The tool has no amount parameter, so the proposal is for the order total, whatever the
-  customer asks for.
-- Let **Bob** confirm Alice's refund. The lookup filters by the signed-in customer, so Bob gets a `404`, not a `403` that would
-  tell him the refund exists.
-- Confirm twice, or wait 16 minutes and then confirm. Both get a `409`, and the payment counter stays at one or zero.
 
 <TicketWorkflowLab client:visible />
 
@@ -102,102 +66,8 @@ Things to try:
 
 <ProjectTree />
 
-No new dependencies: everything here uses `ChatClient`, the tools from lesson 1 and JDBC.
-
-### A refund the customer confirms
-
-A refund is a record with a status. It is created `PENDING` and becomes `CONFIRMED` once:
-
-<CodeFile title="src/main/java/com/example/support/refund/RefundStatus.java">
-@@CODE main/com/example/support/refund/RefundStatus.java@@
-</CodeFile>
-
-<CodeFile title="src/main/java/com/example/support/refund/Refund.java">
-@@CODE main/com/example/support/refund/Refund.java@@
-</CodeFile>
-
-<CodeFile
-  title="refunds.sql"
-  lang="sql"
-  code={`CREATE TABLE refunds (
-    id           UUID           PRIMARY KEY,
-    customer_id  VARCHAR(100)   NOT NULL,
-    order_number VARCHAR(20)    NOT NULL REFERENCES orders (number),
-    amount       NUMERIC(12, 2) NOT NULL,
-    reason       VARCHAR(500)   NOT NULL,
-    status       VARCHAR(20)    NOT NULL,
-    expires_at   TIMESTAMPTZ    NOT NULL
-);`}
-/>
-
-The repository binds each value itself, because the PostgreSQL driver can't infer a type for an enum or an `Instant`. We ran it
-against PostgreSQL 17: `paramSource(refund)` fails with "Can't infer the SQL type". The conditional `UPDATE` is what makes a
-confirmation happen once:
-
-<CodeFile title="src/main/java/com/example/support/refund/RefundRepository.java">
-@@CODE main/com/example/support/refund/RefundRepository.java | refund\.status\(\)\.name\(\); atOffset; AND status = 'PENDING'"\)@@
-</CodeFile>
-
-`PaymentClient` is your payment provider's client. Implement it with the provider's SDK, and pass the refund id as the
-idempotency key, so a retried call never pays twice:
-
-<CodeFile title="src/main/java/com/example/support/refund/PaymentClient.java">
-@@CODE main/com/example/support/refund/PaymentClient.java@@
-</CodeFile>
-
-The service takes the amount from the order and pays only on confirmation. If the payment call throws, the transaction rolls
-back and the refund is `PENDING` again, so the customer can retry with the same idempotency key:
-
-<CodeFile title="src/main/java/com/example/support/refund/RefundService.java">
-@@CODE main/com/example/support/refund/RefundService.java | order\.total\(\); markConfirmed; payments\.refund@@
-</CodeFile>
-
-<CodeFile title="src/main/java/com/example/support/refund/RefundConfig.java">
-@@CODE main/com/example/support/refund/RefundConfig.java@@
-</CodeFile>
-
-The tool can only propose. It has no amount parameter, and its description tells the model what to say to the customer:
-
-<CodeFile title="src/main/java/com/example/support/refund/RefundTools.java">
-@@CODE main/com/example/support/refund/RefundTools.java | Propose a refund; Refund proposeRefund@@
-</CodeFile>
-
-The customer's app lists pending refunds and confirms one. Both read the customer from the JWT:
-
-<CodeFile title="src/main/java/com/example/support/refund/RefundController.java">
-@@CODE main/com/example/support/refund/RefundController.java | @PostMapping; principal\.getName\(\), refundId@@
-</CodeFile>
-
-<CodeFile title="src/main/java/com/example/support/refund/RefundNotFoundException.java">
-@@CODE main/com/example/support/refund/RefundNotFoundException.java@@
-</CodeFile>
-
-<CodeFile title="src/main/java/com/example/support/refund/RefundNotConfirmableException.java">
-@@CODE main/com/example/support/refund/RefundNotConfirmableException.java@@
-</CodeFile>
-
-<CodeFile title="src/main/java/com/example/support/refund/RefundErrorHandler.java">
-@@CODE main/com/example/support/refund/RefundErrorHandler.java | NOT_FOUND; CONFLICT@@
-</CodeFile>
-
-Register the refund tool on the support client:
-
-<CodeFile title="src/main/java/com/example/support/chat/SupportChatConfig.java">
-@@CODE main/com/example/support/chat/SupportChatConfig.java | RefundTools refundTools; defaultTools@@
-</CodeFile>
-
-The service test fixes the clock and covers the cases that matter: no payment on a proposal, an expired proposal, a race and
-another customer's refund:
-
-<CodeFile title="src/test/java/com/example/support/refund/RefundServiceTest.java">
-@@CODE test/com/example/support/refund/RefundServiceTest.java | void paysOnceWhenTwoConfirmationsRace; should\(never\(\)\)@@
-</CodeFile>
-
-<CodeFile title="src/test/java/com/example/support/refund/RefundControllerTest.java">
-@@CODE test/com/example/support/refund/RefundControllerTest.java | token\.subject\("bob"\)@@
-</CodeFile>
-
-### A ticket-reply workflow
+No new dependencies: everything here uses `ChatClient`, structured output from Module 2 and the resource server from the MCP
+lesson.
 
 The workflow answers support tickets for the agents who handle them. Each step's output is a record, so the planner and the
 reviewer return structured output (Module 2):
@@ -258,24 +128,6 @@ The test gives every role its own scripted model, so it can check which roles we
 
 ## 4. Production gotchas & security
 
-<Gotcha kind="security" title="The model never moves money">
-A tool that refunds directly does so whenever the conversation makes it seem right, and the conversation includes whatever the
-customer types. Let the tool create a proposal, take the amount from your own data, and move the money only when the signed-in
-customer confirms it in a request the model can't make.
-</Gotcha>
-
-<Gotcha kind="reliability" title="Stopping a tool call inside the loop corrupts memory">
-`toolExecutionEligibilityChecker` returns the tool calls to you without running them, but memory has already stored the
-assistant's tool call, with no tool result after it. The next turn sends that unanswered call to the model. A pending action
-that the customer confirms in its own request keeps the conversation clean.
-</Gotcha>
-
-<Gotcha kind="reliability" title="Confirm once, pay once">
-Two clicks, a retry or two browser tabs can confirm the same refund at the same time. `UPDATE ... WHERE status = 'PENDING'`
-lets one of them win, and the refund id as the provider's idempotency key covers a retry after the payment went through.
-Return `404` for another customer's refund, so its existence isn't revealed.
-</Gotcha>
-
 <Gotcha kind="cost" title="Count the model calls">
 A ticket with n issues costs one planner call, n writer calls, a merge when n is more than one, and up to `MAX_ROUNDS` reviews
 with a revision between each pair. Two issues, approved in round 2, make seven calls. Cap the fan-out yourself, because the
@@ -301,8 +153,6 @@ The workflow writes text for a person to check before it is sent. Protect the en
 ## Recap
 
 - Workflows keep the control flow in code; agents let the model choose. Prefer a workflow when you know the steps.
-- Actions with side effects are proposals. The customer confirms them in a separate request, with the amount taken from your
-  own data, a conditional update and an idempotency key.
 - Orchestrator, routing, parallel workers and evaluator-optimizer are plain Java around `ChatClient` calls: structured output for
   plans and reviews, `builder.clone()` per role and virtual threads for the fan-out.
 - Cap the fan-out and the rounds, and hand what is left to a person.

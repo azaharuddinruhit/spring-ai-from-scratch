@@ -20,9 +20,8 @@ keys, virtual threads.
 
 Tasks, biggest gain first:
 
-1. **Split Agentic Workflows into two lessons:** "A refund the customer confirms" and "A ticket-reply workflow", about 25 min
-   each. Add the new slug to `src/data/curriculum.ts`, split `lesson-src/module-5/templates/agentic-workflows.mdx`, give each its
-   sandbox (`RefundApprovalLab`, `TicketWorkflowLab`), and fix links between lessons.
+1. ~~**Split Agentic Workflows into two lessons.**~~ Done on 2026-11-19: Human in the Loop (`human-in-the-loop`, the refund,
+   `RefundApprovalLab`) and Agentic Workflows (the ticket reply, `TicketWorkflowLab`).
 2. **Collapse files that barely change:** small records, exceptions, and tests carried over from earlier modules go behind a
    "show full file" toggle in `CodeFile`, with the changed lines shown first. Follow DESIGN.md.
 3. **Add a "You'll need" line to each Module 5 lesson** (for example "Spring Security basics, OAuth2 client credentials"), so

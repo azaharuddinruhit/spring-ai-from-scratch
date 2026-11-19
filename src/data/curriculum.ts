@@ -77,6 +77,7 @@ export const CURRICULUM: Module[] = [
     lessons: [
       { slug: 'tool-calling', title: 'Tool Calling & ToolCallingAdvisor' },
       { slug: 'model-context-protocol', title: 'Model Context Protocol (MCP)' },
+      { slug: 'human-in-the-loop', title: 'Human in the Loop' },
       { slug: 'agentic-workflows', title: 'Agentic Workflows' },
       { slug: 'tool-search', title: 'Tool Search & DecisionToolIndex', preview: true },
     ],

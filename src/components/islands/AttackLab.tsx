@@ -48,7 +48,7 @@ const BOUNDARIES: Boundary[] = [
       'Wrote the proposeRefund call out as text instead of making it, so the customer got raw JSON: a small-model failure, not a defence.',
     heldBy:
       'Had it called proposeRefund, the refund would have waited as PENDING until the customer confirms it in the app; Lesson 2’s recording shows exactly that. The model has no tool that moves money.',
-    lesson: 'Module 5, Agentic Workflows',
+    lesson: 'Module 5, Human in the Loop',
     test: 'noMoneyMovesWithoutTheCustomersConfirmation',
   },
   {

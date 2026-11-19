@@ -23,7 +23,7 @@ every guarantee where the model can't reach:
 | Must never happen | Enforced by | Built in |
 | --- | --- | --- |
 | A customer reads another customer's orders | The tool takes the customer from the tool context, not from the model | Module 5, Tool Calling |
-| Money moves without the customer's consent | The model can only propose a refund; the customer confirms it in the app | Module 5, Agentic Workflows |
+| Money moves without the customer's consent | The model can only propose a refund; the customer confirms it in the app | Module 5, Human in the Loop |
 | A customer reads staff documents | The retrieval filter asks only for customer documents | Module 4 |
 | Card numbers reach the model, memory or logs | `PiiRedactionAdvisor` masks them first | Module 3 |
 | The model calls a tool nobody reviewed | The MCP allowlist | Module 5, MCP |
