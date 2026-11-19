@@ -42,6 +42,12 @@ There are no unit tests. `npm run build` is the gate.
   `pre.shiki`, so code CSS targets `pre:is(.shiki, .astro-code)`. Box colours are `--code-*` variables in `global.css`. The font is
   JetBrains Mono with ligatures off, so code shows exactly as typed. All scrollbars are thin and themed (`--scrollbar`; code boxes use
   the code palette).
+- Project tree: `<ProjectTree />` sits right under every lesson's `## 3.` heading (templates too), closed by default. `src/lib/project-tree.ts` builds it from
+  `CodeFile` titles: this lesson's files are linked and marked new or changed (a title note such as "(additions)", or the path in an
+  earlier lesson of the same app); earlier lessons' files are muted. Modules 2-6 are one app (`support`, plus `shipping` from the
+  Java package); each Module 1 and preview lesson stands alone. `CodeFile` ids come from `codeFileAnchor()` (the nth block for a path
+  gets `-n`), keyed by the page `Request` on `globalThis`, because Astro loads `CodeFile` as more than one module instance per page.
+  Give every `CodeFile` a real path title, so the tree stays right.
 - Islands live in `src/components/islands/` and share `LabFrame`, `Pill` and `CodeView`. Code an island shows that is static per variant is
   highlighted at build time in an Astro wrapper (see `ProviderSwitcherLab.astro`), so islands don't ship Shiki. Code an island builds
   at runtime goes through `CodeView` with `lang` (`java`, `sql` or `json`), or `CodeEditor` for editable code: `src/lib/code-tokens.ts`

@@ -12,6 +12,20 @@ export const STACK = {
   jspecify: '1.0.1',
 } as const;
 
+export type Stack = { readonly [K in keyof typeof STACK]: string };
+
+/**
+ * The stack of the preview lessons (`preview: true` in the curriculum), which teach Spring AI 2.1 before its release.
+ * Spring AI 2.1.0-RC2 is built on Spring Boot 4.2.0-RC2 (Spring Framework 7.1.0-RC2); both are on Maven Central.
+ * At GA these move to the release versions, and then into STACK with the rest of the course (UPGRADE-2.1.md).
+ */
+export const PREVIEW_STACK: Stack = {
+  ...STACK,
+  springBoot: '4.2.0-RC2',
+  springFramework: '7.1',
+  springAi: '2.1.0-RC2',
+};
+
 /**
  * The site's own version, shown in the header pill. The deploy workflow sets SITE_VERSION to VERSION (major.minor) plus
  * its run number; any other build (npm run dev, a local build, a pull request) shows "dev".

@@ -1,0 +1,56 @@
+---
+/**
+ * The project as it stands after this lesson, at the top of the code section, closed by default so it costs one line. Files
+ * the lesson shows are linked to their code block and marked new or changed; files from earlier lessons are muted, and
+ * directories the lesson doesn't touch fold into one line. Built from CodeFile titles (src/lib/project-tree.ts), so it needs
+ * no props.
+ */
+import TreeNodes from './TreeNodes.astro';
+import { projectTree, toNodes } from '@/lib/project-tree';
+
+const id = Astro.url.pathname.replace(/^.*\/modules\//, '').replace(/\/$/, '');
+const roots = projectTree(id).map((root) => ({ name: root.name, nodes: toNodes(root.files) }));
+const nodes = roots.flatMap((root) => root.nodes);
+const shown = nodes.reduce((sum, node) => sum + node.shownCount, 0);
+const total = nodes.reduce((sum, node) => sum + node.fileCount, 0);
+---
+
+{
+  roots.length > 0 && (
+    <details class="project-tree group not-prose my-5 rounded-md border border-(--code-border) bg-(--code-bg)">
+      <summary class="flex cursor-pointer list-none items-start gap-2 rounded-md px-3.5 py-2.5 [&::-webkit-details-marker]:hidden">
+        <svg
+          class="mt-[0.2rem] size-3.5 shrink-0 text-slate-500 transition-transform group-open:rotate-90 motion-reduce:transition-none dark:text-slate-400"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m9 6 6 6-6 6" />
+        </svg>
+        <span class="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+          <span class="text-[0.8rem] font-medium text-slate-700 dark:text-slate-300">The project after this lesson</span>
+          <span class="text-xs text-slate-500 dark:text-slate-400">
+            {shown} of {total} files are in this lesson
+          </span>
+        </span>
+      </summary>
+      <div class="code-mono border-t border-(--code-border) px-3.5 py-3 text-[0.8rem] leading-[1.8] text-(--code-fg)">
+        <p class="mb-2 font-sans text-xs text-slate-500 dark:text-slate-400">
+          Linked files jump to their code below; muted files are unchanged.
+        </p>
+        {
+          roots.map((root) => (
+            <div class="[&+&]:mt-3">
+              <p class="font-semibold">{root.name}/</p>
+              <TreeNodes nodes={root.nodes} />
+            </div>
+          ))
+        }
+      </div>
+    </details>
+  )
+}

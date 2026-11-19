@@ -6,6 +6,8 @@
 export interface Lesson {
   slug: string;
   title: string;
+  /** Teaches a Spring AI release candidate (PREVIEW_STACK in src/data/versions.ts) and is marked as a preview. */
+  preview?: true;
 }
 
 export interface Module {
@@ -28,6 +30,7 @@ export const CURRICULUM: Module[] = [
       { slug: 'chatclient-fluent-api', title: 'The ChatClient Fluent API' },
       { slug: 'multi-provider-portability', title: 'Multi-Provider Portability' },
       { slug: 'prompts-and-multimodality', title: 'Prompt Engineering & Multimodality' },
+      { slug: 'message-parts-and-reasoning', title: 'Message Parts & Reasoning', preview: true },
     ],
   },
   {
@@ -38,6 +41,7 @@ export const CURRICULUM: Module[] = [
     lessons: [
       { slug: 'structured-output-converters', title: 'The StructuredOutputConverter Ecosystem' },
       { slug: 'native-json-schema', title: 'Native JSON Schema & Strict Mode' },
+      { slug: 'decision-models', title: 'Decision Models', preview: true },
     ],
   },
   {
@@ -60,6 +64,7 @@ export const CURRICULUM: Module[] = [
       { slug: 'etl-pipeline', title: 'The ETL Pipeline' },
       { slug: 'embeddings-and-vector-stores', title: 'Embeddings & VectorStore' },
       { slug: 'modular-rag', title: 'Modular RAG with RetrievalAugmentationAdvisor' },
+      { slug: 'decision-filter-and-reranker', title: 'Decision Filter & Reranker', preview: true },
     ],
   },
   {
@@ -71,6 +76,7 @@ export const CURRICULUM: Module[] = [
       { slug: 'tool-calling', title: 'Tool Calling & ToolCallingAdvisor' },
       { slug: 'model-context-protocol', title: 'Model Context Protocol (MCP)' },
       { slug: 'agentic-workflows', title: 'Agentic Workflows' },
+      { slug: 'tool-search', title: 'Tool Search & DecisionToolIndex', preview: true },
     ],
   },
   {

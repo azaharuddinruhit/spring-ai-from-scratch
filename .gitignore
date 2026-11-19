@@ -23,3 +23,4 @@ lesson-src/*/out/
 lesson-src/*/cp.arg
 lesson-src/*/cp.txt
 *.class
+lesson-src/*/probes/*-log.jsonl

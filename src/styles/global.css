@@ -189,6 +189,12 @@ pre:is(.shiki, .astro-code) .line.diff-changed::before {
   @apply prose-code:before:content-none prose-code:after:content-none;
   @apply prose-pre:bg-transparent prose-pre:p-0;
 }
+/* @tailwindcss/typography 0.5.4 styles an element marked not-prose itself, only its children are skipped. The prose rules
+   that reach those elements (figure, h2 + *, :first-child) only set margins, so give them back their own: the code viewer's
+   and the diagrams' my-5 / my-6, which an unlayered prose rule would otherwise beat. */
+.lesson-prose .not-prose {
+  margin-block: revert-layer;
+}
 .lesson-prose :not(pre) > code {
   @apply rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[0.85em] font-medium text-slate-800 dark:bg-slate-800 dark:text-slate-100;
 }

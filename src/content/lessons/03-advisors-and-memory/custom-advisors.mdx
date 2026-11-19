@@ -5,6 +5,7 @@ description: What SimpleLoggerAdvisor and SafeGuardAdvisor really do, and how to
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
 import GuardrailLab from '@/components/islands/GuardrailLab';
+import ProjectTree from '@/components/ProjectTree.astro';
 
 The previous lesson showed how the chain runs. This one fills it: two built-in advisors you will use on day one, and three you
 write yourself. For each, the code is short. The decision that matters is where it sits in the order.
@@ -60,6 +61,8 @@ Things to try:
   keep the real number. Move it **before memory**.
 
 ## 3. Idiomatic Java 25 & Gradle 9 code
+
+<ProjectTree />
 
 The advisors need nothing new. The semantic cache needs a `VectorStore` bean, which Module 4 sets up; until then, leave out the
 FAQ client below.

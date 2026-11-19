@@ -6,6 +6,7 @@ import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
 import VectorSearchLab from '@/components/islands/VectorSearchLab';
+import ProjectTree from '@/components/ProjectTree.astro';
 
 The previous lesson ended with `vectorStore.add(chunks)`. This one opens that call: an `EmbeddingModel` turns each chunk into a
 vector, a `VectorStore` saves it next to the text and metadata, and a search turns the question into a vector and returns the
@@ -77,6 +78,8 @@ Things to try:
 - Try the `NOT` and `!` presets and read the SQL: neither means what it looks like.
 
 ## 3. Idiomatic Java 25 & Gradle 9 code
+
+<ProjectTree />
 
 Add the PgVector starter and the PostgreSQL driver. The embedding model comes from the OpenAI starter you added in Module 1:
 

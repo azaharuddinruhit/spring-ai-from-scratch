@@ -6,6 +6,7 @@ import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
 import ChatMemoryLab from '@/components/islands/ChatMemoryLab';
+import ProjectTree from '@/components/ProjectTree.astro';
 
 A chat model remembers nothing between calls. Every request must carry the conversation so far, and choosing what to carry,
 where to keep it and whose it is, is your job. Spring AI splits that job into three parts, and the advisor from the previous two
@@ -83,6 +84,8 @@ Things to try:
 - With `maxMessages` at 4, keep talking and watch the oldest rows go. The model then no longer knows the order number.
 
 ## 3. Idiomatic Java 25 & Gradle 9 code
+
+<ProjectTree />
 
 Add the JDBC repository starter and your database driver to the build:
 

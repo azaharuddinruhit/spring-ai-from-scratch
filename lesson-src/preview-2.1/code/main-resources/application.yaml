@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: support
+  ai:
+    model:
+      decision: ollama
+    ollama:
+      base-url: http://localhost:11434
+      decision:
+        model: d1-omni:600m
+      init:
+        pull-model-strategy: when_missing
+        chat:
+          include: false
+        embedding:
+          include: false
+        decision:
+          include: true
+
+support:
+  routing:
+    # Set from labelled tickets, not left at 0.5: with d1-omni:600m, real injections scored 0.92 and above, while a customer
+    # asking what "ignore previous instructions" means scored 0.79 (lesson 2.3, findings.md).
+    injection-threshold: 0.9
+    minimum-intent-confidence: 0.6

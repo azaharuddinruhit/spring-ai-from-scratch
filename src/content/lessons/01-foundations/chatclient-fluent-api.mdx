@@ -6,6 +6,7 @@ import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
 import ChatClientLifecycle from '@/components/islands/ChatClientLifecycle';
+import ProjectTree from '@/components/ProjectTree.astro';
 
 `ChatClient` is the main API in Spring AI 2.x, and `ChatModel` is the lower-level building block underneath it.
 If you've used `RestClient`, the shape will feel familiar.
@@ -65,6 +66,8 @@ itself again, including your logger. Memory advisors are the exception: they def
 outside the tool loop and run once per call. Modules 3 and 5 build on this.
 
 ## 3. Idiomatic Java 25 & Gradle 9 code
+
+<ProjectTree />
 
 Keep the system prompt in a resource rather than a Java string so you can review and version it like any other file.
 

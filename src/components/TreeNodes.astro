@@ -1,0 +1,54 @@
+---
+/** One level of ProjectTree: directories (folded when the lesson shows nothing in them), then files. */
+import Breakable from './Breakable.astro';
+import type { TreeNode } from '@/lib/project-tree';
+
+interface Props {
+  nodes: TreeNode[];
+}
+
+const { nodes } = Astro.props;
+const muted = 'text-slate-500 dark:text-slate-400';
+// A name that wraps on a phone continues indented, so its second line doesn't read as a child.
+const hang = 'pl-[2ch] -indent-[2ch]';
+---
+
+<ul class="ml-[0.3rem] border-l border-(--code-border) pl-2.5">
+  {
+    nodes.map((node) =>
+      node.file ? (
+        <li class={hang}>
+          {node.file.anchor ? (
+            <>
+              <a
+                href={`#${node.file.anchor}`}
+                class="text-brand-700 underline decoration-brand-500/40 underline-offset-2 hover:decoration-brand-600 dark:text-brand-400"
+              >
+                <Breakable text={node.label} />
+              </a>
+              <span class={node.file.status === 'new' ? 'ml-2 text-xs text-brand-700 dark:text-brand-400' : `ml-2 text-xs ${muted}`}>
+                {node.file.status}
+              </span>
+            </>
+          ) : (
+            <span class={muted}><Breakable text={node.label} /></span>
+          )}
+        </li>
+      ) : node.shownCount === 0 ? (
+        <li>
+          <details>
+            <summary class={`cursor-pointer ${hang} ${muted}`}>
+              <Breakable text={`${node.label}/`} /> <span class="text-xs">{node.fileCount === 1 ? '1 file' : `${node.fileCount} files`}</span>
+            </summary>
+            <Astro.self nodes={node.children} />
+          </details>
+        </li>
+      ) : (
+        <li>
+          <span class={`block ${hang}`}><Breakable text={`${node.label}/`} /></span>
+          <Astro.self nodes={node.children} />
+        </li>
+      ),
+    )
+  }
+</ul>

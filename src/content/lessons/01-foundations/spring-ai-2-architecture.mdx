@@ -7,6 +7,7 @@ import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
 import OptionsMergeLab from '@/components/islands/OptionsMergeLab';
 import { buildGradle } from '@/data/snippets';
+import ProjectTree from '@/components/ProjectTree.astro';
 
 Spring AI doesn't invent a new programming model. It takes the patterns you already use for databases and HTTP and applies them to model APIs:
 a portable interface, vendor implementations picked by a starter, a fluent client, and ordered interceptors. Once you see that mapping,
@@ -84,6 +85,8 @@ Things to try:
 3. Click **`getStopSequences().add(…)`** and then **`mutate()…build()`** to see the 2.x immutability rules.
 
 ## 3. Idiomatic Java 25 & Gradle 9 code
+
+<ProjectTree />
 
 Create the Gradle wrapper with `gradle wrapper --gradle-version 9.9.1`. Then use the build below, which pins
 Spring Boot and imports the Spring AI BOM so that individual Spring AI artifacts need no version numbers.

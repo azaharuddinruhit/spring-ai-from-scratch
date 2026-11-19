@@ -6,6 +6,7 @@ import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
 import PromptTemplateLab from '@/components/islands/PromptTemplateLab';
+import ProjectTree from '@/components/ProjectTree.astro';
 
 A `Prompt` is a list of messages plus options. Prompt engineering in Spring AI mostly means building that list well: a reviewed system
 prompt kept in a resource file, user input passed in as template **parameters** (never concatenated), optional few-shot examples, and media where
@@ -56,6 +57,8 @@ Things to try:
 3. Uncheck **attach screenshot.png** to see `Media` disappear from the `UserMessage`.
 
 ## 3. Idiomatic Java 25 & Gradle 9 code
+
+<ProjectTree />
 
 Keep prompts in `src/main/resources/prompts/`. They are code, so review and test them like code.
 

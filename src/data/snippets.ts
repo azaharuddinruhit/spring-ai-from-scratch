@@ -1,4 +1,4 @@
-import { STACK } from './versions';
+import { STACK, type Stack } from './versions';
 
 /** The dependencies block of a Spring Boot 4 web app with the given Spring AI starters (versions come from the BOM). */
 export function gradleDependencies(starters: string[]): string {
@@ -11,12 +11,12 @@ ${starterLines}
 }`;
 }
 
-/** A complete Groovy DSL build file for a Spring Boot 4 + Spring AI 2 web app. */
-export function buildGradle(starters: string[]): string {
+/** A complete Groovy DSL build file for a Spring Boot 4 + Spring AI 2 web app (preview lessons pass PREVIEW_STACK). */
+export function buildGradle(starters: string[], stack: Stack = STACK): string {
   return `plugins {
     id 'java'
-    id 'org.springframework.boot' version '${STACK.springBoot}'
-    id 'io.spring.dependency-management' version '${STACK.dependencyManagementPlugin}'
+    id 'org.springframework.boot' version '${stack.springBoot}'
+    id 'io.spring.dependency-management' version '${stack.dependencyManagementPlugin}'
 }
 
 group = 'com.example'
@@ -24,7 +24,7 @@ version = '0.0.1-SNAPSHOT'
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(${STACK.java})
+        languageVersion = JavaLanguageVersion.of(${stack.java})
     }
 }
 
@@ -34,7 +34,7 @@ repositories {
 
 dependencyManagement {
     imports {
-        mavenBom "org.springframework.ai:spring-ai-bom:${STACK.springAi}"
+        mavenBom "org.springframework.ai:spring-ai-bom:${stack.springAi}"
     }
 }
 

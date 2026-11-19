@@ -6,6 +6,7 @@ import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
 import TextSplitterLab from '@/components/islands/TextSplitterLab';
+import ProjectTree from '@/components/ProjectTree.astro';
 
 Retrieval-augmented generation answers from your documents, so the first job is getting those documents into a form a
 model can search: small pieces of text, each stored with a vector and some metadata. Spring AI calls this the ETL pipeline,
@@ -76,6 +77,8 @@ Things to try:
 - Set `keepSeparator` to `false` and watch the line breaks (↵) turn into spaces.
 
 ## 3. Idiomatic Java 25 & Gradle 9 code
+
+<ProjectTree />
 
 Add the readers you need. The `VectorStore` comes from the next lesson; the tests here use `SimpleVectorStore`, which lives in
 memory.

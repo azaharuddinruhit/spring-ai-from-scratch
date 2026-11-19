@@ -6,6 +6,7 @@ import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
 import StructuredOutputLab from '@/components/islands/StructuredOutputLab';
+import ProjectTree from '@/components/ProjectTree.astro';
 
 The previous lesson's converter asks the model for JSON and trusts what comes back. Spring AI 2.0 gives you two stronger options,
 both set on the same `entity(...)` call: let the provider enforce the schema while it generates, and check the reply against the
@@ -70,6 +71,8 @@ Things to try:
 - Switch to **useProviderStructuredOutput()**, then choose **One @Nullable field**. OpenAI's strict mode rejects the schema.
 
 ## 3. Idiomatic Java 25 & Gradle 9 code
+
+<ProjectTree />
 
 Strict mode accepts a schema only when every property of every object is listed in `required`. Design the record for that: instead
 of an optional field, use a value the model can always produce, such as an empty string, an empty list or an enum constant like `NONE`.

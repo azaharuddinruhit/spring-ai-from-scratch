@@ -6,6 +6,7 @@ import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
 import AnswerCheckLab from '@/components/islands/AnswerCheckLab';
+import ProjectTree from '@/components/ProjectTree.astro';
 
 **You'll need:** JUnit 5 and Testcontainers basics, and the support app from Module 5.
 
@@ -63,6 +64,8 @@ wrong answer without also failing correct ones, and the small judge fails everyt
 the model it grades, and why you check it against answers you labelled yourself before you trust its gate.
 
 ## 3. Idiomatic Java 25 & Gradle 9 code
+
+<ProjectTree />
 
 The tests run Ollama, while production uses OpenAI, so the Ollama starter is a test dependency only. `evalTest` is a separate task
 that runs only tests tagged `eval`:

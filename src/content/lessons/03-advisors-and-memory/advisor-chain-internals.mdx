@@ -6,6 +6,7 @@ import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
 import AdvisorChainLab from '@/components/islands/AdvisorChainLab';
+import ProjectTree from '@/components/ProjectTree.astro';
 
 Every `ChatClient` call you have made so far went through advisors, even when you registered none: Module 2's format text came
 from `ChatModelCallAdvisor`, and `validateSchema()` added `StructuredOutputValidationAdvisor`. This lesson opens the chain itself:
@@ -82,6 +83,8 @@ Things to try:
 - Leave the logger and RAG at `0` and watch which one runs first: the logger, because it is registered last.
 
 ## 3. Idiomatic Java 25 & Gradle 9 code
+
+<ProjectTree />
 
 There are no new dependencies: the advisor API is part of `spring-ai-client-chat`, which every model starter brings in.
 

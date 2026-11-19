@@ -257,6 +257,18 @@ interactive. Gotchas keep a 4px colored left edge because the hue encodes the go
 - **Lines:** CSS-counter line numbers in the gutter color, never copied. Key lines get the green band and a green number.
 - **Sandboxes:** `CodeView` uses the same box at the same size; the provider switcher uses the same title line and copy button.
 
+### Project tree
+- **Place:** first thing under every lesson's "## 3." heading (`<ProjectTree />`), above the first code file.
+- **Closed by default:** a `<details>` card in the code box colours (Code Rule border, 6px radius) whose summary is one line: a
+  chevron that turns 90° when open (no turn under reduced motion), "The project after this lesson" in the code-file title style and
+  "N of M files are in this lesson" in muted xs text (on the right on desktop, under the title on a phone). Open, a Code Rule line
+  separates the summary from the tree, which starts with "Linked files jump to their code below; muted files are unchanged."
+- **Tree:** 0.8rem mono in the code palette, no line numbers and no copy button.
+  Each level is a Code Rule left guide; a source root (`src/main/java/com/example/support/`, `src/main/resources/`) is one line.
+- **Files:** a file the lesson shows is an emerald underlined link to its code block, followed by a small "new" (emerald) or
+  "changed" (muted) mark. Every other file is muted. A directory with nothing the lesson shows folds into a `<details>` line with
+  its file count. Long names wrap at capitals and slashes with a hanging indent, so the box never scrolls sideways.
+
 ### Sandbox frame
 - **Corner style:** 12px, 1px slate border with a 2px emerald top edge, white (dark: slate-800 at 40%).
 - **Header:** the sandbox title, the note "Simulated in your browser, no API key needed", and a one-line how-to.
@@ -272,6 +284,10 @@ interactive. Gotchas keep a 4px colored left edge because the hue encodes the go
   tabular figures, reading `v1.0.37` on a deploy and `dev` on any other build.
 - **Sidebar:** modules with tabular numbers, lessons in a 1px rail. The current lesson takes an emerald rail segment and emerald
   text. Unwritten lessons are muted with an italic lowercase "soon".
+- **Preview pill:** a lesson that teaches a Spring AI release candidate (`preview: true` in the curriculum) carries "2.1 preview"
+  after its title in the sidebar, the course sheet and the home list (`PreviewPill.astro`): the version pill's slate outline at
+  11px, fully round, never emerald, so it reads as a version label and not as the current lesson. On the lesson itself the line
+  under the lede starts "Preview, written for …" with the release-candidate versions.
 - **Course sheet (below lg):** the header's menu button opens the sidebar as a bottom sheet on a modal `<dialog>`: paper,
   a 1px top hairline, 12px top corners, no shadow, a 50% slate-950 scrim, at most 85dvh. A grab bar and "Course contents"
   with a close button head it; dragging that head down past a quarter of its height (at most 120px) closes it, as do the

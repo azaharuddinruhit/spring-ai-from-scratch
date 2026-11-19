@@ -5,6 +5,7 @@
  * for snippets generated from src/data.
  */
 import { highlight } from '@/lib/highlight';
+import { codeFileAnchor } from '@/lib/project-tree';
 
 interface Props {
   title: string;
@@ -15,10 +16,12 @@ interface Props {
 }
 
 const { title, code, lang, lines } = Astro.props;
+// Taken before any await, so blocks are numbered in page order.
+const anchor = codeFileAnchor(Astro.request, title);
 const html = code ? await highlight(code.trimEnd(), lang ?? 'text', lines) : null;
 ---
 
-<figure class="not-prose my-5" data-code-file>
+<figure id={anchor} class="not-prose my-5 scroll-mt-20" data-code-file>
   <figcaption class="mb-1.5 flex items-center justify-between gap-2">
     <span class="code-mono min-w-0 truncate text-[0.8rem] font-medium text-slate-700 dark:text-slate-300">{title}</span>
     <button type="button" class="copy-btn" data-copy aria-label={`Copy ${title}`} title="Copy code">

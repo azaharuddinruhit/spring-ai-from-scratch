@@ -6,6 +6,7 @@ import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
 import ToolLoopLab from '@/components/islands/ToolLoopLab';
+import ProjectTree from '@/components/ProjectTree.astro';
 
 The support assistant answers from the knowledge base, but it can't see a customer's orders. "Where is my order 1042?" needs
 data that lives in your database. With tool calling, the model asks your application to run a method, reads the result and then
@@ -73,6 +74,8 @@ Things to try:
   its own fallback instead of the limit message.
 
 ## 3. Idiomatic Java 25 & Gradle 9 code
+
+<ProjectTree />
 
 Tool calling is part of `spring-ai-model`, which every model starter already brings, so `build.gradle` doesn't change. The order
 lookup lives in its own package. An order is a record, and the repository always filters by customer:

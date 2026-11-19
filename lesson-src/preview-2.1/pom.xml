@@ -1,0 +1,21 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>demo</groupId><artifactId>preview21probe</artifactId><version>1</version>
+  <!-- Spring AI 2.1.0-RC2 is built on Spring Boot 4.2.0-RC2; PREVIEW_STACK in src/data/versions.ts pins the same pair. -->
+  <dependencyManagement><dependencies>
+    <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-bom</artifactId><version>2.1.0-RC2</version><type>pom</type><scope>import</scope></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-dependencies</artifactId><version>4.2.0-RC2</version><type>pom</type><scope>import</scope></dependency>
+  </dependencies></dependencyManagement>
+  <dependencies>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-webmvc</artifactId></dependency>
+    <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-starter-model-ollama</artifactId></dependency>
+    <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-starter-model-openai</artifactId></dependency>
+    <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-rag</artifactId></dependency>
+    <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-tool-search-tool</artifactId></dependency>
+    <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-starter-tool-search-advisor</artifactId></dependency>
+    <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-autoconfigure-model-decision-observation</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-webmvc-test</artifactId></dependency>
+    <dependency><groupId>org.junit.platform</groupId><artifactId>junit-platform-console</artifactId></dependency>
+  </dependencies>
+</project>

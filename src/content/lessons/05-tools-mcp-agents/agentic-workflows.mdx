@@ -7,6 +7,7 @@ import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
 import RefundApprovalLab from '@/components/islands/RefundApprovalLab';
 import TicketWorkflowLab from '@/components/islands/TicketWorkflowLab';
+import ProjectTree from '@/components/ProjectTree.astro';
 
 The assistant can look things up. Two jobs need more than one tool loop. A refund moves money, so the model must not be the one
 who decides it. A support ticket with several questions needs several steps: split it, answer each part, merge the answers,
@@ -98,6 +99,8 @@ Things to try:
   after `MAX_ROUNDS` the draft goes to an agent with `needsAgent: true`. Lower `MAX_ROUNDS` and count the model calls.
 
 ## 3. Idiomatic Java 25 & Gradle 9 code
+
+<ProjectTree />
 
 No new dependencies: everything here uses `ChatClient`, the tools from lesson 1 and JDBC.
 

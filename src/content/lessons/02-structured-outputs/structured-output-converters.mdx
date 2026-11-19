@@ -6,6 +6,7 @@ import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
 import RecordSchemaLab from '@/components/islands/RecordSchemaLab';
+import ProjectTree from '@/components/ProjectTree.astro';
 
 In Module 1, `.entity(Joke.class)` turned a reply into a record in one line. This lesson opens that line up: what Spring AI adds to
 your prompt, how it reads the reply, and which promises in the generated schema nothing actually checks.
@@ -78,6 +79,8 @@ Try it with the support ticket example. Remove `@Nullable` from `suggestedReply`
 that is appended to your prompt.
 
 ## 3. Idiomatic Java 25 & Gradle 9 code
+
+<ProjectTree />
 
 There are no new dependencies. The schema generator and the JSON Schema validator used in the next lesson come with
 `spring-ai-client-chat`, and JSpecify's `@Nullable` comes with Spring Framework 7.

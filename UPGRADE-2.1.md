@@ -6,7 +6,8 @@ they are done.
 
 ## Decisions
 
-- **Two phases.** Phase 1 ships now: four new lessons on Spring AI 2.1.0-RC2, each marked as a preview. Phase 2 waits for GA:
+- **Two phases.** Phase 1 ships now, one lesson at a time: four new lessons on Spring AI 2.1.0-RC2, each marked as a preview.
+  Each one is merged into `main` and deployed as soon as it is finished (the owner's standing approval). Phase 2 waits for GA:
   the existing lessons and the support app move to 2.1, and Session Memory replaces `ChatMemory`.
 - **New content only, in its own lessons.** The 18 existing lessons stay on 2.0.2 / Boot 4.1.2 until phase 2. No page mixes the
   two stacks; an existing lesson gets at most a one-line pointer to the new lesson.
@@ -38,14 +39,15 @@ they are done.
     (`QWEN_BASE_URL`, `QWEN_API_KEY`). Lesson code uses a placeholder base URL that a reader can point at Ollama's `/v1` or any
     OpenAI-compatible server.
   - Each lesson says which model produced its recordings and that another model may answer or score differently.
-- **Versions.** `VERSION` goes to 1.6 when the preview lessons ship and to 2.0 when phase 2 merges.
+- **Versions.** `VERSION` goes to 1.6 when the first preview lesson ships and to 2.0 when phase 2 merges.
 - **`@tailwindcss/typography` stays at 0.5.4** (the owner's choice). It drops 0.5.20's `th, td { text-align: start }`, `figure`,
   `kbd`, `dl` and `picture` rules, and its `not-prose` covers only the element's children. Fix what that changes in
   `global.css` (step 1).
 
 ## Checked in the RC2 jars (2026-11-19)
 
-From Maven Central and the class files, not yet by running them:
+From Maven Central and the class files. Step 1 then ran the classes; the results, recordings and anything that
+corrects this list are in `lesson-src/preview-2.1/findings.md`.
 
 - **Spring AI 2.1.0-RC2 is built on Spring Boot 4.2.0-RC2** (2.0.2 was built on 4.1.2), so the preview lessons pin Boot
   4.2.0-RC2. Both are on Maven Central; no milestone repository is needed.
@@ -95,14 +97,14 @@ Probed on 2026-11-19 over plain HTTP from this PC:
 
 ### 1. Ground work
 
-- [ ] Fix the typography 0.5.4 fallout in `global.css` (table header alignment, `not-prose` on the element itself); check lessons
-      at 320px, 390px and desktop in both themes.
-- [ ] Preview stack: a `PREVIEW_STACK` next to `STACK` in `src/data/versions.ts`, a preview flag per lesson in
+- [x] Fix the typography 0.5.4 fallout in `global.css`. Only the `not-prose` change mattered (code viewer and diagram margins);
+      after the fix every lesson's layout matches `main` at 1280px and 390px in both themes.
+- [x] Preview stack: a `PREVIEW_STACK` next to `STACK` in `src/data/versions.ts`, a preview flag per lesson in
       `src/data/curriculum.ts`, the "Preview" line in `LessonLayout`, the navigation mark, and preview pins in `buildGradle()` /
       `gradleDependencies()`. Update DESIGN.md for the mark.
-- [ ] Set up `lesson-src/preview-2.1/` on the Module 5/6 workflow (code, tests, templates, `assemble.py`, `findings.md`) with a
+- [x] Set up `lesson-src/preview-2.1/` on the Module 5/6 workflow (code, tests, templates, `assemble.py`, `findings.md`) with a
       2.1.0-RC2 / Boot 4.2.0-RC2 classpath.
-- [ ] Run the classes to confirm every fact under "Checked in the RC2 jars", and record the results in `findings.md`.
+- [x] Run the classes to confirm every fact under "Checked in the RC2 jars", and record the results in `findings.md`.
 
 ### 2. Lessons (each: code that compiles and passes its tests, recordings, sandbox, lesson)
 
@@ -111,12 +113,16 @@ Probed on 2026-11-19 over plain HTTP from this PC:
 - [ ] 5.4 Tool Search & DecisionToolIndex.
 - [ ] 1.5 Message Parts & Reasoning.
 
-### 3. Ship the preview
+### 3. Ship each lesson as it is finished
 
-- [ ] One-line pointers from Native JSON Schema, Modular RAG, Tool Calling and Multi-Provider Portability to the new lessons.
-- [ ] CLAUDE.md (new facts, the preview workflow), PRODUCT.md (preview lessons are checked against RC2, not a release),
-      README.md (curriculum table), the module summaries in `src/data/curriculum.ts`.
-- [ ] Check new pages at 320px and 390px; `npm run build` passes; `VERSION` 1.6; merge.
+For every lesson in step 2, before it merges:
+
+- [ ] A one-line pointer to it from the related existing lesson (Native JSON Schema, Modular RAG, Tool Calling or Multi-Provider
+      Portability).
+- [ ] CLAUDE.md (its verified facts, the preview workflow), README.md (curriculum table), the module summary in
+      `src/data/curriculum.ts` if it changes. With the first lesson: PRODUCT.md (preview lessons are checked against RC2, not a
+      release) and `VERSION` 1.6.
+- [ ] Check its page at 320px and 390px; `npm run build` passes; merge into `main`, push, confirm the deploy.
 
 ### 4. At GA (phase 2)
 
@@ -130,11 +136,18 @@ Probed on 2026-11-19 over plain HTTP from this PC:
       Security & Data Protection and CLAUDE.md say about the recorded behaviour (for example which attacks `llama3.2:3b` fell for).
 - [ ] `VERSION` 2.0, merge.
 
+## What step 1 changed
+
+- `d1-omni:600m` is deterministic and fast (about 0.5 s a call), but weak at 600M parameters: a blatant injection scores 0.54;
+  the RAG filter dropped an injected passage only because its evidence score was low, and kept an off-topic one; the tool index
+  found no tool for any request at the default applicability threshold of 0.5. The lessons show these recordings as they are
+  and teach thresholds, checks and evaluation from them, rather than presenting the decision features as reliable out of the
+  box.
+- `OpenAiChatModel` on the Qwen server returns `ReasoningPart`s, replays them as `reasoning_content`, and streams them; lesson
+  1.5 can be built on it as planned.
+
 ## Open questions
 
-- **Decision probabilities from `d1-omni:600m`.** Whether they are stable from run to run (record each preset more than once).
-- **`OpenAiChatModel` against the Qwen server.** The 2.1 notes say `reasoning_content` becomes a `ReasoningPart` and is
-  replayed (`replayReasoningContent`); confirm it through LiteLLM and vLLM, including streaming.
 - **The same code on Ollama's `/v1`.** Ollama's OpenAI-compatible endpoint names the field `reasoning`; confirm that the lesson
   code a reader runs against Ollama gets `ReasoningPart`s too.
 - **Token usage across the tool loop.** The 2.1 notes call summed usage a change; CLAUDE.md already records summed usage for

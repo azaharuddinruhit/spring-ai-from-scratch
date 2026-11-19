@@ -6,6 +6,7 @@ import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
 import RagPipelineLab from '@/components/islands/RagPipelineLab';
+import ProjectTree from '@/components/ProjectTree.astro';
 
 The knowledge base is loaded and searchable. Now the support assistant should answer from it. `RetrievalAugmentationAdvisor`
 does that inside the advisor chain from Module 3: it runs a search with the user's question and puts the results into the
@@ -79,6 +80,8 @@ Things to try:
 - Turn on the expander with a repeated variant. The whole request fails.
 
 ## 3. Idiomatic Java 25 & Gradle 9 code
+
+<ProjectTree />
 
 Add the RAG module:
 
