@@ -1,159 +1,148 @@
-# Upgrade to Spring AI 2.1
+# Spring AI 2.1: preview lessons, then the full move
 
-The plan for moving the whole course from Spring AI 2.0.2 to 2.1, agreed with the owner on 2026-11-19. Work happens on the
-`spring-ai-2.1` branch. Tick items off here as they are done.
+The plan for bringing Spring AI 2.1 into the course. It started from `prompt-updated.md` (the original request) and was settled
+with the owner on 2026-11-19; where the two differ, this file wins. Work happens on the `spring-ai-2.1` branch. Tick items off as
+they are done.
 
 ## Decisions
 
-- **The whole course moves to 2.1.** There is no separate "What's new" module: each 2.1 feature goes into the module where a
-  learner would look for it.
-- **Ship at GA.** 2.1 is at 2.1.0-RC2 and its docs still call 2.0.2 the stable release. The site says every lesson was checked
-  against the released classes, so `main` keeps 2.0.2 until 2.1.0 GA is out. Then the pin moves from RC2 to GA, the tests run
-  again, and the branch merges. (2.0 went from RC2 to GA in three days.)
-- **Memory: Session Memory only.** `ChatMemory`, `MessageChatMemoryAdvisor`, `MessageWindowChatMemory` and the chat memory
-  repositories are deprecated for removal in 3.0. Lessons teach `SessionAdvisors` and cover the old API in one
-  `Gotcha kind="migration"`.
-- **Ollama models only.** No cloud keys. Every recording (decisions, reasoning, traces, attacks) comes from local Ollama.
-- **Small models only.** The machine has 11.8 GB of RAM and 11 GB free on C:, so 7B+ thinking models (`qwen3:8b`,
-  `deepseek-r1:7b`) are out. See "Machine limits" below for the models and settings.
-- **Sandboxes show recorded runs only.** The decision simulator offers preset messages with recorded `d1-omni:600m`
-  probabilities. The sliders re-route those real numbers; there is no free-text input with made-up scores.
-- **Version:** `VERSION` goes to the next major (2.0) when the branch merges, because the whole course moves to a new stack.
+- **Two phases.** Phase 1 ships now: four new lessons on Spring AI 2.1.0-RC2, each marked as a preview. Phase 2 waits for GA:
+  the existing lessons and the support app move to 2.1, and Session Memory replaces `ChatMemory`.
+- **New content only, in its own lessons.** The 18 existing lessons stay on 2.0.2 / Boot 4.1.2 until phase 2. No page mixes the
+  two stacks; an existing lesson gets at most a one-line pointer to the new lesson.
+- **Each feature goes where a learner would look for it**, as the last lesson of that module (no "What's new" module):
 
-## Where the new content goes
+  | Lesson | Covers | Sandbox |
+  | --- | --- | --- |
+  | 1.5 Message Parts & Reasoning | `getParts()`, `TextPart` / `ReasoningPart` / `ToolCallPart` / `ToolResultPart` / `MediaPart` / `UnknownPart`, `getReasoning()`, reasoning replayed across turns, through `OpenAiChatModel` on an OpenAI-compatible server | The parts of a recorded reply with reasoning and a tool call, in order |
+  | 2.3 Decision Models | `DecisionModel`, `YesNoQuestion` / `ChoiceQuestion` / `ScoreQuestion`, thresholds, refusals, why not parse a chat reply | Decision Model & Threshold Simulator |
+  | 4.4 Decision Filter & Reranker | `DecisionDocumentFilter` (injection, contradiction, relevance, evidence), `DecisionDocumentReranker`, fail open / closed, concurrency and virtual threads, filter before rerank | The filter policy over recorded scores |
+  | 5.4 Tool Search & DecisionToolIndex | `ToolSearchToolCallingAdvisor` with the regex, Lucene, vector and decision indexes | Which tools each index picks for recorded questions |
 
-| 2.1 feature | Where |
-| --- | --- |
-| Message parts, `getReasoning()`, reasoning across turns | New lesson in Module 1, after Multi-Provider Portability |
-| `DecisionModel`, `YesNoQuestion` / `ChoiceQuestion` / `ScoreQuestion` | New lesson 2.3 in Structured Outputs, with the Decision Model & Threshold Simulator |
-| `DecisionDocumentFilter`, `DecisionDocumentReranker` | Module 4, probably a new lesson 4.4 (Modular RAG is already long). The filter becomes the support app's injection screen |
-| `DecisionToolIndex` | Module 5 Tool Calling: the tool-search section grows into a comparison of the regex, Lucene, vector and decision indexes |
-| Session Memory | Module 3 Chat Memory rewritten; the Module 5 and 6 support app migrated |
+  Each keeps the five-section layout. The 4.4 examples stand alone; the support app gets the filter in phase 2.
+- **Preview marking.** A preview lesson says "Preview: Spring AI 2.1.0-RC2, Spring Boot 4.2.0-RC2" where the other lessons say
+  "Written for …", and the course navigation marks it. Its build snippets use the preview pins.
+- **Memory waits.** `ChatMemory`, `MessageChatMemoryAdvisor`, `MessageWindowChatMemory`, `ChatMemoryRepository` and
+  `JdbcChatMemoryRepository` are deprecated for removal in RC2. Phase 1 leaves Module 3 and the support app alone; phase 2
+  rewrites them for Session Memory.
+- **Sandboxes show recorded runs only.** The simulator offers preset messages with probabilities recorded from `d1-omni:600m`;
+  sliders re-route those real numbers. There is no free-text input, because the site has no model to score typed text and
+  PRODUCT.md rules out invented numbers.
+- **Models: no cloud keys, two local sources.**
+  - Decisions: `d1-omni:600m` on Ollama only (the 2.1 default). The Qwen server has no `/v1/systemone` endpoint.
+  - The owner's Qwen server (see "Machine and models") for: all of lesson 1.5; the chat side of 5.4 (the model that calls the
+    tools `DecisionToolIndex` selects); the chat-model side wherever 2.3 or 4.4 compares a decision model with asking a chat
+    model; and the phase 2 re-recordings of `TraceLab` and `AttackLab` (replacing `llama3.2:3b`).
+  - Lessons name it generically: "a 27B Qwen 3 reasoning model", served through an OpenAI-compatible endpoint. The server's
+    address, key and model aliases never appear in the repo or on the site; probes read them from environment variables
+    (`QWEN_BASE_URL`, `QWEN_API_KEY`). Lesson code uses a placeholder base URL that a reader can point at Ollama's `/v1` or any
+    OpenAI-compatible server.
+  - Each lesson says which model produced its recordings and that another model may answer or score differently.
+- **Versions.** `VERSION` goes to 1.6 when the preview lessons ship and to 2.0 when phase 2 merges.
+- **`@tailwindcss/typography` stays at 0.5.4** (the owner's choice). It drops 0.5.20's `th, td { text-align: start }`, `figure`,
+  `kbd`, `dl` and `picture` rules, and its `not-prose` covers only the element's children. Fix what that changes in
+  `global.css` (step 1).
 
-Each new lesson keeps the five-section layout and gets a sandbox.
+## Checked in the RC2 jars (2026-11-19)
 
-## Machine limits
+From Maven Central and the class files, not yet by running them:
 
-Measured on 2026-11-19: 11.8 GB RAM, C: 11 GB free, D: 187 GB free.
+- **Spring AI 2.1.0-RC2 is built on Spring Boot 4.2.0-RC2** (2.0.2 was built on 4.1.2), so the preview lessons pin Boot
+  4.2.0-RC2. Both are on Maven Central; no milestone repository is needed.
+- New artifacts: `spring-ai-session`, `spring-ai-session-advisor`, `spring-ai-session-jdbc`,
+  `spring-ai-starter-model-session-jdbc`, `spring-ai-systemone`, `spring-ai-autoconfigure-model-decision-observation`, and
+  Google GenAI transcription and TTS.
+- `org.springframework.ai.decision` (in `spring-ai-model`): `DecisionModel`, `DecisionPrompt`, `DecisionResponse`, `DecisionResult`,
+  `DecisionOptions`; questions `YesNoQuestion`, `ChoiceQuestion`, `ScoreQuestion`, `ScoreLevel`; answers `YesNoAnswer`,
+  `ChoiceAnswer`, `ScoreAnswer`, `RefusalAnswer`; inputs `TextInput`, `ConversationInput`, `FieldsInput`.
+- `OllamaDecisionModel` (in `spring-ai-ollama`) calls Ollama's `/v1/systemone` endpoint through the TypeSafe Java SDK
+  (`org.springaicommunity.typesafe`). Properties `spring.ai.ollama.decision.*`; the selector `spring.ai.model.decision` exists.
+- `DecisionDocumentFilter` and `DecisionDocumentReranker` are in `spring-ai-rag` (`rag.postretrieval.document`).
+- `DecisionToolIndex`, `RegexToolIndex`, `LuceneToolIndex` and `VectorToolIndex` are in `spring-ai-tool-search-tool`;
+  `spring.ai.chat.client.tool-search-advisor.tool-index-type` takes `regex`, `lucene`, `vector` or `decision`.
+- Message parts are in `chat.messages.part`. `OllamaChatModel` builds `ReasoningPart`s and replays thinking, so the reasoning
+  lesson can run on Ollama.
+- Upgrade notes that matter for phase 2: `getToolCalls()` and `getMedia()` return unmodifiable lists; message `equals()` compares
+  parts; Anthropic and Gemini thinking come back as parts of one generation; Anthropic drops temperature / top-p / top-k and sends
+  `Authorization: Bearer`.
 
-- **Disk.** Ollama keeps models in `%USERPROFILE%\.ollama\models` on C: unless `OLLAMA_MODELS` is set, so they move to D:.
-  `tinyllama` is the only model there now; pull it again later or drop it. The RC2 jars go to the Maven/Gradle caches on C:
-  (a few hundred MB). If C: runs low, move `GRADLE_USER_HOME` and the Maven local repository to D: as well.
-- **RAM.** One model in memory at a time, unloaded after two idle minutes. Don't run a model while Docker (PostgreSQL 17 for the
-  Module 4 and 6 checks) and the Gradle daemon are busy; stop Docker between those checks.
+## Machine and models
 
-The owner runs these once (they change the user environment), then quits and restarts Ollama:
+Measured on 2026-11-19: 11.8 GB RAM, C: 47 GB free, D: 257 GB free, Ollama 0.40.16.
 
-```
-setx OLLAMA_MODELS D:\ollama\models
-setx OLLAMA_MAX_LOADED_MODELS 1
-setx OLLAMA_KEEP_ALIVE 2m
-```
+- `OLLAMA_MODELS` is set to `D:\ollama\models`. Still to set (owner, then restart Ollama):
+  `setx OLLAMA_MAX_LOADED_MODELS 1` and `setx OLLAMA_KEEP_ALIVE 2m`.
+- Pulled: `d1-omni:600m` (849 MB, capabilities decision and vision), `deepseek-r1:1.5b` (1.1 GB, tools and thinking),
+  `llama3.2:3b`, `gemma3:1b`, `nomic-embed-text`, plus `d3:2b` and `laya`. Only `d1-omni:600m` is used now; `llama3.2:3b`
+  stays until phase 2 has re-recorded Module 6.
+- One Ollama model in memory at a time. Don't run a model while Docker and the Gradle daemon are busy.
 
-### Models
+### The Qwen server (owner's machine on the LAN)
 
-The smallest model that does each job. Pull them one at a time, when a step needs them, and `ollama rm` what a finished step no
-longer needs. Each still needs a first run in step 1 to confirm it works.
+Probed on 2026-11-19 over plain HTTP from this PC:
 
-| Model | Download | For | Instead of |
-| --- | --- | --- | --- |
-| `d1-omni:600m` | small (600M parameters) | Decision Models, filter, reranker, `DecisionToolIndex` | (the 2.1 default) |
-| `qwen3:0.6b` | about 0.5 GB | Reasoning: message parts and `getReasoning()` | `qwen3:8b` |
-| `qwen3:1.7b` | about 1.4 GB | Reasoning, if 0.6b's thinking is too thin to teach from | `qwen3:8b` |
-| `deepseek-r1:1.5b` | about 1.1 GB | Second reasoning model, only if a lesson compares two | `deepseek-r1:7b` |
-| `llama3.2:3b` | about 2 GB | Re-recording the Module 6 traces and attacks, where the 2.1 output changes | (unchanged) |
-
-Sizes are approximate; `ollama pull` shows the exact size.
-
-**Honesty about small models.** Recorded reasoning from a 0.6B–1.7B model is short and sometimes wrong. The lesson is about the
-structure (which parts come back, in which order, what is replayed), so that is fine, but the lesson names the model behind each
-recording and doesn't present its reasoning as good reasoning. The same goes for decision probabilities: they are what
-`d1-omni:600m` returned, and the lesson says another model may give different numbers.
+- A LiteLLM proxy in front of vLLM, OpenAI-compatible (`/v1/chat/completions`). Inference runs there, so this PC's RAM limit
+  doesn't apply.
+- The chat model is a 27B Qwen 3 reasoning model (NVFP4). Both chat aliases the proxy lists route to that same model; use either.
+- Replies carry `reasoning_content` beside `content`. With a tool, it returns reasoning and a `findOrder` call
+  (`finish_reason: tool_calls`) in 3–7 s.
+- Replaying the assistant turn with its `reasoning_content`, then a tool result, is accepted, and the model answers from the result.
+- `chat_template_kwargs: {"enable_thinking": false}` turns reasoning off. The owner's other Spring AI app found that `extra-body`
+  values bind as strings, so `"false"` is truthy in the chat template; check that on 2.1 for a gotcha in 1.5.
+- It also serves an 8B embedding model, a reranker, a 4B guard model, ASR and OCR models; this plan doesn't use them.
 
 ## Steps
 
-### 1. Find out what breaks
+### 1. Ground work
 
-- [ ] Owner: run the three `setx` commands under "Machine limits" and restart Ollama.
-- [ ] Pull `d1-omni:600m` and `qwen3:0.6b`. Pull `llama3.2:3b` only when Module 6 needs re-recording.
-- [ ] Build a 2.1.0-RC2 classpath for `lesson-src` and check that RC2 runs on Boot 4.1.2 (or find the Boot version it needs).
-- [ ] Compile the Module 5 and 6 code and run the tests. Record every compile error and deprecation warning.
-- [ ] Re-check what CLAUDE.md says to re-check on an upgrade: `src/lib/token-text-splitter.ts`, `src/lib/vector-filter.ts`,
-      `RecordSchemaLab` against `BeanOutputConverter.getJsonSchema()`, and the advisor orders in `AdvisorChainLab`, `GuardrailLab`
-      and `ChatMemoryLab`.
-- [ ] Re-check every fact in the "Content accuracy" section of CLAUDE.md against RC2.
-- [ ] Write the results in `lesson-src/upgrade-2.1/findings.md`.
+- [ ] Fix the typography 0.5.4 fallout in `global.css` (table header alignment, `not-prose` on the element itself); check lessons
+      at 320px, 390px and desktop in both themes.
+- [ ] Preview stack: a `PREVIEW_STACK` next to `STACK` in `src/data/versions.ts`, a preview flag per lesson in
+      `src/data/curriculum.ts`, the "Preview" line in `LessonLayout`, the navigation mark, and preview pins in `buildGradle()` /
+      `gradleDependencies()`. Update DESIGN.md for the mark.
+- [ ] Set up `lesson-src/preview-2.1/` on the Module 5/6 workflow (code, tests, templates, `assemble.py`, `findings.md`) with a
+      2.1.0-RC2 / Boot 4.2.0-RC2 classpath.
+- [ ] Run the classes to confirm every fact under "Checked in the RC2 jars", and record the results in `findings.md`.
 
-### 2. Migrate Modules 1–6, in order
+### 2. Lessons (each: code that compiles and passes its tests, recordings, sandbox, lesson)
 
-- [ ] Module 1: provider notes (Anthropic: no temperature / top-p / top-k, `Authorization: Bearer`; `DeepSeekAssistantMessage`
-      deprecated; `deepseek-reasoner` in `src/data/snippets.ts`).
-- [ ] Module 2: re-run the structured-output checks.
-- [ ] Module 3: rewrite Chat Memory for Session Memory (`spring-ai-session-advisor`, `spring-ai-starter-model-session-jdbc`,
-      `EventFilter.lastN`, compaction, `MemoryAdvisor.CONVERSATION_ID` or `SessionAdvisors.session(id)`). Update `ChatMemoryLab`,
-      `AdvisorChainLab` and `HeroTrace`.
-- [ ] Module 4: re-run the ETL, vector store and RAG checks on PostgreSQL 17.
-- [ ] Module 5: migrate the support app (`ChatMemoryConfig`, `SupportChatConfig`, `SupportChatService`, tests) and regenerate the
-      lessons from the templates.
-- [ ] Module 6: Session Memory keeps tool calls, so the `JdbcChatMemoryRepository` gotcha becomes a migration note; rework erasure
-      and retention for the session tables; re-record `TraceLab` and `AttackLab` where the output changed (for example, token
-      usage is now summed across the tool loop).
+- [ ] 2.3 Decision Models and the Decision Model & Threshold Simulator (first: the other decision lessons build on it).
+- [ ] 4.4 Decision Filter & Reranker.
+- [ ] 5.4 Tool Search & DecisionToolIndex.
+- [ ] 1.5 Message Parts & Reasoning.
 
-### 3. Write the new content
+### 3. Ship the preview
 
-- [ ] Module 1: Message Parts & Reasoning, with a sandbox showing the parts of a recorded message.
-- [ ] Module 2: Decision Models, with the Decision Model & Threshold Simulator.
-- [ ] Module 4: decision filter and reranker, with a sandbox for the filter policy.
-- [ ] Module 5: `DecisionToolIndex` and the tool-index comparison.
+- [ ] One-line pointers from Native JSON Schema, Modular RAG, Tool Calling and Multi-Provider Portability to the new lessons.
+- [ ] CLAUDE.md (new facts, the preview workflow), PRODUCT.md (preview lessons are checked against RC2, not a release),
+      README.md (curriculum table), the module summaries in `src/data/curriculum.ts`.
+- [ ] Check new pages at 320px and 390px; `npm run build` passes; `VERSION` 1.6; merge.
 
-### 4. Update the rest
+### 4. At GA (phase 2)
 
-- [ ] `src/data/versions.ts`, the "Content accuracy" section and module notes in CLAUDE.md, `PRODUCT.md`, `README.md`, the
-      Module summaries in `src/data/curriculum.ts`.
-- [ ] Check new pages at 320px and 390px. `npm run build` passes.
+- [ ] Move the preview pins to 2.1.0 and Boot 4.2.0 GA, re-run the preview tests and recordings, drop the preview marks.
+- [ ] Move the existing lessons to 2.1: re-check what CLAUDE.md says to re-check on an upgrade and every fact in its "Content
+      accuracy" section; update the provider notes in Module 1 (Anthropic sampling and header, `DeepSeekAssistantMessage`).
+- [ ] Rewrite Module 3 Chat Memory for Session Memory, migrate the Module 5 and 6 support app (`MemoryAdvisor.CONVERSATION_ID`,
+      tool calls kept, erasure and retention on the session tables), add the decision filter to the app, regenerate the Module 5
+      and 6 lessons.
+- [ ] Re-record `TraceLab` and `AttackLab` with the Qwen model instead of `llama3.2:3b`, and rewrite what Testing & Evals,
+      Security & Data Protection and CLAUDE.md say about the recorded behaviour (for example which attacks `llama3.2:3b` fell for).
+- [ ] `VERSION` 2.0, merge.
 
-### 5. Ship
+## Open questions
 
-- [ ] When 2.1.0 GA is out: move the pin from RC2 to GA, run the tests and probes again, raise `VERSION` to 2.0, merge.
+- **Decision probabilities from `d1-omni:600m`.** Whether they are stable from run to run (record each preset more than once).
+- **`OpenAiChatModel` against the Qwen server.** The 2.1 notes say `reasoning_content` becomes a `ReasoningPart` and is
+  replayed (`replayReasoningContent`); confirm it through LiteLLM and vLLM, including streaming.
+- **The same code on Ollama's `/v1`.** Ollama's OpenAI-compatible endpoint names the field `reasoning`; confirm that the lesson
+  code a reader runs against Ollama gets `ReasoningPart`s too.
+- **Token usage across the tool loop.** The 2.1 notes call summed usage a change; CLAUDE.md already records summed usage for
+  2.0.2. Settle it when running the classes.
 
-## Open questions to settle in step 1
-
-- **Ollama and reasoning parts.** The upgrade notes list the models that build message parts in RC2: OpenAI, Anthropic, Google
-  GenAI, DeepSeek, Bedrock and Mistral. Ollama is not on the list, and the Ollama page still shows thinking in the `thinking`
-  metadata key. If that holds, the lesson teaches `getReasoning()` and states that Ollama keeps thinking in metadata (or uses
-  Ollama's OpenAI-compatible endpoint through `OpenAiChatModel`, if that yields `ReasoningPart`s; to be tested). Test both
-  with `qwen3:0.6b`.
-- **Small thinking models with tools.** The lesson shows reasoning interleaved with tool calls. Check whether `qwen3:0.6b` or
-  `qwen3:1.7b` calls tools reliably (in Module 6, `qwen2.5:1.5b` never did). If neither does, the interleaving is shown with
-  one recorded run that worked, and the lesson says how often it worked.
-- **The decision model selector property.** The docs show `spring.ai.openai.decision` and `spring.ai.ollama.decision` prefixes.
-  Whether a `spring.ai.model.decision` selector exists has to come from the auto-configuration jar.
-- **Token usage summed across the tool loop.** The upgrade notes list it as a 2.1 change; CLAUDE.md already records summed usage
-  for 2.0.2. Check which is right.
-
-## Verified so far (2.1 reference docs, 2026-11-19)
-
-- `DecisionModel.call(DecisionPrompt)`; questions `YesNoQuestion`, `ChoiceQuestion`, `ScoreQuestion`; answers `YesNoAnswer.isYes(threshold)`,
-  `ChoiceAnswer.getRankedOptions()`, `ScoreAnswer.getNearestLevel()`; `isRefused(name)` for refusals. Implementations
-  `OpenAiDecisionModel`, `OllamaDecisionModel` (default `d1-omni:600m`), `SystemOneDecisionModel`. Observed as
-  `gen_ai.client.operation` with the `decision` operation name.
-- `DecisionDocumentFilter`: four questions (injection, contradicts premise, relevant, answer evidence), default policy
-  0.70 / 0.70 / 0.45 / 0.55, fails open by default with one warning per run, `failClosed(true)`, conflicting passages kept with
-  `decision.classification`. `DecisionDocumentReranker`: `topK`, `minimumScore` 0, timeout 60 s, `concurrency(4)`, unscored
-  documents kept after the scored ones. Both take `virtualThreads(boolean)` (default false); a custom `executor` drops the
-  concurrency limit. Filter first, then rerank.
-- `DecisionToolIndex`: one call asks which tool fits and whether any fits; `applicabilityThreshold` 0.5, `minimumRelevance` 0;
-  sends every tool on every search; `spring.ai.chat.client.tool-search-advisor.tool-index-type=decision`.
-- Message parts: `TextPart`, `ReasoningPart`, `ToolCallPart`, `ToolResultPart`, `MediaPart`, `UnknownPart`; `getParts()`;
-  `getText()`, `getToolCalls()` and `getReasoning()` are views over the parts.
-- Session Memory: `SessionAdvisors.builder(sessionService)`, `spring-ai-starter-model-session-jdbc`, keeps tool calls; does not
-  read the old `SPRING_AI_CHAT_MEMORY` table.
-
-These come from the docs, not from running the classes yet. Step 1 confirms them.
-
-Sources: [Decision Models](https://docs.spring.io/spring-ai/reference/2.1/api/decision.html),
+Sources: [Upgrade notes](https://docs.spring.io/spring-ai/reference/2.1/upgrade-notes.html),
+[Decision Models](https://docs.spring.io/spring-ai/reference/2.1/api/decision.html),
 [RAG](https://docs.spring.io/spring-ai/reference/2.1/api/retrieval-augmented-generation.html),
 [Tool Search Tool](https://docs.spring.io/spring-ai/reference/2.1/api/tools/tool-search-tool.html),
-[Upgrade notes](https://docs.spring.io/spring-ai/reference/2.1/upgrade-notes.html),
 [Chat Memory](https://docs.spring.io/spring-ai/reference/2.1/api/chat-memory.html),
 [Ollama Chat](https://docs.spring.io/spring-ai/reference/2.1/api/chat/ollama-chat.html).

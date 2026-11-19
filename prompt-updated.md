@@ -1,3 +1,6 @@
+> The original request for the Spring AI 2.1 work. `UPGRADE-2.1.md` is the agreed plan and overrides this file where they
+> differ (preview lessons now, no free-text input in the simulator, Session Memory later).
+
 You are a Principal Java & Spring Architect, AI Systems Educator, and Expert Code Auditor.
 
 I have already built the core "Spring AI from Scratch" learning platform using Java 25, Gradle 9, Spring Boot 4, and Spring AI 2.x. Now, I want you to perform a **comprehensive gap analysis and audit** of my existing codebase to integrate the latest **Spring AI 2.1.0-RC2** features, focusing heavily on **Decision Models**, **Message Parts & Reasoning**, and advanced RAG/Tool enhancements.

@@ -30,11 +30,12 @@ Tasks, biggest gain first:
 4. **Consider marking lessons foundational or advanced**, so learners know what they can skim on a first pass.
 5. **Consider fewer gotchas per lesson on a first read** (now 6–8): keep the most important ones visible and fold the rest.
 
-## Move the course to Spring AI 2.1 (in progress)
+## Spring AI 2.1 (in progress)
 
-Agreed on 2026-11-19; the plan and its checklist are in `UPGRADE-2.1.md`, the work is on the `spring-ai-2.1` branch. It adds
-Decision Models, decision-based RAG post-processors, `DecisionToolIndex` and message parts with reasoning, and replaces
-`ChatMemory` (deprecated for removal in 3.0) with Session Memory in Modules 3, 5 and 6. It merges when 2.1.0 GA is out.
+Agreed on 2026-11-19; the plan and its checklist are in `UPGRADE-2.1.md`, the work is on the `spring-ai-2.1` branch. Phase 1
+ships four preview lessons on 2.1.0-RC2 / Boot 4.2.0-RC2 (message parts and reasoning, Decision Models, the decision filter
+and reranker, `DecisionToolIndex`). Phase 2, at GA, moves the rest of the course and replaces `ChatMemory` (deprecated for
+removal) with Session Memory.
 
 ## Other open items
 
