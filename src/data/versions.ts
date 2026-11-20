@@ -1,30 +1,18 @@
 /**
  * The stack every lesson's code targets. Bump versions here only; snippets read from this object.
- * Verified against Maven Central and services.gradle.org on 2026-11-17.
+ * Spring AI 2.1.0 is built on Spring Boot 4.2.0 (Spring Framework 7.1.0). Verified against Maven Central on 2026-11-20.
  */
 export const STACK = {
   java: '25',
   gradle: '9.9.1',
-  springBoot: '4.1.2',
-  springFramework: '7',
-  springAi: '2.0.2',
+  springBoot: '4.2.0',
+  springFramework: '7.1',
+  springAi: '2.1.0',
   dependencyManagementPlugin: '1.1.7',
   jspecify: '1.0.1',
 } as const;
 
 export type Stack = { readonly [K in keyof typeof STACK]: string };
-
-/**
- * The stack of the preview lessons (`preview: true` in the curriculum), which teach Spring AI 2.1 before its release.
- * Spring AI 2.1.0-RC2 is built on Spring Boot 4.2.0-RC2 (Spring Framework 7.1.0-RC2); both are on Maven Central.
- * At GA these move to the release versions, and then into STACK with the rest of the course (UPGRADE-2.1.md).
- */
-export const PREVIEW_STACK: Stack = {
-  ...STACK,
-  springBoot: '4.2.0-RC2',
-  springFramework: '7.1',
-  springAi: '2.1.0-RC2',
-};
 
 /**
  * The site's own version, shown in the header pill. The deploy workflow sets SITE_VERSION to VERSION (major.minor) plus

@@ -4,7 +4,7 @@
  * every earlier lesson that builds the same app, so it never drifts from the lessons.
  *
  * Apps: Modules 2-6 build one support app (Module 5 adds the separate shipping MCP server under com/example/shipping). Each
- * Module 1 lesson and each preview lesson is its own small project.
+ * Module 1 lesson and each `standalone` lesson is its own small project.
  */
 import { CURRICULUM, lessonId } from '@/data/curriculum';
 
@@ -96,7 +96,7 @@ function baseline(root: string, yaml: boolean): string[] {
 /** The lessons, in course order, whose files make up the same app as this one (this one last). */
 function lessonsOfSameApp(id: string): string[] {
   const ordered = CURRICULUM.flatMap((module) =>
-    module.lessons.map((lesson) => ({ id: lessonId(module, lesson), standalone: module.number === 1 || lesson.preview === true })),
+    module.lessons.map((lesson) => ({ id: lessonId(module, lesson), standalone: module.number === 1 || lesson.standalone === true })),
   );
   const index = ordered.findIndex((lesson) => lesson.id === id);
   if (index < 0) return [];

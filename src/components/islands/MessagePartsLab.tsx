@@ -4,7 +4,7 @@ import recorded from '../../data/recorded-parts.json';
 
 /*
  * Recorded, not invented (lesson-src/preview-2.1/probes/parts-to-sandbox.py): the lesson's OrderAssistant on Spring AI
- * 2.1.0-RC2, through OpenAiChatModel, against a 27B Qwen 3 reasoning model behind an OpenAI-compatible server. For every model
+ * 2.1.0-RC2 (2.1.0 changed only the finish reason category), through OpenAiChatModel, against a 27B Qwen 3 reasoning model behind an OpenAI-compatible server. For every model
  * call the sandbox shows the parts Spring AI built and the JSON that went over the wire (tool definitions and the model name
  * left out). Nothing is computed except which request carried reasoning back.
  */

@@ -11,7 +11,7 @@ ${starterLines}
 }`;
 }
 
-/** A complete Groovy DSL build file for a Spring Boot 4 + Spring AI 2 web app (preview lessons pass PREVIEW_STACK). */
+/** A complete Groovy DSL build file for a Spring Boot 4 + Spring AI 2 web app. */
 export function buildGradle(starters: string[], stack: Stack = STACK): string {
   return `plugins {
     id 'java'

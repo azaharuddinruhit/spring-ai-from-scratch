@@ -5,7 +5,7 @@ import recorded from '../../data/recorded-rag.json';
 /*
  * Recorded, not invented (lesson-src/preview-2.1/probes/rag-to-sandbox.py): three questions against eight passages in a
  * SimpleVectorStore with nomic-embed-text; DecisionDocumentFilter's four probabilities and DecisionDocumentReranker's score
- * from d1-omni:600m (Spring AI 2.1.0-RC2); and a 27B Qwen 3 reasoning model's own labels for every pair. The controls replay
+ * from d1-omni:600m (recorded on Spring AI 2.1.0-RC2; KnowledgeChatIT gets the same passages on 2.1.0); and a 27B Qwen 3 reasoning model's own labels for every pair. The controls replay
  * those numbers through the filter's rule order and the reranker's cut; nothing here calls a model.
  */
 
