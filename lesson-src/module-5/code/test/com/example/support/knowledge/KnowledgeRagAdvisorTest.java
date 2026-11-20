@@ -8,9 +8,6 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatModel;
@@ -18,18 +15,27 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
+import org.springframework.ai.session.DefaultSessionService;
+import org.springframework.ai.session.InMemorySessionRepository;
+import org.springframework.ai.session.SessionService;
+import org.springframework.ai.session.advisor.SessionAdvisors;
+import org.springframework.core.Ordered;
 import org.springframework.ai.vectorstore.SimpleVectorStore;
 
 class KnowledgeRagAdvisorTest {
 
     private final List<String> answerPrompts = new ArrayList<>();
-    private final ChatMemory chatMemory = MessageWindowChatMemory.builder().build();
+    private final List<String> rewritePrompts = new ArrayList<>();
+    private final SessionService sessionService = DefaultSessionService.builder()
+            .sessionRepository(InMemorySessionRepository.builder().build())
+            .build();
     private final SimpleVectorStore vectorStore = SimpleVectorStore.builder(new KeywordEmbeddingModel()).build();
 
-    /** Answers the compression call with a standalone question, and records every other prompt. */
+    /** Answers the compression call with a standalone question, and records every prompt. */
     private final ChatModel model = prompt -> {
         String text = prompt.getUserMessage().getText();
         if (text.contains("Standalone query:")) {
+            rewritePrompts.add(text);
             return reply(text.contains("gift cards?") ? "How long do gift card refunds take?" : "How long do refunds take?");
         }
         answerPrompts.add(text);
@@ -37,9 +43,10 @@ class KnowledgeRagAdvisorTest {
     };
 
     private final ChatClient chatClient = ChatClient.builder(model)
-            .defaultAdvisors(
-                    MessageChatMemoryAdvisor.builder(chatMemory).build(),
-                    new KnowledgeRagConfig().knowledgeRagAdvisor(ChatClient.builder(model), vectorStore))
+            .defaultAdvisors(SessionAdvisors.builder(sessionService)
+                    .memory(memory -> memory.order(Ordered.HIGHEST_PRECEDENCE + 210))
+                    .build())
+            .defaultAdvisors(new KnowledgeRagConfig().knowledgeRagAdvisor(ChatClient.builder(model), vectorStore))
             .build();
 
     KnowledgeRagAdvisorTest() {
@@ -62,7 +69,7 @@ class KnowledgeRagAdvisorTest {
     void memoryStoresTheQuestionNotTheAugmentedPrompt() {
         ask("How long do refunds take?");
 
-        assertThat(chatMemory.get("c1"))
+        assertThat(sessionService.getMessages("c1"))
                 .extracting(Message::getText)
                 .containsExactly("How long do refunds take?", "Done.");
     }
@@ -72,6 +79,7 @@ class KnowledgeRagAdvisorTest {
         ask("How long do refunds take?");
         ask("And for gift cards?");
 
+        assertThat(rewritePrompts.getLast()).contains("How long do refunds take?", "And for gift cards?");
         assertThat(answerPrompts.getLast())
                 .contains("Gift card refunds take 10 business days.")
                 .contains("Query: And for gift cards?");
@@ -80,8 +88,8 @@ class KnowledgeRagAdvisorTest {
     private void ask(String question) {
         chatClient.prompt()
                 .user(question)
+                .advisors(SessionAdvisors.session("c1"))
                 .advisors(advisor -> advisor
-                        .param(ChatMemory.CONVERSATION_ID, "c1")
                         .param(VectorStoreDocumentRetriever.FILTER_EXPRESSION, KnowledgeFilters.customerDocuments("billing")))
                 .call()
                 .content();

@@ -24,6 +24,7 @@ import io.modelcontextprotocol.spec.McpSchema.TextResourceContents;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.test.context.TestPropertySource; // probe-only
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -31,6 +32,7 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
+@TestPropertySource(properties = "spring.autoconfigure.exclude=org.springframework.ai.model.session.jdbc.autoconfigure.JdbcSessionRepositoryAutoConfiguration") // probe-only: this classpath also holds the support app, its datasource and session store
 class ShippingMcpServerTest {
 
     @LocalServerPort

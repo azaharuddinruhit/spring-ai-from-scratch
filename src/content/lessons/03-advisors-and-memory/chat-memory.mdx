@@ -1,5 +1,5 @@
 ---
-description: Give the stateless model a conversation with ChatMemory, MessageWindowChatMemory and MessageChatMemoryAdvisor, store it in JDBC, Redis, Cassandra, MongoDB or Neo4j, and keep every user's conversation apart with CONVERSATION_ID.
+description: Give the stateless model a conversation with Spring AI 2.1 session memory. Store sessions in PostgreSQL, choose what is sent with an event filter, and keep every user's conversation apart with a session id derived on the server.
 ---
 
 import Mermaid from '@/components/Mermaid.astro';
@@ -9,67 +9,70 @@ import ChatMemoryLab from '@/components/islands/ChatMemoryLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 
 A chat model remembers nothing between calls. Every request must carry the conversation so far, and choosing what to carry,
-where to keep it and whose it is, is your job. Spring AI splits that job into three parts, and the advisor from the previous two
-lessons ties them together.
+where to keep it and whose it is, is your job. Spring AI 2.1 does it with sessions: a session stores a conversation as events,
+and two advisors from the previous lessons load and save them around each call.
 
 ## 1. Spring mental model
 
-Chat memory works like an HTTP session, and the pieces map one to one:
+Session memory works like Spring Session, and the pieces map one to one:
 
-| Spring you know | Spring AI 2.0 | What it does |
+| Spring you know | Spring AI 2.1 | What it does |
 | --- | --- | --- |
-| `HttpSession` | A conversation, keyed by `ChatMemory.CONVERSATION_ID` | One user's history with the assistant. |
-| Spring Session's `SessionRepository` | `ChatMemoryRepository` | Stores messages: `saveAll`, `findByConversationId`, `deleteByConversationId`. |
-| A session size or timeout policy | `ChatMemory`, usually `MessageWindowChatMemory` | Decides which messages to keep. |
-| `SessionRepositoryFilter` | `MessageChatMemoryAdvisor` | Loads the history before the call and saves the new messages after it. |
+| `HttpSession` | A session, named by the id you pass with `SessionAdvisors.session(id)` | One user's conversation with the assistant. |
+| Spring Session's `SessionRepository` | `SessionRepository` | Stores sessions and their events: in memory, or in JDBC. |
+| `SessionRepositoryFilter` | `SessionTurnAdvisor` and `SessionMemoryAdvisor` | Open the turn, load the history before the call and save the new messages after it. |
+| `maxInactiveInterval` | `spring.ai.session.time-to-live` | When a session expires: 60 days by default, counted from its creation. |
 
-You get memory without configuring anything. Every model starter brings in `ChatMemoryAutoConfiguration`, which defines a
-`MessageWindowChatMemory` over an `InMemoryChatMemoryRepository` when you haven't defined your own beans. To make the
-conversation survive a restart, add a repository starter; it replaces the in-memory repository.
-
-| Backend | Starter |
-| --- | --- |
-| JDBC: PostgreSQL, MySQL and MariaDB, Oracle, SQL Server, H2, HSQLDB, SQLite | `spring-ai-starter-model-chat-memory-repository-jdbc` |
-| Redis | `spring-ai-starter-model-chat-memory-repository-redis` |
-| Apache Cassandra | `spring-ai-starter-model-chat-memory-repository-cassandra` |
-| MongoDB | `spring-ai-starter-model-chat-memory-repository-mongodb` |
-| Neo4j | `spring-ai-starter-model-chat-memory-repository-neo4j` |
-
-`MessageWindowChatMemory` keeps the newest 20 messages per conversation by default, and there is no property to change that,
-so you define the bean yourself. When it trims, it never drops a system message, and a new system message replaces the old one.
+`SessionService` sits in front of the repository: the advisors use it, and so does your code when it deletes a chat or looks one
+up. The session stores every message as an event and never trims it. What reaches the model is chosen per request by an
+`EventFilter`: the memory advisor's default, `EventFilter.all()`, sends the whole conversation; `EventFilter.lastN(40)` sends
+the newest 40 messages, extended back to the start of a turn so a turn is never cut in half.
 
 <Mermaid
-  caption="One turn through MessageChatMemoryAdvisor. The prompt is the stored window plus the new message; the window is trimmed when the messages are saved."
+  caption="One turn through the session advisors. The session keeps every event; the filter decides what is sent."
   code={`
 sequenceDiagram
   autonumber
   participant S as Service
-  participant A as MessageChatMemoryAdvisor
-  participant W as MessageWindowChatMemory
+  participant T as SessionTurnAdvisor +200
+  participant A as SessionMemoryAdvisor +210
+  participant R as SessionService
   participant M as Rest of the chain
-  S->>A: request, CONVERSATION_ID in context
-  A->>W: get(id)
-  A->>W: add(id, user message)
-  Note over W: saveAll to the repository,<br/>trimmed to maxMessages
-  A->>M: system, stored window, new message
+  S->>T: request, session id in context
+  T->>R: find or create the session
+  T->>A: request
+  A->>R: events the filter picks
+  A->>R: append the user message
+  A->>M: system, history, new message
   M-->>A: answer
-  A->>W: add(id, answer)
+  A->>R: append the answer
   A-->>S: answer
 `}
 />
 
-Spring AI has two memory advisors, and they answer different questions:
+These rules come from the 2.1.0 classes and from tests we ran against them:
 
-| | `MessageChatMemoryAdvisor` | `VectorStoreChatMemoryAdvisor` |
+- Model starters don't configure sessions. Add `spring-ai-starter-model-session-jdbc` for PostgreSQL, MySQL, SQL Server or H2, or
+  define a `SessionService` over an `InMemorySessionRepository` yourself, as the first lesson of this module did. The JDBC
+  starter creates its tables only for embedded databases unless you set `spring.ai.session.repository.jdbc.initialize-schema`.
+- A call without a session id fails with `IllegalStateException: No session ID found in advisor context`, before anything is
+  stored or sent.
+- Session ids are `VARCHAR(255)` in JDBC, and the session records its creation time, its expiry and metadata you pass when it is
+  created.
+- System messages aren't stored. `ChatClient` sends your system prompt with every request, so changing it changes every
+  conversation at once.
+- Memory ordered after `ToolCallingAdvisor`, as `SessionAdvisors` does by default, stores every tool call and tool result. This
+  course orders it at `HIGHEST_PRECEDENCE + 210`, before the loop, so a session holds the questions and the final answers.
+
+Spring AI also keeps `VectorStoreChatMemoryAdvisor`, which answers a different question:
+
+| | Session memory | `VectorStoreChatMemoryAdvisor` |
 | --- | --- | --- |
-| Artifact | `spring-ai-client-chat`, with every model starter | `spring-ai-vector-store-advisor` |
-| Stores | Messages in a `ChatMemory` | Each message as a document in a `VectorStore`, tagged with the conversation id |
-| Sends to the model | The recent messages, in order, as real messages | The messages most similar to the question (top 20 by default), as text in the system prompt |
+| Artifact | `spring-ai-session-advisor`, in the session starter | `spring-ai-vector-store-advisor` |
+| Stores | Every message as an event in the session | Each message as a document in a `VectorStore`, tagged with the conversation id |
+| Sends to the model | The messages the event filter picks, in order, as real messages | The messages most similar to the question (top 20 by default), as text in the system prompt |
 | Good for | Ordinary chat: what was just said | Long histories where something from weeks ago matters |
-| Default order | `HIGHEST_PRECEDENCE + 200` | `HIGHEST_PRECEDENCE + 200` |
-
-Both read the conversation id from the request context, and in 2.0 it is mandatory: a call without it fails with
-`IllegalArgumentException: conversationId cannot be null`.
+| Default order | `HIGHEST_PRECEDENCE + 200` (turn), `+ 1000` (memory) | `HIGHEST_PRECEDENCE + 200` |
 
 ## 2. Interactive sandbox
 
@@ -79,76 +82,107 @@ Things to try:
 
 - As Alice, say **My order number is 1042.** Switch to Bob and ask **What is my order number?** With **UUID from user and chat**,
   Bob's conversation is empty. Choose **The chat id from the URL** and repeat: Bob gets Alice's order number.
-- Choose `userId + ":" + chatId`. It is unique per user too, but Alice's id is 42 characters long, which doesn't fit the
-  36-character column, so the call fails before the model is called.
-- With `maxMessages` at 4, keep talking and watch the oldest rows go. The model then no longer knows the order number.
+- Choose **No session id** and send anything. The call fails, and nothing is stored.
+- With `lastN(4)`, keep talking. Every message stays in the table, but the model only gets the newest four and forgets the order
+  number. Switch to `all()` and it remembers again, at the price of sending the whole conversation every time.
 
 ## 3. Idiomatic Java 25 & Gradle 9 code
 
 <ProjectTree />
 
-Add the JDBC repository starter and your database driver to the build:
+Replace the session advisor dependency from the first lesson with the JDBC session starter, which brings it in, and add your
+database driver:
 
 <CodeFile
   title="build.gradle"
   lang="groovy"
   lines="2-3"
   code={`dependencies {
-    implementation 'org.springframework.ai:spring-ai-starter-model-chat-memory-repository-jdbc'
+    implementation 'org.springframework.ai:spring-ai-starter-model-session-jdbc'
     runtimeOnly 'org.postgresql:postgresql'
 }`}
 />
 
-The repository creates its table only for embedded databases unless you say otherwise:
+The starter creates its tables only for embedded databases unless you say otherwise:
 
 <CodeFile
   title="src/main/resources/application.yaml"
   lang="yaml"
-  lines="11"
+  lines="10"
   code={`spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/support
     username: support
     password: \${SUPPORT_DB_PASSWORD}
   ai:
-    chat:
-      memory:
-        repository:
-          jdbc:
-            initialize-schema: always`}
+    session:
+      repository:
+        jdbc:
+          initialize-schema: always`}
 />
 
-Define the `ChatMemory` bean to choose the window. The repository bean comes from the starter:
+The starter defines the `SessionService`, so the in-memory bean goes. The memory advisor gets a filter, so a long conversation
+doesn't send everything:
 
-<CodeFile title="src/main/java/com/example/support/chat/ChatMemoryConfig.java">
-```java {16}
+<CodeFile title="src/main/java/com/example/support/chat/SupportChatConfig.java">
+```java {34-37}
 package com.example.support.chat;
 
-import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.ChatMemoryRepository;
-import org.springframework.ai.chat.memory.MessageWindowChatMemory;
+import java.time.Clock;
+import java.util.List;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.SafeGuardAdvisor;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
+import org.springframework.ai.session.EventFilter;
+import org.springframework.ai.session.SessionService;
+import org.springframework.ai.session.advisor.SessionAdvisors;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 
 @Configuration(proxyBeanMethods = false)
-class ChatMemoryConfig {
+class SupportChatConfig {
 
     @Bean
-    ChatMemory chatMemory(ChatMemoryRepository chatMemoryRepository) {
-        return MessageWindowChatMemory.builder()
-                .chatMemoryRepository(chatMemoryRepository)
-                .maxMessages(40)
+    ChatClient supportChatClient(ChatClient.Builder builder, SessionService sessionService) {
+        return builder
+                .defaultSystem("You are the support assistant for Acme Cloud.")
+                .defaultAdvisors(
+                        SafeGuardAdvisor.builder()
+                                .sensitiveWords(List.of("internal only", "api_key"))
+                                .order(Ordered.HIGHEST_PRECEDENCE + 25)
+                                .build(),
+                        new TokenBudgetAdvisor(200_000, Clock.systemUTC()),   // + 50
+                        new PiiRedactionAdvisor(),                            // + 100
+                        new AnswerLanguageAdvisor(),                          // + 250
+                        new SimpleLoggerAdvisor())                            // 0, in the tool loop
+                // The turn (+ 200) and memory (+ 210) before the tool loop, so memory runs once per call.
+                .defaultAdvisors(SessionAdvisors.builder(sessionService)
+                        .memory(memory -> memory
+                                .order(Ordered.HIGHEST_PRECEDENCE + 210)
+                                .eventFilter(EventFilter.lastN(40)))
+                        .build())
+                .build();
+    }
+
+    @Bean
+    ChatClient faqChatClient(ChatClient.Builder builder, VectorStore vectorStore) {
+        return builder
+                .defaultSystem("Answer questions about Acme Cloud plans and billing.")
+                .defaultAdvisors(new PiiRedactionAdvisor(), new SemanticCacheAdvisor(vectorStore, 0.92))
                 .build();
     }
 }
 ```
 </CodeFile>
 
-The service builds the conversation id from the signed-in user and the chat id from the URL. A name-based UUID is the same every
-time for the same pair, is different for every user, and fits the column:
+The service builds the session id from the signed-in user and the chat id from the URL. A name-based UUID is the same every
+time for the same pair and different for every user, and it keeps the user's name out of the session table and the logs:
 
 <CodeFile title="src/main/java/com/example/support/chat/SupportChatService.java">
-```java {26,34,39}
+```java {25,34,37-39}
 package com.example.support.chat;
 
 import java.nio.charset.StandardCharsets;
@@ -156,25 +190,26 @@ import java.util.Locale;
 import java.util.UUID;
 
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.session.SessionService;
+import org.springframework.ai.session.advisor.SessionAdvisors;
 import org.springframework.stereotype.Service;
 
 @Service
 public class SupportChatService {
 
     private final ChatClient supportChatClient;
-    private final ChatMemory chatMemory;
+    private final SessionService sessionService;
 
-    public SupportChatService(ChatClient supportChatClient, ChatMemory chatMemory) {
+    public SupportChatService(ChatClient supportChatClient, SessionService sessionService) {
         this.supportChatClient = supportChatClient;
-        this.chatMemory = chatMemory;
+        this.sessionService = sessionService;
     }
 
     public String ask(String userId, UUID chatId, String question, Locale language) {
         return supportChatClient.prompt()
                 .user(question)
+                .advisors(SessionAdvisors.session(sessionId(userId, chatId)))
                 .advisors(advisor -> advisor
-                        .param(ChatMemory.CONVERSATION_ID, conversationId(userId, chatId))
                         .param(TokenBudgetAdvisor.USER_ID, userId)
                         .param(AnswerLanguageAdvisor.LANGUAGE, language))
                 .call()
@@ -182,11 +217,11 @@ public class SupportChatService {
     }
 
     public void forget(String userId, UUID chatId) {
-        chatMemory.clear(conversationId(userId, chatId));
+        sessionService.delete(sessionId(userId, chatId));
     }
 
-    /** A UUID that only this user's chat maps to, and that fits the 36-character JDBC column. */
-    static String conversationId(String userId, UUID chatId) {
+    /** A session id that only this user's chat maps to, so a chat id alone never reaches another user's session. */
+    static String sessionId(String userId, UUID chatId) {
         return UUID.nameUUIDFromBytes((userId + ":" + chatId).getBytes(StandardCharsets.UTF_8)).toString();
     }
 }
@@ -246,10 +281,10 @@ class SupportChatController {
 ```
 </CodeFile>
 
-The isolation is the behaviour that matters, so test it with real memory:
+The isolation is the behaviour that matters, so test it with real session memory over the in-memory repository:
 
 <CodeFile title="src/test/java/com/example/support/chat/SupportChatServiceTest.java">
-```java {37,60}
+```java {43,66}
 package com.example.support.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -261,19 +296,23 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.session.DefaultSessionService;
+import org.springframework.ai.session.InMemorySessionRepository;
+import org.springframework.ai.session.SessionService;
+import org.springframework.ai.session.advisor.SessionAdvisors;
+import org.springframework.core.Ordered;
 
 class SupportChatServiceTest {
 
     private final List<Prompt> prompts = new ArrayList<>();
-    private final ChatMemory chatMemory = MessageWindowChatMemory.builder().build();
+    private final SessionService sessionService = DefaultSessionService.builder()
+            .sessionRepository(InMemorySessionRepository.builder().build())
+            .build();
     private final UUID chatId = UUID.fromString("0f8e2a4c-6b1d-4c3e-9a7f-5d2b8c1e4a60");
 
     private final SupportChatService service = new SupportChatService(
@@ -281,9 +320,11 @@ class SupportChatServiceTest {
                         prompts.add(prompt);
                         return new ChatResponse(List.of(new Generation(new AssistantMessage("Noted."))));
                     })
-                    .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                    .defaultAdvisors(SessionAdvisors.builder(sessionService)
+                            .memory(memory -> memory.order(Ordered.HIGHEST_PRECEDENCE + 210))
+                            .build())
                     .build(),
-            chatMemory);
+            sessionService);
 
     @Test
     void usersWithTheSameChatIdDoNotShareAConversation() {
@@ -306,21 +347,14 @@ class SupportChatServiceTest {
     }
 
     @Test
-    void conversationIdsFitTheJdbcColumn() {
-        String id = SupportChatService.conversationId("alice.long-name@customer.example.com", chatId);
-
-        assertThat(id).hasSize(36).isEqualTo(SupportChatService.conversationId("alice.long-name@customer.example.com", chatId));
-    }
-
-    @Test
-    void forgetClearsOnlyThatUsersChat() {
+    void forgetDeletesOnlyThatUsersChat() {
         service.ask("alice", chatId, "Hello", Locale.ENGLISH);
         service.ask("bob", chatId, "Hello", Locale.ENGLISH);
 
         service.forget("alice", chatId);
 
-        assertThat(chatMemory.get(SupportChatService.conversationId("alice", chatId))).isEmpty();
-        assertThat(chatMemory.get(SupportChatService.conversationId("bob", chatId))).hasSize(2);
+        assertThat(sessionService.findById(SupportChatService.sessionId("alice", chatId))).isNull();
+        assertThat(sessionService.getMessages(SupportChatService.sessionId("bob", chatId))).hasSize(2);
     }
 }
 ```
@@ -420,48 +454,53 @@ class SupportChatControllerTest {
 
 ## 4. Production gotchas & security
 
-<Gotcha kind="security" title="A conversation id from the client is a data leak">
+<Gotcha kind="security" title="A session id from the client is a data leak">
 If the id comes straight from the URL or the request body, anyone who learns or guesses it reads that conversation, and two users
-who pick the same id share one. Derive the id on the server from the authenticated user, as `conversationId(userId, chatId)` does,
-or look up the conversation and check its owner.
-</Gotcha>
-
-<Gotcha kind="reliability" title="The JDBC column holds 36 characters">
-`SPRING_AI_CHAT_MEMORY.conversation_id` is `VARCHAR(36)`, the length of a UUID. A longer id fails with
-`DataIntegrityViolationException` when the user message is saved, before the model is called. Use UUIDs, or create the table
-yourself with a wider column.
+who pick the same id share one. Derive the id on the server from the authenticated user, as `sessionId(userId, chatId)` does,
+or look up the session and check its owner.
 </Gotcha>
 
 <Gotcha kind="reliability" title="The schema is created only for embedded databases">
-`spring.ai.chat.memory.repository.jdbc.initialize-schema` defaults to `embedded`, so on PostgreSQL the table doesn't exist and
-the first call fails. Set it to `always`, or, better in production, copy
-`org/springframework/ai/chat/memory/repository/jdbc/schema-postgresql.sql` from the jar into a Flyway or Liquibase migration and
-set it to `never`.
+`spring.ai.session.repository.jdbc.initialize-schema` defaults to `embedded`, so on PostgreSQL the tables don't exist and the
+first call fails. Set it to `always`, or, better in production, copy
+`org/springframework/ai/session/jdbc/schema-postgresql.sql` from the `spring-ai-session-jdbc` jar into a Flyway or Liquibase
+migration and set it to `never`.
 </Gotcha>
 
-<Gotcha kind="cost" title="The window counts messages, not tokens">
-Twenty messages can be twenty short lines or twenty pasted log files, and all of them are sent, and billed, with every turn. Keep
-the window small, cap the input size as the controller does with `@Size`, and keep memory before the tool loop, so that tool results
-aren't stored and sent again.
+<Gotcha kind="reliability" title="The app needs its database to start">
+The JDBC session repository connects at startup to detect the database dialect. A test context that loads the full
+configuration without a database fails before any test runs. `@WebMvcTest` doesn't load it; for `@SpringBootTest`, start
+PostgreSQL in Testcontainers, as Module 6 does.
 </Gotcha>
 
-<Gotcha kind="security" title="Conversations are kept until you delete them">
-No repository expires messages for you. Conversations hold whatever users typed, so give users a way to delete a chat
-(`chatMemory.clear(id)`), remove a user's conversations when the account goes, and run a retention job against the table. Store
-messages after redaction, as in the previous lesson.
+<Gotcha kind="cost" title="By default every message is sent, every time">
+The memory advisor's default filter is `EventFilter.all()`, so a conversation's whole history goes to the model, and is billed,
+with every turn. Set `EventFilter.lastN(...)`, cap the input size as the controller does with `@Size`, and keep memory before
+the tool loop, so that tool results aren't stored and sent again. The filter counts messages, not tokens: forty short lines and
+forty pasted log files cost very differently.
 </Gotcha>
 
-<Gotcha kind="migration" title="There is no default conversation any more">
-In 1.x a call without a conversation id fell back to `ChatMemory.DEFAULT_CONVERSATION_ID`, so every user shared one conversation
-named "default". In 2.0 the constant is gone and the advisor throws `IllegalArgumentException` instead. Pass
-`ChatMemory.CONVERSATION_ID` on every call that uses a memory advisor.
+<Gotcha kind="security" title="An expired session lives on until you delete it">
+A session expires 60 days after it was created (`spring.ai.session.time-to-live`), but expiry is only a date in the table. The
+repository still finds an expired session, the advisors keep using it, and its rows stay until something calls
+`SessionService.deleteExpiredSessions`. Spring AI runs no sweep of its own. Conversations hold whatever users typed, so give
+users a way to delete a chat, store messages after redaction as in the previous lesson, and schedule the sweep. Module 6 does
+both.
+</Gotcha>
+
+<Gotcha kind="migration" title="ChatMemory is deprecated for removal">
+`ChatMemory`, `MessageWindowChatMemory`, `MessageChatMemoryAdvisor` and `ChatMemoryRepository` are deprecated for removal since
+2.1.0. Replace `MessageChatMemoryAdvisor` with `SessionAdvisors`, `ChatMemory.CONVERSATION_ID` with
+`SessionAdvisors.session(id)`, `maxMessages` with an `EventFilter`, and `chatMemory.clear(id)` with `sessionService.delete(id)`.
+The sessions live in new tables, so existing conversations aren't carried over, and the 36-character limit of the old
+`conversation_id` column is gone.
 </Gotcha>
 
 ## Recap
 
-- `ChatMemoryRepository` stores messages, `ChatMemory` decides which to keep, and `MessageChatMemoryAdvisor` loads and saves them
-  around each call.
-- The default is a 20-message window in memory. Add a repository starter for JDBC, Redis, Cassandra, MongoDB or Neo4j, and define
-  the `ChatMemory` bean to change the window.
-- `CONVERSATION_ID` is mandatory. Derive it on the server from the authenticated user, and keep it within 36 characters for JDBC.
+- A `SessionService` stores each conversation as events; `SessionAdvisors` loads and saves them around each call, and the event
+  filter decides what is sent.
+- Add `spring-ai-starter-model-session-jdbc` for a database, and set `initialize-schema` for anything but an embedded one.
+- The session id is mandatory. Derive it on the server from the authenticated user.
+- Sessions expire 60 days after creation by default, but an expired session works until `deleteExpiredSessions` removes it.
 - `VectorStoreChatMemoryAdvisor` recalls similar past messages from a vector store instead of the recent ones.

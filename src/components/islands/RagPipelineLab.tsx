@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { CodeView, LabFrame, Pill } from './LabFrame';
 
 /*
- * One question through RetrievalAugmentationAdvisor (Spring AI 2.0.2), placed after MessageChatMemoryAdvisor as in the lesson.
+ * One question through RetrievalAugmentationAdvisor (Spring AI 2.1.0, unchanged since 2.0.2), placed after session memory as in the lesson.
  * From the classes, and checked by running them:
  * - The query is the last user message; its history is every message in the prompt, the new one included.
  * - Query transformers run in order, then the expander; MultiQueryExpander splits the reply on "\n", falls back to the
@@ -453,7 +453,7 @@ export default function RagPipelineLab() {
 
       {memory.length > 0 && (
         <div className="mt-4 rounded-md border border-slate-200 p-3 dark:border-slate-700/70">
-          <h4 className="text-xs font-medium text-slate-600 dark:text-slate-400">Chat memory: what MessageChatMemoryAdvisor stored</h4>
+          <h4 className="text-xs font-medium text-slate-600 dark:text-slate-400">Session memory: what the session stored</h4>
           <ol className="mt-2 space-y-1">
             {memory.map((m, i) => (
               <li key={i} className="flex gap-2 text-sm leading-snug">

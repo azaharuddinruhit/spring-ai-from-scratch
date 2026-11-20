@@ -36,7 +36,7 @@ flowchart LR
 `}
 />
 
-These readers ship in 2.0.2. Each is its own artifact, except the two in `spring-ai-commons`, which every model starter brings in:
+These readers ship in 2.1.0. Each is its own artifact, except the two in `spring-ai-commons`, which every model starter brings in:
 
 | Reader | Artifact | One `Document` per | Metadata it adds |
 | --- | --- | --- | --- |
@@ -49,13 +49,16 @@ These readers ship in 2.0.2. Each is its own artifact, except the two in `spring
 ranges. A page range with `withPagesPerDocument(2)` never joins pages across a gap: pages 2 and 3 become one `Document` and page
 5 becomes another.
 
-The transformer you always need is `TokenTextSplitter`. These are its rules, from the 2.0.2 source:
+The transformer you always need is `TokenTextSplitter`. These are its rules, from the 2.1.0 source (2.0.2 splits the same
+text into the same chunks):
 
 - It encodes the text with the `cl100k_base` tokenizer and takes `chunkSize` tokens (default 800).
 - If more text follows, it cuts after the last `.`, `?`, `!` or line break in that window, but only if that mark comes after
   character `minChunkSizeChars` (default 350). Otherwise it cuts at the token limit, even mid-word.
 - With `keepSeparator(false)` it replaces `System.lineSeparator()` with a space: `\n` on Linux, `\r\n` on Windows.
 - It drops chunks of 5 characters or fewer (`minChunkLengthToEmbed`).
+- Chunks don't overlap by default. 2.1 adds `withChunkOverlap(n)` to the builder: each chunk then starts `n` tokens before
+  the end of the previous one, after the punctuation cut. `n` must be smaller than `chunkSize`.
 - Every chunk gets a new random id and a copy of the parent's metadata, plus `parent_document_id`, `chunk_index` and
   `total_chunks`.
 

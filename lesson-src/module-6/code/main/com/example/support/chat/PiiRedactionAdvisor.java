@@ -7,6 +7,7 @@ import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.client.advisor.api.AdvisorChain;
 import org.springframework.ai.chat.client.advisor.api.BaseAdvisor;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.core.Ordered;
 
 /** Masks e-mail addresses and card numbers in the user message before memory, logs or the model see it. */
@@ -24,6 +25,10 @@ public final class PiiRedactionAdvisor implements BaseAdvisor {
 
     @Override
     public ChatClientRequest before(ChatClientRequest request, AdvisorChain chain) {
+        // A confirmation resumes with tool results and no new message; augmentUserMessage would append one after them.
+        if (!(request.prompt().getInstructions().getLast() instanceof UserMessage)) {
+            return request;
+        }
         return request.mutate()
                 .prompt(request.prompt().augmentUserMessage(user -> user.mutate().text(redact(user.getText())).build()))
                 .build();

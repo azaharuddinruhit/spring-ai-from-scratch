@@ -3,17 +3,19 @@ import type { ReactNode } from 'react';
 import { CodeView, LabFrame, Pill } from './LabFrame';
 
 /*
- * Two users chat through MessageChatMemoryAdvisor with MessageWindowChatMemory on the JDBC repository (PostgreSQL), as in
- * Spring AI 2.0.2. Checked against the real classes:
- * - The advisor sends the stored window plus the new message, then saves the message and the reply. MessageWindowChatMemory trims
- *   each conversation to the newest maxMessages messages when it saves, and the repository replaces that conversation's rows.
- * - A call without ChatMemory.CONVERSATION_ID fails with IllegalArgumentException: conversationId cannot be null.
- * - SPRING_AI_CHAT_MEMORY.conversation_id is VARCHAR(36), so a longer id fails when the user message is saved, before the model call.
+ * Two users chat through Spring AI 2.1 session memory on the JDBC repository (PostgreSQL), as the lesson configures it: the
+ * memory advisor at HIGHEST_PRECEDENCE + 210 with an event filter. Checked against the real classes:
+ * - The memory advisor sends the system message, the stored events the filter picks and the new message, then saves the message
+ *   and the reply as events. The session keeps every event; EventFilter.lastN(n) only limits what is sent (it extends back to
+ *   the start of a turn, and every turn here is one user and one assistant message). The default filter is EventFilter.all().
+ * - A call without a session id fails with IllegalStateException before anything is stored or sent.
+ * - SessionService.delete removes the session row, and ON DELETE CASCADE removes its events.
  * The derived ids are UUID.nameUUIDFromBytes((userId + ":" + chatId).getBytes(UTF_8)), computed with the JDK.
  */
 
 type User = 'alice' | 'bob';
-type Strategy = 'derived' | 'chat' | 'joined' | 'none';
+type Strategy = 'derived' | 'chat' | 'none';
+type Window = 4 | 6 | 'all';
 type Role = 'system' | 'user' | 'assistant';
 type Msg = { role: Role; text: string };
 
@@ -26,10 +28,9 @@ const SYSTEM: Msg = { role: 'system', text: 'You are the support assistant for A
 const NAMES: Record<User, string> = { alice: 'Alice', bob: 'Bob' };
 
 const STRATEGIES: Record<Strategy, { label: string; param: string | null }> = {
-  derived: { label: 'UUID from user and chat', param: 'conversationId(userId, chatId)' },
+  derived: { label: 'UUID from user and chat', param: 'sessionId(userId, chatId)' },
   chat: { label: 'The chat id from the URL', param: 'chatId.toString()' },
-  joined: { label: 'userId + ":" + chatId', param: 'userId + ":" + chatId' },
-  none: { label: 'No CONVERSATION_ID', param: null },
+  none: { label: 'No session id', param: null },
 };
 
 const SUGGESTIONS: Record<User, string[]> = {
@@ -43,8 +44,6 @@ function conversationIdFor(strategy: Strategy, user: User): string | null {
       return DERIVED[user];
     case 'chat':
       return CHAT_ID;
-    case 'joined':
-      return `${user}:${CHAT_ID}`;
     case 'none':
       return null;
   }
@@ -79,13 +78,16 @@ interface Exchange {
   error?: string;
 }
 
-function javaFor(strategy: Strategy, maxMessages: number): string {
+const MISSING_ID =
+  'IllegalStateException: No session ID found in advisor context. Set SESSION_ID_CONTEXT_KEY on every request: …';
+
+function javaFor(strategy: Strategy, eventWindow: Window): string {
   const param = STRATEGIES[strategy].param;
-  const params = param ? `\n                .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, ${param}))` : '';
-  return `ChatMemory chatMemory = MessageWindowChatMemory.builder()
-        .chatMemoryRepository(jdbcChatMemoryRepository)
-        .maxMessages(${maxMessages})
-        .build();
+  const params = param ? `\n                .advisors(SessionAdvisors.session(${param}))` : '';
+  const filter = eventWindow === 'all' ? '' : `\n                        .eventFilter(EventFilter.lastN(${eventWindow}))`;
+  return `.defaultAdvisors(SessionAdvisors.builder(sessionService)
+                .memory(memory -> memory.order(Ordered.HIGHEST_PRECEDENCE + 210)${filter})
+                .build())
 
 String answer = supportChatClient.prompt()
         .user(question)${params}
@@ -104,7 +106,7 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
 
 export default function ChatMemoryLab() {
   const [strategy, setStrategy] = useState<Strategy>('derived');
-  const [maxMessages, setMaxMessages] = useState(4);
+  const [eventWindow, setEventWindow] = useState<Window>(4);
   const [user, setUser] = useState<User>('alice');
   const [rows, setRows] = useState<Row[]>([]);
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
@@ -114,29 +116,18 @@ export default function ChatMemoryLab() {
 
   const send = (text: string) => {
     if (conversationId === null) {
-      setExchanges((e) => [...e, { user, text, error: 'IllegalArgumentException: conversationId cannot be null' }]);
-      return;
-    }
-    if (conversationId.length > 36) {
-      setExchanges((e) => [
-        ...e,
-        {
-          user,
-          text,
-          error: `DataIntegrityViolationException: … ERROR: value too long for type character varying(36). The id "${conversationId}" has ${conversationId.length} characters.`,
-        },
-      ]);
+      setExchanges((e) => [...e, { user, text, error: MISSING_ID }]);
       return;
     }
     const stored: Msg[] = rows.filter((r) => r.conversationId === conversationId).map((r) => ({ role: r.role, text: r.text }));
-    const prompt: Msg[] = [SYSTEM, ...stored, { role: 'user', text }];
+    const sent = eventWindow === 'all' ? stored : stored.slice(-eventWindow);
+    const prompt: Msg[] = [SYSTEM, ...sent, { role: 'user', text }];
     const reply = modelReply(prompt);
-    const conversation: Row[] = [
-      ...stored.map((m) => ({ conversationId, role: m.role as Row['role'], text: m.text })),
+    setRows((all) => [
+      ...all,
       { conversationId, role: 'user' as const, text },
       { conversationId, role: 'assistant' as const, text: reply },
-    ].slice(-maxMessages);
-    setRows((all) => [...all.filter((r) => r.conversationId !== conversationId), ...conversation]);
+    ]);
     setExchanges((e) => [...e, { user, text, reply }]);
     setLastPrompt(prompt);
   };
@@ -144,7 +135,7 @@ export default function ChatMemoryLab() {
   const forget = () => {
     if (conversationId === null) return;
     setRows((all) => all.filter((r) => r.conversationId !== conversationId));
-    setExchanges((e) => [...e, { user, text: 'DELETE /api/chats/' + CHAT_ID, reply: `chatMemory.clear("${conversationId}") removed every row with this id.` }]);
+    setExchanges((e) => [...e, { user, text: 'DELETE /api/chats/' + CHAT_ID, reply: `sessionService.delete("${conversationId}") removed the session, and its events with it.` }]);
   };
 
   const reset = () => {
@@ -155,12 +146,12 @@ export default function ChatMemoryLab() {
 
   return (
     <LabFrame
-      title="Conversation ids and the memory window"
-      hint="Alice and Bob both open chat 0f8e2a4c-… in the app. Choose how the service turns that into a conversation id, then chat as either user."
+      title="Session ids and the event filter"
+      hint="Alice and Bob both open chat 0f8e2a4c-… in the app. Choose how the service turns that into a session id, then chat as either user."
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <fieldset className="min-w-0 sm:col-span-2">
-          <legend className="text-xs font-medium text-slate-600 dark:text-slate-400">CONVERSATION_ID</legend>
+          <legend className="text-xs font-medium text-slate-600 dark:text-slate-400">Session id</legend>
           <div className="mt-1.5 flex flex-wrap gap-2">
             {(Object.keys(STRATEGIES) as Strategy[]).map((s) => (
               <Pill key={s} active={strategy === s} onClick={() => setStrategy(s)}>
@@ -170,11 +161,11 @@ export default function ChatMemoryLab() {
           </div>
         </fieldset>
         <fieldset className="min-w-0">
-          <legend className="text-xs font-medium text-slate-600 dark:text-slate-400">maxMessages</legend>
+          <legend className="text-xs font-medium text-slate-600 dark:text-slate-400">Event filter</legend>
           <div className="mt-1.5 flex flex-wrap gap-2">
-            {[4, 6, 20].map((n) => (
-              <Pill key={n} active={maxMessages === n} onClick={() => setMaxMessages(n)}>
-                {n === 20 ? '20 (default)' : String(n)}
+            {([4, 6, 'all'] as Window[]).map((n) => (
+              <Pill key={n} active={eventWindow === n} onClick={() => setEventWindow(n)}>
+                {n === 'all' ? 'all() (default)' : `lastN(${n})`}
               </Pill>
             ))}
           </div>
@@ -193,9 +184,9 @@ export default function ChatMemoryLab() {
 
       <div className="mt-4">
         <h4 className="text-xs font-medium text-slate-600 dark:text-slate-400">Your code</h4>
-        <CodeView code={javaFor(strategy, maxMessages)} lang="java" className="mt-1.5" />
+        <CodeView code={javaFor(strategy, eventWindow)} lang="java" className="mt-1.5" />
         <p className="mt-2 text-sm text-slate-600 [overflow-wrap:anywhere] dark:text-slate-400">
-          {NAMES[user]}'s conversation id:{' '}
+          {NAMES[user]}'s session id:{' '}
           <span className="code-mono text-[0.8rem] text-slate-800 dark:text-slate-200">{conversationId ?? 'none'}</span>
         </p>
       </div>
@@ -240,15 +231,15 @@ export default function ChatMemoryLab() {
           ))}
         </div>
 
-        <Panel title={`SPRING_AI_CHAT_MEMORY (${rows.length} rows)`}>
+        <Panel title={`AI_SESSION_EVENT (${rows.length} rows)`}>
           {rows.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-[0.8rem]">
                 <thead className="text-xs text-slate-500 dark:text-slate-400">
                   <tr>
-                    <th className="py-1 pr-3 font-medium">conversation_id</th>
-                    <th className="py-1 pr-3 font-medium">type</th>
-                    <th className="py-1 font-medium">content</th>
+                    <th className="py-1 pr-3 font-medium">session_id</th>
+                    <th className="py-1 pr-3 font-medium">message_type</th>
+                    <th className="py-1 font-medium">message_content</th>
                   </tr>
                 </thead>
                 <tbody>

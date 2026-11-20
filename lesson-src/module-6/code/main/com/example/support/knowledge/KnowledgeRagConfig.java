@@ -38,7 +38,7 @@ class KnowledgeRagConfig {
                 // An order question finds no documents. The default would then replace it with a refusal, and the model
                 // would never call a tool. The system prompt keeps policy answers to the documents instead.
                 .queryAugmenter(ContextualQueryAugmenter.builder().allowEmptyContext(true).build())
-                // After memory (+ 200), so memory stores the question rather than the augmented prompt,
+                // After memory (+ 210), so memory stores the question rather than the augmented prompt,
                 // and before tool calling (+ 300), so it retrieves once per question.
                 .order(Ordered.HIGHEST_PRECEDENCE + 225)
                 .build();

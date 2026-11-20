@@ -23,11 +23,11 @@ every guarantee where the model can't reach:
 | Must never happen | Enforced by | Built in |
 | --- | --- | --- |
 | A customer reads another customer's orders | The tool takes the customer from the tool context, not from the model | Module 5, Tool Calling |
-| Money moves without the customer's consent | The model can only propose a refund; the customer confirms it in the app | Module 5, Human in the Loop |
+| Money moves without the customer's consent | The refund tool waits for the customer's confirmation, and the service checks the amount | Module 5, Human in the Loop |
 | A customer reads staff documents | The retrieval filter asks only for customer documents | Module 4 |
 | Card numbers reach the model, memory or logs | `PiiRedactionAdvisor` masks them first | Module 3 |
 | The model calls a tool nobody reviewed | The MCP allowlist | Module 5, MCP |
-| A conversation is kept forever, or can't be deleted | An owner table, a retention job and an erasure endpoint | This lesson |
+| A conversation is kept forever, or can't be deleted | The session's owner, a time to live, a nightly sweep and an erasure endpoint | This lesson |
 
 <Mermaid
   caption="Everything the model can be talked into is checked after it, by code that knows who is signed in."
@@ -37,17 +37,20 @@ flowchart LR
   R --> S["Retrieval filter<br/>customer documents"]
   S --> M["Model"]
   M -->|"tool call"| T["Tool<br/>customer from tool context"]
-  T -->|"refund"| P["PENDING until<br/>the customer confirms"]
+  T -->|"refund"| P["waits until<br/>the customer confirms"]
 `}
 />
 
-Then know where a customer's data stays after the answer. These come from the 2.0.2 classes and the recorded runs:
+Then know where a customer's data stays after the answer. These come from the 2.1.0 classes and the recorded runs:
 
-- Chat memory keeps the redacted customer messages and the model's replies. `JdbcChatMemoryRepository` doesn't store tool calls
-  or tool results; it logs a warning and leaves them out.
-- The conversation id is a hash of customer and chat (Module 3), which keeps customers apart but means you can't list a
-  customer's conversations. Spring AI's table records neither the owner nor the last use, so erasure and retention need a table
-  of your own.
+- Session memory keeps the redacted customer messages and the model's replies. With memory before the tool loop (`+ 210`), the
+  tool rounds of an ordinary answer aren't stored; a refund's paused call and its result are, because they leave and enter
+  through the chat client.
+- The session id is a hash of customer and chat (Module 3), which keeps customers apart but can't be listed by customer. A new
+  session records metadata, though: pass the owner under `SessionAttributes.PRINCIPAL_NAME` and `findByMetadata` finds every
+  session of that customer.
+- `spring.ai.session.time-to-live` (60 days by default) counts from the session's creation, and nothing extends it. Expired
+  sessions stay in the tables until something calls `SessionService.deleteExpiredSessions`; Spring AI runs no sweep of its own.
 - The model's replies can repeat what tools returned, such as a tracking number, so memory holds personal data even with
   redaction on.
 - Orders and refunds are business records with their own retention rules. Traces and logs follow your observability backend's
@@ -67,89 +70,22 @@ with the audience condition removed from the retrieval filter, the staff-documen
 
 <ProjectTree />
 
-A table records which customer owns each conversation and when it was last used:
-
-<CodeFile
-  title="support_chats.sql"
-  lang="sql"
-  code={`CREATE TABLE support_chats (
-    conversation_id VARCHAR(36)  PRIMARY KEY,
-    customer_id     VARCHAR(100) NOT NULL,
-    last_used       TIMESTAMPTZ  NOT NULL
-);
-CREATE INDEX support_chats_customer_id_idx ON support_chats (customer_id);
-CREATE INDEX support_chats_last_used_idx ON support_chats (last_used);`}
-/>
-
-<CodeFile title="src/main/java/com/example/support/chat/SupportChats.java">
-```java {24,27}
-package com.example.support.chat;
-
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.util.List;
-
-import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.stereotype.Repository;
-
-/** Who owns each conversation and when it was last used. Spring AI's memory table records neither. */
-@Repository
-class SupportChats {
-
-    private final JdbcClient jdbc;
-
-    SupportChats(JdbcClient jdbc) {
-        this.jdbc = jdbc;
-    }
-
-    void recordUse(String conversationId, String customerId, Instant usedAt) {
-        jdbc.sql("""
-                        INSERT INTO support_chats (conversation_id, customer_id, last_used)
-                        VALUES (:conversationId, :customerId, :usedAt)
-                        ON CONFLICT (conversation_id) DO UPDATE SET last_used = EXCLUDED.last_used""")
-                .param("conversationId", conversationId)
-                .param("customerId", customerId)
-                .param("usedAt", usedAt.atOffset(ZoneOffset.UTC)) // the driver can't bind an Instant
-                .update();
-    }
-
-    List<String> ofCustomer(String customerId) {
-        return jdbc.sql("SELECT conversation_id FROM support_chats WHERE customer_id = :customerId")
-                .param("customerId", customerId)
-                .query(String.class)
-                .list();
-    }
-
-    List<String> idleSince(Instant cutoff) {
-        return jdbc.sql("SELECT conversation_id FROM support_chats WHERE last_used < :cutoff")
-                .param("cutoff", cutoff.atOffset(ZoneOffset.UTC))
-                .query(String.class)
-                .list();
-    }
-
-    void delete(String conversationId) {
-        jdbc.sql("DELETE FROM support_chats WHERE conversation_id = :conversationId")
-                .param("conversationId", conversationId)
-                .update();
-    }
-}
-```
-</CodeFile>
-
-The service records the owner on every question. Erasure and retention find the conversations in that table and delete them
-through `ChatMemory.clear`, Spring AI's own API, so the code never depends on the memory table's columns. One transaction covers
-both tables:
+The service passes the owner as session metadata. Spring AI stores it when the session is created, and the JDBC repository
+indexes it. Erasure finds the customer's sessions by that metadata and deletes them, events included; retention deletes every
+session past its time to live:
 
 <CodeFile title="src/main/java/com/example/support/chat/SupportChatService.java">
-```java {47,78,84,94,95}
+```java {100,101,107,108,118}
 package com.example.support.chat;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
-import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import com.example.support.knowledge.KnowledgeFilters;
 import com.example.support.tools.CustomerToolContext;
@@ -157,13 +93,24 @@ import com.example.support.tools.CustomerToolContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
+import org.springframework.ai.model.tool.ToolCallDecision;
+import org.springframework.ai.model.tool.ToolCallDecisions;
 import org.springframework.ai.model.tool.ToolCallLimitExceededException;
+import org.springframework.ai.model.tool.ToolCallingChatOptions;
+import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
 import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
+import org.springframework.ai.session.Session;
+import org.springframework.ai.session.SessionAttributes;
+import org.springframework.ai.session.SessionService;
+import org.springframework.ai.session.advisor.SessionAdvisors;
+import org.springframework.ai.session.advisor.SessionMemoryAdvisor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -171,38 +118,92 @@ import org.springframework.transaction.annotation.Transactional;
 public class SupportChatService {
 
     static final String TOOL_LIMIT_ANSWER = "I couldn't finish looking that up. A support agent will follow up in this chat.";
+    static final String CONFIRMATION_ANSWER = "Please confirm or decline this in the app.";
+    static final String DECLINED = "The customer declined.";
 
     private static final Logger log = LoggerFactory.getLogger(SupportChatService.class);
 
     private final ChatClient supportChatClient;
-    private final ChatMemory chatMemory;
-    private final SupportChats chats;
+    private final SessionService sessionService;
+    private final ToolCallingManager toolCallingManager;
+    private final SupportTools tools;
     private final Clock clock;
 
-    public SupportChatService(ChatClient supportChatClient, ChatMemory chatMemory, SupportChats chats, Clock clock) {
+    public SupportChatService(ChatClient supportChatClient, SessionService sessionService,
+                              ToolCallingManager toolCallingManager, SupportTools tools, Clock clock) {
         this.supportChatClient = supportChatClient;
-        this.chatMemory = chatMemory;
-        this.chats = chats;
+        this.sessionService = sessionService;
+        this.toolCallingManager = toolCallingManager;
+        this.tools = tools;
         this.clock = clock;
     }
 
     public SupportAnswer ask(String userId, UUID chatId, String product, String question, Locale language) {
-        String conversationId = conversationId(userId, chatId);
-        chats.recordUse(conversationId, userId, clock.instant());
-        ChatResponse response = supportChatClient.prompt()
+        return answer(userId, chatId, language, request -> request
                 .user(question)
+                // Replaces the retriever's default filter, so it must keep the audience condition.
+                .advisors(advisor -> advisor.param(VectorStoreDocumentRetriever.FILTER_EXPRESSION,
+                        KnowledgeFilters.customerDocuments(product))));
+    }
+
+    /** The tool calls waiting for the customer's decision: the session's last message, when it is an unanswered call. */
+    public List<AssistantMessage.ToolCall> awaitingConfirmation(String userId, UUID chatId) {
+        return pausedReply(sessionId(userId, chatId)).map(AssistantMessage::getToolCalls).orElse(List.of());
+    }
+
+    /** Runs the calls the customer confirmed, or tells the model they declined, and returns the model's answer. */
+    public SupportAnswer confirm(String userId, UUID chatId, boolean approved, Locale language) {
+        AssistantMessage paused = pausedReply(sessionId(userId, chatId)).orElseThrow(NothingToConfirmException::new);
+        // Every call of the reply needs a decision, the ones that didn't need confirmation too.
+        var decisions = new ToolCallDecisions(ToolCallDecisions.toolCallKeys(paused).stream()
+                .map(key -> approved ? ToolCallDecision.allow(key) : ToolCallDecision.deny(key, DECLINED))
+                .toList());
+        var options = ToolCallingChatOptions.builder()
+                .toolCallbacks(tools.callbacks())
                 .toolContext(CustomerToolContext.of(userId))
+                .build();
+        List<Message> history = toolCallingManager
+                .executeToolCalls(new Prompt(List.of(), options), new ChatResponse(List.of(new Generation(paused))), decisions)
+                .conversationHistory();
+        // The session holds the question and the paused reply; send only the tool results.
+        return answer(userId, chatId, language, request -> request.messages(history.getLast()));
+    }
+
+    public void forget(String userId, UUID chatId) {
+        sessionService.delete(sessionId(userId, chatId));
+    }
+
+    /** Erasure: every session this customer owns, with all its messages. */
+    @Transactional
+    public int forgetCustomer(String userId) {
+        List<Session> sessions = sessionService.findByMetadata(SessionAttributes.PRINCIPAL_NAME, userId);
+        sessions.forEach(session -> sessionService.delete(session.id()));
+        return sessions.size();
+    }
+
+    /** Retention: every session past its time to live (spring.ai.session.time-to-live). */
+    public int forgetExpiredChats() {
+        return sessionService.deleteExpiredSessions(clock.instant());
+    }
+
+    private SupportAnswer answer(String userId, UUID chatId, Locale language,
+                                 Consumer<ChatClient.ChatClientRequestSpec> request) {
+        ChatClient.ChatClientRequestSpec spec = supportChatClient.prompt()
+                .toolContext(CustomerToolContext.of(userId))
+                .advisors(SessionAdvisors.session(sessionId(userId, chatId)))
                 .advisors(advisor -> advisor
-                        .param(ChatMemory.CONVERSATION_ID, conversationId)
+                        // A new session records its owner, so erasure can find every session of a customer.
+                        .param(SessionMemoryAdvisor.SESSION_METADATA_CONTEXT_KEY, Map.of(SessionAttributes.PRINCIPAL_NAME, userId))
                         .param(TokenBudgetAdvisor.USER_ID, userId)
-                        .param(AnswerLanguageAdvisor.LANGUAGE, language)
-                        // Replaces the retriever's default filter, so it must keep the audience condition.
-                        .param(VectorStoreDocumentRetriever.FILTER_EXPRESSION, KnowledgeFilters.customerDocuments(product)))
-                .call()
-                .chatResponse();
+                        .param(AnswerLanguageAdvisor.LANGUAGE, language));
+        request.accept(spec);
+        ChatResponse response = spec.call().chatResponse();
         Generation answer = response == null ? null : response.getResult();
         if (answer == null) {
             throw new IllegalStateException("The model returned no answer");
+        }
+        if (ToolCallDecisions.isAwaitingDecision(response)) {
+            return new SupportAnswer(CONFIRMATION_ANSWER, List.of());
         }
         if (ToolCallLimitExceededException.FINISH_REASON.equals(answer.getMetadata().getFinishReason())) {
             log.warn("Tool call limit reached for {}: {}", userId, answer.getOutput().getText());
@@ -212,39 +213,19 @@ public class SupportChatService {
         return new SupportAnswer(answer.getOutput().getText(), sources);
     }
 
-    @Transactional
-    public void forget(String userId, UUID chatId) {
-        delete(conversationId(userId, chatId));
-    }
-
-    /** Erasure: every conversation this customer has stored. */
-    @Transactional
-    public int forgetCustomer(String userId) {
-        return deleteAll(chats.ofCustomer(userId));
-    }
-
-    /** Retention: every conversation nobody has used for this long. */
-    @Transactional
-    public int forgetIdleChats(Duration retention) {
-        return deleteAll(chats.idleSince(clock.instant().minus(retention)));
-    }
-
-    private int deleteAll(List<String> conversationIds) {
-        conversationIds.forEach(this::delete);
-        return conversationIds.size();
-    }
-
-    private void delete(String conversationId) {
-        chatMemory.clear(conversationId);
-        chats.delete(conversationId);
+    private Optional<AssistantMessage> pausedReply(String sessionId) {
+        List<Message> messages = sessionService.findById(sessionId) == null ? List.of() : sessionService.getMessages(sessionId);
+        return messages.isEmpty() || !(messages.getLast() instanceof AssistantMessage reply) || !reply.hasToolCalls()
+                ? Optional.empty()
+                : Optional.of(reply);
     }
 
     /** The answer, and the knowledge chunks it was given. Evals check the answer against exactly these. */
     public record SupportAnswer(String text, List<Document> sources) {
     }
 
-    /** A UUID that only this user's chat maps to, and that fits the 36-character JDBC column. */
-    static String conversationId(String userId, UUID chatId) {
+    /** A session id that only this user's chat maps to, so a chat id alone never reaches another user's session. */
+    static String sessionId(String userId, UUID chatId) {
         return UUID.nameUUIDFromBytes((userId + ":" + chatId).getBytes(StandardCharsets.UTF_8)).toString();
     }
 }
@@ -254,19 +235,22 @@ public class SupportChatService {
 The customer deletes their own history with one call:
 
 <CodeFile title="src/main/java/com/example/support/chat/SupportChatController.java">
-```java {44,45}
+```java {61,62}
 package com.example.support.chat;
 
 import java.security.Principal;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -289,6 +273,20 @@ class SupportChatController {
         return new AnswerResponse(chatService.ask(principal.getName(), chatId, request.product(), request.question(), locale).text());
     }
 
+    /** What the model wants to do and waits for the customer to confirm: tool names and the exact arguments. */
+    @GetMapping("/{chatId}/confirmation")
+    List<PendingCall> awaitingConfirmation(@PathVariable UUID chatId, Principal principal) {
+        return chatService.awaitingConfirmation(principal.getName(), chatId).stream()
+                .map(call -> new PendingCall(call.name(), call.arguments()))
+                .toList();
+    }
+
+    @PostMapping("/{chatId}/confirmation")
+    AnswerResponse confirm(@PathVariable UUID chatId, @Valid @RequestBody ConfirmRequest request, Principal principal,
+                           Locale locale) {
+        return new AnswerResponse(chatService.confirm(principal.getName(), chatId, request.approved(), locale).text());
+    }
+
     @DeleteMapping("/{chatId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void forget(@PathVariable UUID chatId, Principal principal) {
@@ -307,63 +305,126 @@ class SupportChatController {
 
     record AnswerResponse(String answer) {
     }
+
+    record PendingCall(String tool, String arguments) {
+    }
+
+    record ConfirmRequest(@NotNull Boolean approved) {
+    }
 }
 ```
 </CodeFile>
 
-A nightly job applies the retention period. It runs on every instance, and deleting the same conversation twice does no harm:
+A nightly job applies the retention period. It runs on every instance, and deleting an expired session twice does no harm:
 
 <CodeFile title="src/main/java/com/example/support/chat/ChatRetentionConfig.java">
-```java {26,28}
+```java {22,24}
 package com.example.support.chat;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
-@EnableConfigurationProperties(PrivacyProperties.class)
 class ChatRetentionConfig {
 
     private static final Logger log = LoggerFactory.getLogger(ChatRetentionConfig.class);
 
     private final SupportChatService chatService;
-    private final PrivacyProperties privacy;
 
-    ChatRetentionConfig(SupportChatService chatService, PrivacyProperties privacy) {
+    ChatRetentionConfig(SupportChatService chatService) {
         this.chatService = chatService;
-        this.privacy = privacy;
     }
 
-    /** Every instance runs it; deleting the same conversation twice does no harm. */
+    /** Spring AI doesn't sweep expired sessions itself. Every instance runs it; a session is deleted once. */
     @Scheduled(cron = "0 30 3 * * *", zone = "UTC")
-    void deleteIdleChats() {
-        int deleted = chatService.forgetIdleChats(privacy.chatRetention());
-        log.info("Deleted {} conversations unused for {}", deleted, privacy.chatRetention());
+    void deleteExpiredChats() {
+        log.info("Deleted {} expired conversations", chatService.forgetExpiredChats());
     }
 }
 ```
 </CodeFile>
 
-<CodeFile title="src/main/java/com/example/support/chat/PrivacyProperties.java">
-```java {13}
+The service reads the time from a `Clock` bean, so the tests can move it:
+
+<CodeFile title="src/main/java/com/example/support/chat/SupportChatConfig.java">
+```java {28}
 package com.example.support.chat;
 
-import java.time.Duration;
+import java.time.Clock;
+import java.util.List;
 
-import jakarta.validation.constraints.NotNull;
+import com.example.support.mcp.BestEffortToolCallbacks;
+import com.example.support.order.OrderTools;
+import com.example.support.refund.RefundTools;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.validation.annotation.Validated;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.SafeGuardAdvisor;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
+import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
+import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import org.springframework.ai.session.EventFilter;
+import org.springframework.ai.session.SessionService;
+import org.springframework.ai.session.advisor.SessionAdvisors;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 
-/** How long a conversation nobody uses is kept before it is deleted. */
-@Validated
-@ConfigurationProperties("support.privacy")
-public record PrivacyProperties(@NotNull Duration chatRetention) {
+@Configuration(proxyBeanMethods = false)
+class SupportChatConfig {
+
+    /** Session expiry is checked against this clock, so tests can move it. */
+    @Bean
+    Clock clock() {
+        return Clock.systemUTC();
+    }
+
+    @Bean
+    SupportTools supportTools(OrderTools orderTools, RefundTools refundTools, SyncMcpToolCallbackProvider mcpTools) {
+        return new SupportTools(orderTools, refundTools, new BestEffortToolCallbacks(mcpTools));
+    }
+
+    @Bean
+    ChatClient supportChatClient(ChatClient.Builder builder, SessionService sessionService,
+                                RetrievalAugmentationAdvisor knowledgeRagAdvisor, SupportTools tools) {
+        return builder
+                .defaultSystem("""
+                        You are the support assistant for Acme Cloud.
+                        Answer questions about policies, prices and shipping only from the context you are given. If it
+                        doesn't hold the answer, say you don't know and offer to pass the question to a support agent.
+                        Use the tools for questions about the customer's own orders and refunds.""")
+                .defaultAdvisors(
+                        SafeGuardAdvisor.builder()
+                                .sensitiveWords(List.of("internal only", "api_key"))
+                                .order(Ordered.HIGHEST_PRECEDENCE + 25)
+                                .build(),
+                        new TokenBudgetAdvisor(200_000, Clock.systemUTC()),   // + 50
+                        new PiiRedactionAdvisor(),                            // + 100
+                        knowledgeRagAdvisor,                                  // + 225
+                        new AnswerLanguageAdvisor(),                          // + 250
+                        new SimpleLoggerAdvisor())                            // 0
+                // The turn (+ 200) and the memory (+ 210) run before RAG, so the memory stores the question rather than
+                // the augmented prompt, and RAG sees the history. The prompt gets the last 40 messages, in whole turns.
+                .defaultAdvisors(SessionAdvisors.builder(sessionService)
+                        .memory(memory -> memory
+                                .order(Ordered.HIGHEST_PRECEDENCE + 210)
+                                .eventFilter(EventFilter.lastN(40)))
+                        .build())
+                .defaultTools(tools.orders(), tools.refunds(), tools.shipping())
+                .build();
+    }
+
+    @Bean
+    ChatClient faqChatClient(ChatClient.Builder builder, VectorStore vectorStore) {
+        return builder
+                .defaultSystem("Answer questions about Acme Cloud plans and billing.")
+                .defaultAdvisors(new PiiRedactionAdvisor(), new SemanticCacheAdvisor(vectorStore, 0.92))
+                .build();
+    }
 }
 ```
 </CodeFile>
@@ -372,9 +433,10 @@ public record PrivacyProperties(@NotNull Duration chatRetention) {
   title="src/main/resources/application.yaml (addition)"
   lang="yaml"
   lines="3"
-  code={`support:
-  privacy:
-    chat-retention: 30d   # a conversation nobody has used for this long is deleted`}
+  code={`spring:
+  ai:
+    session:
+      time-to-live: 30d   # a conversation is deleted this long after it started`}
 />
 
 The security tests run against the real model in Testcontainers. Each asserts what the code allowed: which customer a lookup
@@ -476,9 +538,10 @@ class SupportSecurityIT {
 ```
 </CodeFile>
 
-`CustomerDataIT` checks erasure and retention against PostgreSQL: forgetting alice leaves bob's conversation, and the retention
-job deletes a conversation last used 31 days ago but keeps one from yesterday. `SupportChatServiceTest` covers the same rules
-with a mocked `SupportChats`, and `SupportChatControllerTest` covers `DELETE /api/chats`.
+`CustomerDataIT` checks erasure and retention against PostgreSQL: forgetting alice deletes her sessions and their stored
+messages and leaves bob's, and the sweep deletes an expired session but keeps a current one. `SupportChatServiceTest` covers the
+same rules over the in-memory repository, with the clock moved 31 days, and `SupportChatControllerTest` covers
+`DELETE /api/chats`.
 
 ## 4. Production gotchas & security
 
@@ -496,8 +559,8 @@ possible call you couldn't accept, and a person confirming anything that can't b
 
 <Gotcha kind="security" title="Redaction catches patterns, not people">
 `PiiRedactionAdvisor` masks e-mail addresses and card numbers. Names, street addresses and whatever a customer types into a
-reason field pass through, and the model's replies repeat tool results. Treat chat memory as personal data whatever you redact,
-and delete it on a schedule.
+reason field pass through, and the model's replies repeat tool results. Treat session memory as personal data whatever you
+redact, and delete it on a schedule.
 </Gotcha>
 
 <Gotcha kind="security" title="The FAQ cache keeps questions without an owner">
@@ -506,8 +569,14 @@ erasure can't find them. The questions are redacted, but a name or an address st
 questions out of the cache.
 </Gotcha>
 
+<Gotcha kind="reliability" title="The time to live counts from the first message">
+A session's expiry is fixed when it is created. A customer who keeps one chat going for weeks loses its history 30 days after the
+first question, in the middle of the conversation. Choose the period with that in mind, or give a long conversation a new chat id
+before it expires.
+</Gotcha>
+
 <Gotcha kind="reliability" title="Deleting the conversation doesn't delete its traces">
-Erasure clears chat memory and the owner table. The vector query text in your traces (Lesson 2), log lines from content logging,
+Erasure deletes the sessions and their messages. The vector query text in your traces (Lesson 2), log lines from content logging,
 and the model provider's own logs follow their own retention. Keep each one no longer than the chat retention, or leave the
 content out of it.
 </Gotcha>
@@ -517,5 +586,6 @@ content out of it.
 - The model is not a security boundary. It fell for an attack in our recording, and the code still refused it.
 - Every guarantee lives in code: the tool context, the confirmation step, the retrieval filter, redaction, the MCP allowlist.
 - Security tests attack the real model and assert only what the code allowed, so they keep passing when the wording changes.
-- Record who owns each conversation, so a customer's history can be deleted on request and stale conversations on a schedule.
+- Each session records its owner, so a customer's history can be deleted on request; a nightly sweep deletes sessions past
+  their time to live.
 - Personal data also sits in caches, traces, logs and the provider's logs. Give each one a retention you can defend.

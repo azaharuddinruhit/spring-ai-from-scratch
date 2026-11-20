@@ -3,6 +3,42 @@
 The probes ran in a scratch folder (`tool-probe/`), so paths below use that layout: `tool-probe/l5` is now `code/`, and the
 probe sources are in `probes/`.
 
+## Re-checked on 2.1.0 (2026-11-20, Boot 4.2.0, MCP SDK 2.2.0)
+
+- MCP: `McpProbe`, `McpSecurityProbe`, `ResilienceProbe` and `StdioProbe` give the same results (`alt_1_` renaming, the whole tool
+  context in `_meta`, "Access Denied", `McpHttpClientTransportAuthorizationException`, `ClosedChannelException` while the server is
+  down, a quiet STDIO server works and a default one times out). The SSE conditions still match a missing `protocol`; a `String`
+  prompt is still an ASSISTANT message; `ReadResourceRequest(String)`, `GetPromptRequest(String, Map)` and
+  `httpRequestCustomizer` are still deprecated. Run `StdioProbe` from a folder whose `cp.arg` holds the probe classes: the child
+  server reads it.
+- Tool limits: still 40 per tool and 150 in total; `defaultToolCallbacks` is still deprecated.
+- Session Memory replaces `ChatMemory` (`SessionAdvisors`, memory at `HIGHEST_PRECEDENCE + 210` so it stores the question and RAG
+  sees the history; the tests fail at the default `+ 1000`). The JDBC session repository opens a connection at startup to pick its
+  SQL dialect, and its schema initializer too; `spring.ai.session.repository.jdbc.initialize-schema=never` stops only the second.
+- Human in the loop uses 2.1's tool call confirmation: `@Tool(requiresConfirmation = true)` makes the call return a paused reply
+  (`ToolCallDecisions.isAwaitingDecision`); `ToolCallingManager.executeToolCalls(prompt, response, decisions)` runs or denies it and
+  needs a decision for every call of the reply. The session stores the paused reply, so it is the last message until the customer
+  decides or writes again. On a resumed request the last message is a tool result, so `PiiRedactionAdvisor` skips it
+  (`augmentUserMessage` would append a user message after the tool results). A JSON `59.90` reaches the tool as `BigDecimal` `59.9`: compare with
+  `compareTo`.
+- VERIFIED (probes/ConfirmationProbe.java): `executeToolCalls` with a decision missing throws `IllegalArgumentException: Every tool
+  call of the reply needs a decision; missing: [...]`; an allowed call whose tool isn't in the prompt throws "The prompt does not
+  carry the tool ..."; denied calls need no tools and answer with the deny message, or "The user did not allow this tool call.";
+  without decisions a confirmation tool throws `ToolCallConfirmationRequiredException`. A new user message after a pause makes the
+  session store a TOOL result "No result was recorded for this tool call." before the message. `stream()` pauses too (one chunk,
+  awaiting). A model whose options aren't `ToolCallingChatOptions` never pauses: the loop doesn't run.
+- VERIFIED (same probe): with memory at `+ 210` a plain tool loop stores only USER and the final ASSISTANT; the tool rounds run
+  after memory and aren't kept. A confirmation's paused call and its tool result are kept, because they leave or enter the chain.
+- Module 3 facts (probes/ChainFactsProbe.java, probes/EqualOrderProbe.java run on 2.1.0 and 2.0.2 jars): default orders
+  unchanged (logger, SafeGuard, RAG 0; ToolCallingAdvisor + 300); `SessionAdvisors` builds `SessionTurnAdvisor` (+ 200) and
+  `SessionMemoryAdvisor` (+ 1000); default-order memory stores every tool round (USER, ASSISTANT call, TOOL, ASSISTANT); a missing
+  session id throws `IllegalStateException: No session ID found in advisor context. ...`; `stream()` skips a `CallAdvisor`-only
+  advisor. SafeGuard after memory blocks on stored history, and in 2.1 its refusal has finish reason `guardrailRefusal` (memory
+  stores the refusal). EQUAL ORDERS, both versions: reverse registration order (defaults and per-request advisors alike, the
+  request's last first), EXCEPT advisors ordered after `ToolCallingAdvisor` when the model's options are
+  `ToolCallingChatOptions` (every real provider): those run in registration order. A lambda `ChatModel` has no tool loop, so it
+  shows only the reverse rule. The course said "reverse" without the exception until 2026-11-20.
+
 ## MCP (probes: tool-probe/p/mcpprobe/McpProbe.java, McpSecurityProbe.java, StdioProbe.java)
 - WebMVC server without `spring.ai.mcp.server.protocol` starts the SSE transport (EnabledSseServerCondition matchIfMissing=true,
   Streamable matchIfMissing=false), although McpServerProperties declares STREAMABLE. A streamable-http client then fails startup with
@@ -92,3 +128,19 @@ probe sources are in `probes/`.
 - VERIFIED on PostgreSQL 17 (probes/RepoProbe.java): OrderRepository and RefundRepository work; the driver cannot bind an enum or
   an Instant (`Can't infer the SQL type`), so `paramSource(refund)` failed; RefundRepository binds `.name()` and `OffsetDateTime`.
   `UPDATE ... WHERE status = 'PENDING'` returns 1 then 0 for a second confirmation.
+- Session claims (probes/SessionClaimsProbe.java, 2.1.0): with memory at `+ 210` the model gets SYSTEM, the stored history,
+  then the new USER message; the system message is not stored. EXPIRY IS ONLY A DATE: `findById` returns an expired session
+  (in memory, and the JDBC `SELECT ... WHERE s.id = ?` has no expiry condition), the advisors' `findOrCreate` keeps using it,
+  and only `deleteExpiredSessions(before)` removes it (with its events). The memory advisor's default event filter is
+  `EventFilter.all()`. JDBC `initialize-schema` defaults to `embedded` (Boot's `DatabaseInitializationProperties`). Module 3's
+  lesson code (all three lessons, 14 tests) compiles and passes on 2.1.0 (run without Spring Security on the classpath).
+- RAG before memory (probes/RagBeforeMemoryProbe.java, run with the Module 4 lesson classes on 2.1.0): with RAG at `+ 100` session
+  memory stores the augmented prompt, 422 characters for a 33-character question; at `+ 225` it stores the 33. The Module 4
+  lesson code compiles and passes on 2.1.0 (22 + 18 tests); the ETL lesson uses `KnowledgeFilters` before the next lesson shows it.
+- Module 4 on 2.1.0 (bytecode and source diffs against 2.0.2): `spring-ai-rag` unchanged except the new Decision* classes;
+  `TokenTextSplitter` rewritten for `withChunkOverlap` (default 0) but SplitCompare gave identical chunks (11,347 over 124 texts, five
+  configs); `ExtractedTextFormatter` regexes replaced by a loop, identical output on 12,000 texts; the filter parser adds
+  `MAX_EXPRESSION_DEPTH = 100` (AND/OR count as levels), lexer, builder and `PgVectorFilterExpressionConverter` unchanged;
+  `PgVectorStore` gains configurable column names and calls `embeddingModel.dimensions()` only when it creates the table
+  (otherwise reads the column size), plus dimension checks on the new upsert and query-embedding search paths only;
+  the PDF layout stripper adds a 30,000-lines-per-page guard. The BOM still has 21 vector store starters and the same four readers.

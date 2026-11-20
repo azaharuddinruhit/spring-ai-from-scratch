@@ -3,13 +3,15 @@ import type { ReactNode } from 'react';
 import { CodeView, LabFrame, Pill } from './LabFrame';
 
 /*
- * Steps one ChatClient call through the advisor chain of Spring AI 2.0.2. Every rule here was checked by running the real classes
- * against a fake ChatModel:
- * - Advisors run in ascending getOrder(). Advisors that share an order run in reverse registration order.
+ * Steps one ChatClient call through the advisor chain of Spring AI 2.1.0. Every rule here was checked by running the real classes
+ * against a fake ChatModel whose options are ToolCallingChatOptions, as every real provider's are:
+ * - Advisors run in ascending getOrder(). Advisors that share an order run in reverse registration order before
+ *   ToolCallingAdvisor and in registration order after it.
  * - ToolCallingAdvisor is registered automatically at HIGHEST_PRECEDENCE + 300. Advisors with a higher order sit inside its loop
  *   and run once per model call; the others run once per ChatClient call.
- * - MessageChatMemoryAdvisor saves the last user or tool message as it reaches it, sends the system message plus the stored
- *   conversation, and saves the reply on the way back.
+ * - SessionAdvisors adds SessionTurnAdvisor (HIGHEST_PRECEDENCE + 200) and SessionMemoryAdvisor (default + 1000, inside the loop).
+ *   The memory advisor saves the last user or tool message as it reaches it, sends the system message plus the stored
+ *   conversation (EventFilter.all() by default), and saves the reply on the way back. At + 1000 it stores every tool round.
  * - ChatModelCallAdvisor (LOWEST_PRECEDENCE) is always last and calls the model.
  */
 
@@ -17,25 +19,36 @@ const HIGHEST = -2147483648;
 const TOOLS_ORDER = HIGHEST + 300;
 
 type AdvisorId = 'memory' | 'rag' | 'logger';
-type NodeId = AdvisorId | 'tools' | 'call';
+type NodeId = AdvisorId | 'turn' | 'tools' | 'call';
 
-const POSITIONS = [
-  { value: HIGHEST + 100, label: 'HIGHEST_PRECEDENCE + 100', code: 'Ordered.HIGHEST_PRECEDENCE + 100' },
-  { value: HIGHEST + 200, label: 'HIGHEST_PRECEDENCE + 200', code: 'Ordered.HIGHEST_PRECEDENCE + 200' },
-  { value: 0, label: '0', code: '0' },
-];
+const TURN_ORDER = HIGHEST + 200;
 
-const ADVISORS: Record<AdvisorId, { name: string; defaultOrder: number }> = {
-  memory: { name: 'MessageChatMemoryAdvisor', defaultOrder: HIGHEST + 200 },
-  rag: { name: 'RetrievalAugmentationAdvisor', defaultOrder: 0 },
-  logger: { name: 'SimpleLoggerAdvisor', defaultOrder: 0 },
+interface Position {
+  value: number;
+  label: string;
+  code: string;
+}
+
+const position = (offset: number): Position =>
+  offset === 0
+    ? { value: 0, label: '0', code: '0' }
+    : { value: HIGHEST + offset, label: `HIGHEST_PRECEDENCE + ${offset}`, code: `Ordered.HIGHEST_PRECEDENCE + ${offset}` };
+
+const ADVISORS: Record<AdvisorId, { name: string; defaultOrder: number; positions: Position[] }> = {
+  memory: { name: 'SessionMemoryAdvisor', defaultOrder: HIGHEST + 1000, positions: [position(210), position(1000), position(0)] },
+  rag: { name: 'RetrievalAugmentationAdvisor', defaultOrder: 0, positions: [position(100), position(225), position(0)] },
+  logger: { name: 'SimpleLoggerAdvisor', defaultOrder: 0, positions: [position(100), position(0)] },
 };
 
-/** The order the advisors are passed to defaultAdvisors(...). */
-const REGISTRATION: AdvisorId[] = ['memory', 'rag', 'logger'];
+/** The advisors you can move, in the order the lab lists them. */
+const CONFIGURABLE: AdvisorId[] = ['memory', 'rag', 'logger'];
+
+/** Registration order: RAG and the logger in one defaultAdvisors(...) call, then the session advisors in a second. */
+const REGISTRATION: (AdvisorId | 'turn')[] = ['rag', 'logger', 'turn', 'memory'];
 
 type Orders = Record<AdvisorId, number>;
-const DEFAULT_ORDERS: Orders = { memory: ADVISORS.memory.defaultOrder, rag: ADVISORS.rag.defaultOrder, logger: ADVISORS.logger.defaultOrder };
+/** The lab starts from the course's configuration: memory before the tool loop, RAG and the logger at their defaults. */
+const START_ORDERS: Orders = { memory: HIGHEST + 210, rag: 0, logger: 0 };
 
 interface ChainNode {
   id: NodeId;
@@ -46,18 +59,24 @@ interface ChainNode {
 }
 
 function orderLabel(order: number): string {
-  if (order === TOOLS_ORDER) return 'HIGHEST_PRECEDENCE + 300';
-  return POSITIONS.find((p) => p.value === order)?.label ?? String(order);
+  return order === 0 ? '0' : `HIGHEST_PRECEDENCE + ${order - HIGHEST}`;
+}
+
+function nodeName(id: NodeId): string {
+  if (id === 'tools') return 'ToolCallingAdvisor';
+  if (id === 'turn') return 'SessionTurnAdvisor';
+  if (id === 'call') return 'ChatModelCallAdvisor';
+  return ADVISORS[id].name;
 }
 
 function buildChain(orders: Orders): ChainNode[] {
-  const advisors = REGISTRATION.map((id, index) => ({ id, order: orders[id], index }));
+  const advisors = REGISTRATION.map((id, index) => ({ id, order: id === 'turn' ? TURN_ORDER : orders[id], index }));
   const sorted = [...advisors, { id: 'tools' as const, order: TOOLS_ORDER, index: -1 }].sort(
-    (a, b) => a.order - b.order || b.index - a.index,
+    (a, b) => a.order - b.order || (a.order > TOOLS_ORDER ? a.index - b.index : b.index - a.index),
   );
   const nodes: ChainNode[] = sorted.map((a) => ({
     id: a.id,
-    name: a.id === 'tools' ? 'ToolCallingAdvisor' : ADVISORS[a.id].name,
+    name: nodeName(a.id),
     order: a.order,
     orderLabel: orderLabel(a.order),
     inLoop: a.order > TOOLS_ORDER,
@@ -134,6 +153,10 @@ function simulate(chain: ChainNode[], toolLoop: boolean): Step[] {
         snap('logger', 'up', 'SimpleLoggerAdvisor logs the response', `It logs what came back from below: ${reply === TOOL_CALL ? 'a tool call' : 'the answer'}.`, prompt);
         return reply;
       }
+      case 'turn': {
+        snap('turn', 'down', 'SessionTurnAdvisor opens the turn', 'It finds session c-1, or creates it, and starts a new turn in it.', prompt);
+        return run(i + 1, prompt);
+      }
       case 'memory': {
         const saved = lastUserOrTool(prompt);
         memory.push(saved);
@@ -141,13 +164,13 @@ function simulate(chain: ChainNode[], toolLoop: boolean): Step[] {
         snap(
           'memory',
           'down',
-          'MessageChatMemoryAdvisor loads and saves',
-          `It saves the ${saved.role} message to conversation c-1${saved.docs ? ', together with the documents RAG put in it' : ''}, then sends the system message followed by all ${memory.length} stored messages.`,
+          'SessionMemoryAdvisor loads and saves',
+          `It appends the ${saved.role} message to session c-1${saved.docs ? ', together with the documents RAG put in it' : ''}, then sends the system message followed by all ${memory.length} stored messages.`,
           next,
         );
         const reply = run(i + 1, next);
         memory.push(reply);
-        snap('memory', 'up', 'MessageChatMemoryAdvisor saves the reply', `It adds the ${reply === TOOL_CALL ? 'tool call' : 'answer'} to conversation c-1.`, next);
+        snap('memory', 'up', 'SessionMemoryAdvisor saves the reply', `It appends the ${reply === TOOL_CALL ? 'tool call' : 'answer'} to session c-1.`, next);
         return reply;
       }
       case 'rag': {
@@ -204,13 +227,13 @@ function simulate(chain: ChainNode[], toolLoop: boolean): Step[] {
   }
 
   const start = [SYSTEM, QUESTION];
-  snap('client', 'down', 'ChatClient builds the request', 'The prompt holds the default system message and your user message. CONVERSATION_ID = c-1 is in the request context.', start);
+  snap('client', 'down', 'ChatClient builds the request', 'The prompt holds the default system message and your user message. SessionAdvisors.session("c-1") put the session id in the request context.', start);
   const reply = run(0, start);
   snap(
     'client',
     'up',
     'call().content() returns',
-    `"${reply.text}" The call made ${modelCalls} model call${modelCalls > 1 ? 's' : ''}, and conversation c-1 now holds ${memory.length} messages.`,
+    `"${reply.text}" The call made ${modelCalls} model call${modelCalls > 1 ? 's' : ''}, and session c-1 now holds ${memory.length} messages.`,
     start,
   );
   return steps;
@@ -225,8 +248,11 @@ function notesFor(chain: ChainNode[], toolLoop: boolean): string[] {
   for (let i = 0; i < advisors.length; i++) {
     for (let j = i + 1; j < advisors.length; j++) {
       if (advisors[i].order === advisors[j].order) {
+        const rule = advisors[i].inLoop
+          ? 'Inside the tool loop, ties run in registration order'
+          : 'Before the tool loop, ties run in reverse registration order';
         notes.push(
-          `${advisors[i].name} and ${advisors[j].name} share order ${advisors[i].orderLabel}. In 2.0.2 ties run in reverse registration order, so ${advisors[i].name} runs first even though it is registered later. Give each advisor its own order.`,
+          `${advisors[i].name} and ${advisors[j].name} share order ${advisors[i].orderLabel}. ${rule}, so ${advisors[i].name} runs first. Give each advisor its own order.`,
         );
       }
     }
@@ -240,23 +266,24 @@ function notesFor(chain: ChainNode[], toolLoop: boolean): string[] {
   if (toolLoop) {
     const inside = chain.filter((n) => n.inLoop && n.id !== 'call').map((n) => n.name);
     if (inside.length) notes.push(`Inside the tool loop, ${inside.join(' and ')} run${inside.length === 1 ? 's' : ''} once per model call.`);
-    if (node('memory').inLoop) notes.push('Memory inside the tool loop also stores the tool call and the tool result.');
+    if (node('memory').inLoop) notes.push('Memory inside the tool loop also stores the tool call and the tool result, and sends them again with every later question.');
   }
   return notes;
 }
 
 function javaFor(orders: Orders): string {
-  const code = (id: AdvisorId) => POSITIONS.find((p) => p.value === orders[id])?.code ?? '0';
+  const code = (id: AdvisorId) => ADVISORS[id].positions.find((p) => p.value === orders[id])?.code ?? '0';
   return `ChatClient.builder(chatModel)
         .defaultSystem("You are the support assistant for Acme Cloud.")
         .defaultAdvisors(
-                MessageChatMemoryAdvisor.builder(chatMemory)
-                        .order(${code('memory')}).build(),
                 RetrievalAugmentationAdvisor.builder()
                         .documentRetriever(retriever)
                         .order(${code('rag')}).build(),
                 SimpleLoggerAdvisor.builder()
                         .order(${code('logger')}).build())
+        .defaultAdvisors(SessionAdvisors.builder(sessionService)
+                .memory(memory -> memory.order(${code('memory')}))
+                .build())
         .build();`;
 }
 
@@ -300,7 +327,7 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
 const ARROW: Record<Direction, string> = { down: '↓', up: '↑', here: '●' };
 
 export default function AdvisorChainLab() {
-  const [orders, setOrders] = useState<Orders>(DEFAULT_ORDERS);
+  const [orders, setOrders] = useState<Orders>(START_ORDERS);
   const [toolLoop, setToolLoop] = useState(true);
   const [index, setIndex] = useState(0);
 
@@ -329,7 +356,7 @@ export default function AdvisorChainLab() {
       <div className="grid gap-4 sm:grid-cols-2">
         <fieldset className="min-w-0 space-y-2">
           <legend className="text-xs font-medium text-slate-600 dark:text-slate-400">Order of each advisor</legend>
-          {REGISTRATION.map((id) => (
+          {CONFIGURABLE.map((id) => (
             <label key={id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
               <span className="code-mono text-[0.8rem] text-slate-700 dark:text-slate-300">{ADVISORS[id].name}</span>
               <select
@@ -337,7 +364,7 @@ export default function AdvisorChainLab() {
                 onChange={(e) => changeOrder(id, Number(e.target.value))}
                 className="code-mono rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
               >
-                {POSITIONS.map((p) => (
+                {ADVISORS[id].positions.map((p) => (
                   <option key={p.value} value={p.value}>
                     {p.label}
                     {p.value === ADVISORS[id].defaultOrder ? ' (default)' : ''}
@@ -358,7 +385,8 @@ export default function AdvisorChainLab() {
             </Pill>
           </div>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-            ToolCallingAdvisor is registered for you at HIGHEST_PRECEDENCE + 300, and ChatModelCallAdvisor always comes last.
+            ToolCallingAdvisor is registered for you at HIGHEST_PRECEDENCE + 300, SessionTurnAdvisor sits at + 200, and
+            ChatModelCallAdvisor always comes last.
           </p>
         </fieldset>
       </div>
@@ -451,7 +479,7 @@ export default function AdvisorChainLab() {
             <Messages messages={step.prompt} />
           </Panel>
           <div className="space-y-3">
-            <Panel title={`Conversation c-1 in ChatMemory (${step.memory.length})`}>
+            <Panel title={`Session c-1 (${step.memory.length} stored messages)`}>
               <Messages messages={step.memory} />
             </Panel>
             <Panel title="SimpleLoggerAdvisor output">

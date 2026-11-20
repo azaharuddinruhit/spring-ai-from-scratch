@@ -19,7 +19,7 @@ public class StdioProbe {
     public static class Server {
         public static void main(String[] args) {
             List<String> a = new ArrayList<>(List.of("--spring.ai.openai.api-key=dummy", "--spring.ai.model.chat=none", "--spring.ai.model.embedding=none",
-                    "--spring.ai.vectorstore.type=none", "--spring.ai.chat.memory.repository.jdbc.initialize-schema=never",
+                    "--spring.ai.vectorstore.type=none", "--spring.ai.session.repository.jdbc.initialize-schema=never",
                     "--spring.main.web-application-type=none", "--spring.ai.mcp.server.stdio=true", "--spring.ai.mcp.server.name=orders-stdio",
                     "--spring.ai.mcp.client.enabled=false"));
             a.addAll(List.of(args));
@@ -38,7 +38,7 @@ public class StdioProbe {
             List<String> serverArgs = new ArrayList<>(List.of("@" + argFile, "mcpprobe.StdioProbe$Server"));
             if (mode.equals("quiet")) serverArgs.addAll(List.of("--spring.main.banner-mode=off", "--logging.pattern.console="));
             List<String> clientArgs = new ArrayList<>(List.of("--spring.ai.openai.api-key=dummy", "--spring.ai.model.chat=none", "--spring.ai.model.embedding=none",
-                    "--spring.ai.vectorstore.type=none", "--spring.ai.chat.memory.repository.jdbc.initialize-schema=never",
+                    "--spring.ai.vectorstore.type=none", "--spring.ai.session.repository.jdbc.initialize-schema=never",
                     "--spring.main.web-application-type=none", "--spring.ai.mcp.server.enabled=false", "--logging.level.root=ERROR",
                     "--spring.ai.mcp.client.request-timeout=15s",
                     "--spring.ai.mcp.client.stdio.connections.orders.command=java"));

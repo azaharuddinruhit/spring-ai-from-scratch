@@ -13,4 +13,9 @@ class SupportChatErrorHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS,
                 "You have reached today's assistant limit. It resets at midnight UTC.");
     }
+
+    @ExceptionHandler
+    ProblemDetail nothingToConfirm(NothingToConfirmException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+    }
 }

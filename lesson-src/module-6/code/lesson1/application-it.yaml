@@ -3,6 +3,7 @@ spring:
     model:
       chat: ollama
       embedding: ollama
+      decision: none   # the Ollama starter adds a decision model, and would pull d1-omni:600m for it
     ollama:
       init:
         pull-model-strategy: when_missing
@@ -16,8 +17,7 @@ spring:
       type: pgvector
       pgvector:
         dimensions: 768
-    chat:
-      memory:
-        repository:
-          jdbc:
-            initialize-schema: always
+    session:
+      repository:
+        jdbc:
+          initialize-schema: always

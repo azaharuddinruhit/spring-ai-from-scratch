@@ -3,7 +3,8 @@
  * The home hero: one request travelling through Spring AI at runtime, from your service down the advisor chain to the
  * provider and back as a typed Answer. Each step is a tab whose panel says what happens there and which module teaches it.
  * On load, one pass runs the request out, round the tool loop once and back, then rests on ChatClient, where the course starts.
- * Advisor order is the 2.0.2 default: memory (+200), ToolCallingAdvisor (+300), RAG (0), then the model call.
+ * Advisor order is the one the course uses on 2.1.0: the session turn (+200) and memory (+210), ToolCallingAdvisor (+300),
+ * RAG at its default (0), then the model call.
  */
 import type { NavModule } from '@/lib/course';
 import { withBase } from '@/lib/course';
@@ -44,18 +45,19 @@ const STEPS: Step[] = [
     module: 1,
     body: 'Built once from the auto-configured builder, like RestClient. It turns the call into a ChatClientRequest and passes it down the advisor chain in order.',
     code: `ChatClient chatClient = builder
-        .defaultAdvisors(memoryAdvisor, ragAdvisor)
+        .defaultAdvisors(sessionAdvisors)
+        .defaultAdvisors(ragAdvisor)
         .build();`,
     lang: 'java',
   },
   {
     id: 'memory',
-    label: 'Chat memory',
-    type: 'MessageChatMemoryAdvisor',
+    label: 'Session memory',
+    type: 'SessionAdvisors',
     module: 3,
-    body: 'First in the chain by default (order HIGHEST_PRECEDENCE + 200). It adds this conversation’s earlier messages and saves the new exchange, keyed by the conversation ID you pass.',
+    body: 'First in the chain: the session turn at HIGHEST_PRECEDENCE + 200 and, as this course orders it, memory at + 210. It adds this conversation’s earlier messages and saves the new exchange in the session whose id you pass.',
     code: `chatClient.prompt()
-        .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))`,
+        .advisors(SessionAdvisors.session(sessionId))`,
     lang: 'java',
   },
   {

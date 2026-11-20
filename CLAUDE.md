@@ -20,11 +20,11 @@ There are no unit tests. `npm run build` is the gate.
 
 ## Architecture
 
-- The home hero `src/components/HeroTrace.astro` traces one request through the real 2.0.2 advisor order and links each step to its
+- The home hero `src/components/HeroTrace.astro` traces one request through the advisor order the course uses on 2.1.0 and links each step to its
   module. Keep its steps, order and snippets true to the API when lessons change.
 - `src/data/curriculum.ts` is the single source of truth for module and lesson slugs and titles. A lesson is published when
   `src/content/lessons/<module-slug>/<lesson-slug>.mdx` exists. The MDX frontmatter holds only `description`.
-- `src/data/versions.ts` pins the taught stack (Java 25, Boot 4.1.2, Spring AI 2.0.2, Gradle 9.9.1). Generate build files with
+- `src/data/versions.ts` pins the taught stack (Java 25, Boot 4.2.0, Spring AI 2.1.0, Gradle 9.9.1). Generate build files with
   `buildGradle()` / `gradleDependencies()` from `src/data/snippets.ts` instead of hard-coding versions in MDX.
 - Lesson sections, in order: `## 1. Spring mental model`, `## 2. Interactive sandbox`, `## 3. Idiomatic Java 25 & Gradle 9 code`,
   `## 4. Production gotchas & security`, `## Recap`. The right-hand TOC lists the h2 headings.
@@ -56,7 +56,8 @@ There are no unit tests. `npm run build` is the gate.
 - `src/lib/` holds exact TypeScript ports used by the Module 4 labs: `token-text-splitter.ts` (`TokenTextSplitter.doSplit`, with
   `js-tiktoken` cl100k_base loaded by dynamic import so only that lab fetches the 1 MB rank table) and `vector-filter.ts` (the
   `Filter.Expression` text parser, `PgVectorFilterExpressionConverter` and a jsonpath evaluator with PostgreSQL semantics). Both
-  were diffed against the 2.0.2 classes (and the evaluator against PostgreSQL 17) with zero differences; re-check them on upgrade.
+  were diffed against the 2.0.2 classes (and the evaluator against PostgreSQL 17) with zero differences, and 2.1.0 gives the same
+  output (only the parser gained a depth limit of 100); re-check them on upgrade.
 - The site is deployed under the `/spring-ai-from-scratch` base path. Build internal links with `withBase()` / `lessonHref()` from `src/lib/course.ts`.
 - Phones: zoom is off by the owner's decision (viewport `user-scalable=no`, `touch-action: pan-x pan-y` on `html, body`, and an inline
   `gesturestart` handler in `BaseLayout.astro` for Safari). Don't turn it back on unasked. Inline code wraps (`overflow-wrap: anywhere`)
@@ -76,35 +77,47 @@ There are no unit tests. `npm run build` is the gate.
 
 Lesson code must match the real Spring AI 2.0.x API. Verify names against the jars or the reference docs before writing them. Known 2.x facts used so far:
 options are immutable (`mutate()`, no `copy()`); `ChatClient.options()` / `defaultOptions()` take a builder; `ToolCallingAdvisor` is
-auto-registered at `HIGHEST_PRECEDENCE + 300`, after memory advisors (`+ 200`) and before RAG and logging (order 0); tool limits are `spring.ai.tools.limits.*` / `maxCallsPerTool` (there is no `maxToolCalls`);
+auto-registered at `HIGHEST_PRECEDENCE + 300`, after the session turn (`+ 200`) and the course's memory (`+ 210`) and before RAG and logging (order 0); tool limits are `spring.ai.tools.limits.*` / `maxCallsPerTool` (there is no `maxToolCalls`);
 advisors use `ChatClientRequest` / `ChatClientResponse` (not `AdvisedRequest`); the `.options` segment is gone from property keys;
-`ChatMemory.CONVERSATION_ID` is mandatory for memory advisors; MCP annotations live in `org.springframework.ai.mcp.annotation`.
+a session id (`SessionAdvisors.session(id)`) is mandatory for session memory; MCP annotations live in `org.springframework.ai.mcp.annotation`.
 Structured output (verified by running the 2.0.2 classes): `entity(Type, spec -> spec.useProviderStructuredOutput().validateSchema())`;
 `ChatModelCallAdvisor` appends `getFormat()` to the last user message, or sets `outputSchema` when the options implement
 `StructuredOutputChatOptions` (OpenAI, Anthropic, Google GenAI, Mistral AI, Ollama) and silently falls back otherwise;
 `StructuredOutputValidationAdvisor` sits at `LOWEST_PRECEDENCE - 2000`, retries 3 times by default and returns the last reply when they
 run out; schema properties are sorted by name unless `@JsonPropertyOrder`, and a bare `@JsonProperty("x")` makes the field optional.
 `RecordSchemaLab` reproduces the generator exactly; re-check it against `BeanOutputConverter.getJsonSchema()` when Spring AI is upgraded.
-Advisors and memory (verified by running the 2.0.2 classes): equal orders run in reverse registration order; advisors ordered after
-`ToolCallingAdvisor` run once per model call, and advisors before it see the summed usage (a 2.0.1 change, the same on 2.1.0-RC2); `SimpleLoggerAdvisor` and `SafeGuardAdvisor`
-default to order 0, the RAG advisors to 0; `SafeGuardAdvisor` lower-cases `Prompt.getContents()` (system and memory included) and uses
-`contains`; `SimpleLoggerAdvisor` logs at DEBUG and its request line includes the context map; `BaseAdvisor` runs `before` on
-`boundedElastic` for streams and `after` only on the chunk with a finish reason; `stream()` skips `CallAdvisor`-only advisors.
-`MessageChatMemoryAdvisor` sends system + stored window + the new message, then saves the last user or tool message and the reply;
-`MessageWindowChatMemory` defaults to 20 messages (no property; define the bean), keeps system messages and trims on save; every model
-starter auto-configures it over `InMemoryChatMemoryRepository`; a missing conversation id throws
-`IllegalArgumentException: conversationId cannot be null`; JDBC `conversation_id` is `VARCHAR(36)` and
-`spring.ai.chat.memory.repository.jdbc.initialize-schema` defaults to `embedded`; `VectorStoreChatMemoryAdvisor` lives in
-`spring-ai-vector-store-advisor` (top-K 20, order `+ 200`); there is no `PromptChatMemoryAdvisor` in 2.0.2.
+Advisors and memory (verified by running the 2.1.0 classes, equal orders also on 2.0.2): advisors with equal orders run in reverse
+registration order before `ToolCallingAdvisor` and in registration order after it (a lambda `ChatModel` has no tool loop and
+shows only the reverse rule); advisors ordered after `ToolCallingAdvisor` run once per model call, and advisors before it see the
+summed usage (a 2.0.1 change, the same on 2.1); `SimpleLoggerAdvisor` and `SafeGuardAdvisor` default to order 0, the RAG
+advisors to 0; `SafeGuardAdvisor` lower-cases `Prompt.getContents()` (system and memory included), uses `contains` and marks its
+reply with finish reason `guardrailRefusal` (`GuardrailRefusal.isRefusal`); `SimpleLoggerAdvisor` logs at DEBUG and its request
+line includes the context map; `BaseAdvisor` runs `before` on `boundedElastic` for streams and `after` only on the chunk with a
+finish reason; `stream()` skips `CallAdvisor`-only advisors. Session memory (2.1, replacing `ChatMemory`, `MessageWindowChatMemory`,
+`MessageChatMemoryAdvisor` and `ChatMemoryRepository`, all deprecated for removal): model starters don't configure it; define a
+`SessionService` over `InMemorySessionRepository` or add `spring-ai-starter-model-session-jdbc` (brings `spring-ai-session-advisor`;
+`SessionServiceAutoConfiguration` needs one `SessionRepository`); `SessionAdvisors.builder(sessionService)` adds
+`SessionTurnAdvisor` (`+ 200`) and `SessionMemoryAdvisor` (default `+ 1000`, inside the tool loop, so it stores every tool round;
+the course orders it `+ 210`); the memory advisor sends system + the events its `EventFilter` picks (default `all()`;
+`lastN(n)` extends back to a turn start) + the new message, and stores the message and the reply; system messages aren't stored
+(`allow-system-messages` false); a missing id throws `IllegalStateException: No session ID found in advisor context`; JDBC ids
+are `VARCHAR(255)` in `AI_SESSION` / `AI_SESSION_INDEX` / `AI_SESSION_EVENT` (cascade delete), `initialize-schema` defaults to
+`embedded`, and the repository connects at startup to detect the dialect; `time-to-live` defaults to 60d from creation, but
+expiry is only a date: `findById` and the advisors still use an expired session until `deleteExpiredSessions` removes it (no
+automatic sweep); metadata passed under `SESSION_METADATA_CONTEXT_KEY` applies only when the session is created, and
+`PRINCIPAL_NAME` is always indexed for `findByMetadata`; with memory at `+ 210` a plain tool loop stores only the question and the
+answer. `VectorStoreChatMemoryAdvisor` (`spring-ai-vector-store-advisor`, top-K 20, order `+ 200`) is not deprecated.
 `AdvisorChainLab`, `GuardrailLab` and `ChatMemoryLab` simulate exactly these rules; update them together with the lessons.
-RAG and ETL (verified by running the 2.0.2 classes, filters also on PostgreSQL 17 with PgVector): `TokenTextSplitter` defaults are
-800 / 350 / 5 / 10000 / keepSeparator true, its constructors are deprecated (use the builder), `keepSeparator(false)` replaces
+RAG and ETL (verified by running the 2.0.2 classes, filters also on PostgreSQL 17 with PgVector; on 2.1.0 the splitter and
+text formatter give identical output, the RAG classes are unchanged, the filter parser adds a depth limit of 100 counting AND/OR,
+and `PgVectorStore` asks the model for dimensions only when it creates its table, otherwise reading the column size): `TokenTextSplitter` defaults are
+800 / 350 / 5 / 10000 / keepSeparator true (2.1 adds `withChunkOverlap`, default 0), its constructors are deprecated (use the builder), `keepSeparator(false)` replaces
 `System.lineSeparator()`, and chunks get `parent_document_id`, `chunk_index` and `total_chunks`; `PagePdfDocumentReader` keeps the
 layout spaces and `ExtractedTextFormatter` needs `overrideLineSeparator("
 ")` on Windows; `MarkdownDocumentReader` splits code
 blocks and blockquotes into their own documents by default; `Document` ids are random, so re-ingesting duplicates (the lesson tags
 a revision, adds, then deletes the old revision); `OpenAiEmbeddingModel` embeds metadata unless `metadata-mode: none`;
-`PgVectorStore` `initialize-schema` defaults to false, embeds "Test String" at startup without `dimensions`, and HNSW fails above
+`PgVectorStore` `initialize-schema` defaults to false, embeds "Test String" without `dimensions` (on 2.1 only when it creates the table), and HNSW fails above
 2000 dimensions; filter text: AND binds tighter than OR, `NOT` takes everything to its right, a lone `!` is skipped by the lexer;
 the builder's `and(x, or(y, z))` loses its parentheses in PgVector SQL unless wrapped in `group()`, and builder values are escaped
 while concatenated text is injectable. `RetrievalAugmentationAdvisor` defaults to order 0 (the lesson uses `+ 225`, after memory and

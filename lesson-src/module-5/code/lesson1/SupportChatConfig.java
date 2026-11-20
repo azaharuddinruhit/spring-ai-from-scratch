@@ -6,11 +6,12 @@ import java.util.List;
 import com.example.support.order.OrderTools;
 
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SafeGuardAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
-import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import org.springframework.ai.session.EventFilter;
+import org.springframework.ai.session.SessionService;
+import org.springframework.ai.session.advisor.SessionAdvisors;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,7 +21,7 @@ import org.springframework.core.Ordered;
 class SupportChatConfig {
 
     @Bean
-    ChatClient supportChatClient(ChatClient.Builder builder, ChatMemory chatMemory,
+    ChatClient supportChatClient(ChatClient.Builder builder, SessionService sessionService,
                                 RetrievalAugmentationAdvisor knowledgeRagAdvisor, OrderTools orderTools) {
         return builder
                 .defaultSystem("""
@@ -35,10 +36,16 @@ class SupportChatConfig {
                                 .build(),
                         new TokenBudgetAdvisor(200_000, Clock.systemUTC()),   // + 50
                         new PiiRedactionAdvisor(),                            // + 100
-                        MessageChatMemoryAdvisor.builder(chatMemory).build(), // + 200
                         knowledgeRagAdvisor,                                  // + 225
                         new AnswerLanguageAdvisor(),                          // + 250
                         new SimpleLoggerAdvisor())                            // 0
+                // The turn (+ 200) and the memory (+ 210) run before RAG, so the memory stores the question rather than
+                // the augmented prompt, and RAG sees the history. The prompt gets the last 40 messages, in whole turns.
+                .defaultAdvisors(SessionAdvisors.builder(sessionService)
+                        .memory(memory -> memory
+                                .order(Ordered.HIGHEST_PRECEDENCE + 210)
+                                .eventFilter(EventFilter.lastN(40)))
+                        .build())
                 .defaultTools(orderTools)
                 .build();
     }

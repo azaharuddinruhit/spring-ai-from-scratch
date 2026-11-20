@@ -87,7 +87,7 @@ public class McpProbe {
     static void run(String[] args) throws Exception {
         String[] common = {
                 "--spring.ai.openai.api-key=dummy", "--spring.ai.model.chat=none", "--spring.ai.model.embedding=none", "--spring.ai.vectorstore.type=none",
-                "--spring.ai.chat.memory.repository.jdbc.initialize-schema=never", "--logging.level.root=WARN",
+                "--spring.ai.session.repository.jdbc.initialize-schema=never", "--logging.level.root=WARN",
         };
         List<String> serverArgs = new ArrayList<>(List.of(common));
         serverArgs.addAll(List.of("--server.port=18081", "--spring.ai.mcp.server.name=orders", "--spring.ai.mcp.server.protocol=STREAMABLE", "--spring.ai.mcp.client.enabled=false"));

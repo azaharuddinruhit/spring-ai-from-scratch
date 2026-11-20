@@ -1,12 +1,5 @@
--- The tables the support chat touches, and two customers' orders.
-CREATE TABLE IF NOT EXISTS support_chats (
-    conversation_id VARCHAR(36)  PRIMARY KEY,
-    customer_id     VARCHAR(100) NOT NULL,
-    last_used       TIMESTAMPTZ  NOT NULL
-);
-CREATE INDEX IF NOT EXISTS support_chats_customer_id_idx ON support_chats (customer_id);
-CREATE INDEX IF NOT EXISTS support_chats_last_used_idx ON support_chats (last_used);
-DELETE FROM support_chats;
+-- No sessions from earlier tests (their events and owner rows cascade), the orders table, and two customers' orders.
+DELETE FROM ai_session;
 CREATE TABLE IF NOT EXISTS orders (
     number          VARCHAR(20)    PRIMARY KEY,
     customer_id     VARCHAR(100)   NOT NULL,
@@ -20,9 +13,7 @@ CREATE TABLE IF NOT EXISTS refunds (
     customer_id  VARCHAR(100)   NOT NULL,
     order_number VARCHAR(20)    NOT NULL REFERENCES orders (number),
     amount       NUMERIC(12, 2) NOT NULL,
-    reason       VARCHAR(500)   NOT NULL,
-    status       VARCHAR(20)    NOT NULL,
-    expires_at   TIMESTAMPTZ    NOT NULL
+    reason       VARCHAR(500)   NOT NULL
 );
 DELETE FROM refunds;
 DELETE FROM orders;

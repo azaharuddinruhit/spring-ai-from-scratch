@@ -135,12 +135,19 @@ For every lesson in step 2, before it merges:
 
 Not before 2.1.0 is on Maven Central (the owner chose on 2026-11-19 to wait rather than move the course to RC2).
 
-- [ ] Move the preview pins to 2.1.0 and Boot 4.2.0 GA, re-run the preview tests and recordings, drop the preview marks.
+- [x] Move the preview pins to 2.1.0 and Boot 4.2.0 GA, re-run the preview tests and recordings, drop the preview marks.
 - [ ] Move the existing lessons to 2.1: re-check what CLAUDE.md says to re-check on an upgrade and every fact in its "Content
       accuracy" section; update the provider notes in Module 1 (Anthropic sampling and header, `DeepSeekAssistantMessage`).
+      Done so far (findings in `lesson-src/module-5/findings.md`, "Re-checked on 2.1.0"): Modules 3 and 4 (code compiled and
+      tested on 2.1.0; the splitter and text formatter give identical output, the filter parser adds a depth limit of 100,
+      `PgVectorStore` asks the model for dimensions only when it creates the table), Module 5 MCP, tool and limit facts, Module 6
+      testing and evaluator facts. Equal orders turned out to run in registration order inside the tool loop (also on 2.0.2).
+      Left: Module 1 and 2 provider and structured-output facts.
 - [ ] Rewrite Module 3 Chat Memory for Session Memory, migrate the Module 5 and 6 support app (`MemoryAdvisor.CONVERSATION_ID`,
       tool calls kept, erasure and retention on the session tables), add the decision filter to the app, regenerate the Module 5
-      and 6 lessons.
+      and 6 lessons. Done: Module 3 (sessions, `EventFilter`, the JDBC session starter), Modules 4-6 on sessions, the refund
+      moved to `@Tool(requiresConfirmation = true)`, erasure and retention on the session tables, Module 5 and 6 suites green
+      (62 and 88 tests). Left: the decision filter in the app.
 - [ ] Re-record `TraceLab` and `AttackLab` with the Qwen model instead of `llama3.2:3b`, and rewrite what Testing & Evals,
       Security & Data Protection and CLAUDE.md say about the recorded behaviour (for example which attacks `llama3.2:3b` fell for).
 - [ ] `VERSION` 2.0, merge.

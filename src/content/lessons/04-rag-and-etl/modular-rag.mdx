@@ -15,7 +15,7 @@ prompt. Every step of that search is a module you can swap, which is what "modul
 
 ## 1. Spring mental model
 
-The advisor is a pipeline of small interfaces, like a chain of `HandlerMethodArgumentResolver`s, each with one job. In 2.0.2
+The advisor is a pipeline of small interfaces, like a chain of `HandlerMethodArgumentResolver`s, each with one job. In 2.1.0
 (`spring-ai-rag`):
 
 | Stage | Interface | Built-in implementations | Extra calls per question |
@@ -46,7 +46,7 @@ flowchart LR
 `}
 />
 
-These rules come from the 2.0.2 classes, and we checked each one by running them:
+These rules come from the 2.0.2 classes, which 2.1.0 leaves unchanged, and we checked each one by running them:
 
 - The query is the text of the last user message. Its history is every message in the prompt, including that one, which is
   what `CompressionQueryTransformer` uses.
@@ -62,7 +62,7 @@ These rules come from the 2.0.2 classes, and we checked each one by running them
 
 Order matters as much as in Module 3. RAG defaults to `0`, which runs inside the tool loop and repeats the search on every
 model call. Placed before memory, it changes the user message before memory saves it, so memory stores the whole augmented
-prompt: 413 characters instead of the 33-character question, in our test. `HIGHEST_PRECEDENCE + 225`, between memory and tool
+prompt: 422 characters instead of the 33-character question, in our test. `HIGHEST_PRECEDENCE + 225`, between memory and tool
 calling, avoids both.
 
 ## 2. Interactive sandbox
@@ -127,7 +127,7 @@ class KnowledgeRagConfig {
                         .similarityThreshold(0.5)
                         .filterExpression(KnowledgeFilters.customerDocuments()) // when a call passes no filter
                         .build())
-                // After memory (+ 200), so memory stores the question rather than the augmented prompt,
+                // After memory (+ 210), so memory stores the question rather than the augmented prompt,
                 // and before tool calling (+ 300), so it retrieves once per question.
                 .order(Ordered.HIGHEST_PRECEDENCE + 225)
                 .build();
@@ -139,18 +139,19 @@ class KnowledgeRagConfig {
 Add it to the support client from Module 3:
 
 <CodeFile title="src/main/java/com/example/support/chat/SupportChatConfig.java">
-```java {22,33}
+```java {23,33}
 package com.example.support.chat;
 
 import java.time.Clock;
 import java.util.List;
 
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SafeGuardAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
-import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import org.springframework.ai.session.EventFilter;
+import org.springframework.ai.session.SessionService;
+import org.springframework.ai.session.advisor.SessionAdvisors;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -160,7 +161,7 @@ import org.springframework.core.Ordered;
 class SupportChatConfig {
 
     @Bean
-    ChatClient supportChatClient(ChatClient.Builder builder, ChatMemory chatMemory,
+    ChatClient supportChatClient(ChatClient.Builder builder, SessionService sessionService,
                                 RetrievalAugmentationAdvisor knowledgeRagAdvisor) {
         return builder
                 .defaultSystem("You are the support assistant for Acme Cloud.")
@@ -171,10 +172,15 @@ class SupportChatConfig {
                                 .build(),
                         new TokenBudgetAdvisor(200_000, Clock.systemUTC()),   // + 50
                         new PiiRedactionAdvisor(),                            // + 100
-                        MessageChatMemoryAdvisor.builder(chatMemory).build(), // + 200
                         knowledgeRagAdvisor,                                  // + 225
                         new AnswerLanguageAdvisor(),                          // + 250
-                        new SimpleLoggerAdvisor())                            // 0
+                        new SimpleLoggerAdvisor())                            // 0, in the tool loop
+                // The turn (+ 200) and memory (+ 210) before the tool loop, so memory runs once per call.
+                .defaultAdvisors(SessionAdvisors.builder(sessionService)
+                        .memory(memory -> memory
+                                .order(Ordered.HIGHEST_PRECEDENCE + 210)
+                                .eventFilter(EventFilter.lastN(40)))
+                        .build())
                 .build();
     }
 
@@ -193,7 +199,7 @@ The chat now takes the product the customer picked. The service narrows the sear
 the default one, it uses `customerDocuments(product)`, which keeps the audience condition:
 
 <CodeFile title="src/main/java/com/example/support/chat/SupportChatService.java">
-```java {25,33}
+```java {29,34}
 package com.example.support.chat;
 
 import java.nio.charset.StandardCharsets;
@@ -203,26 +209,27 @@ import java.util.UUID;
 import com.example.support.knowledge.KnowledgeFilters;
 
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
+import org.springframework.ai.session.SessionService;
+import org.springframework.ai.session.advisor.SessionAdvisors;
 import org.springframework.stereotype.Service;
 
 @Service
 public class SupportChatService {
 
     private final ChatClient supportChatClient;
-    private final ChatMemory chatMemory;
+    private final SessionService sessionService;
 
-    public SupportChatService(ChatClient supportChatClient, ChatMemory chatMemory) {
+    public SupportChatService(ChatClient supportChatClient, SessionService sessionService) {
         this.supportChatClient = supportChatClient;
-        this.chatMemory = chatMemory;
+        this.sessionService = sessionService;
     }
 
     public String ask(String userId, UUID chatId, String product, String question, Locale language) {
         return supportChatClient.prompt()
                 .user(question)
+                .advisors(SessionAdvisors.session(sessionId(userId, chatId)))
                 .advisors(advisor -> advisor
-                        .param(ChatMemory.CONVERSATION_ID, conversationId(userId, chatId))
                         .param(TokenBudgetAdvisor.USER_ID, userId)
                         .param(AnswerLanguageAdvisor.LANGUAGE, language)
                         // Replaces the retriever's default filter, so it must keep the audience condition.
@@ -232,11 +239,11 @@ public class SupportChatService {
     }
 
     public void forget(String userId, UUID chatId) {
-        chatMemory.clear(conversationId(userId, chatId));
+        sessionService.delete(sessionId(userId, chatId));
     }
 
-    /** A UUID that only this user's chat maps to, and that fits the 36-character JDBC column. */
-    static String conversationId(String userId, UUID chatId) {
+    /** A session id that only this user's chat maps to, so a chat id alone never reaches another user's session. */
+    static String sessionId(String userId, UUID chatId) {
         return UUID.nameUUIDFromBytes((userId + ":" + chatId).getBytes(StandardCharsets.UTF_8)).toString();
     }
 }
@@ -250,7 +257,7 @@ sources next to the answer, call `.chatResponse()` instead of `.content()` and r
 The test runs the real advisor with memory, a `SimpleVectorStore` and a lambda model that answers the compression call:
 
 <CodeFile title="src/test/java/com/example/support/knowledge/KnowledgeRagAdvisorTest.java">
-```java {58,67,77}
+```java {62,70,81}
 package com.example.support.knowledge;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -261,9 +268,6 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatModel;
@@ -271,12 +275,19 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
+import org.springframework.ai.session.DefaultSessionService;
+import org.springframework.ai.session.InMemorySessionRepository;
+import org.springframework.ai.session.SessionService;
+import org.springframework.ai.session.advisor.SessionAdvisors;
 import org.springframework.ai.vectorstore.SimpleVectorStore;
+import org.springframework.core.Ordered;
 
 class KnowledgeRagAdvisorTest {
 
     private final List<String> answerPrompts = new ArrayList<>();
-    private final ChatMemory chatMemory = MessageWindowChatMemory.builder().build();
+    private final SessionService sessionService = DefaultSessionService.builder()
+            .sessionRepository(InMemorySessionRepository.builder().build())
+            .build();
     private final SimpleVectorStore vectorStore = SimpleVectorStore.builder(new KeywordEmbeddingModel()).build();
 
     /** Answers the compression call with a standalone question, and records every other prompt. */
@@ -290,9 +301,10 @@ class KnowledgeRagAdvisorTest {
     };
 
     private final ChatClient chatClient = ChatClient.builder(model)
-            .defaultAdvisors(
-                    MessageChatMemoryAdvisor.builder(chatMemory).build(),
-                    new KnowledgeRagConfig().knowledgeRagAdvisor(ChatClient.builder(model), vectorStore))
+            .defaultAdvisors(new KnowledgeRagConfig().knowledgeRagAdvisor(ChatClient.builder(model), vectorStore))
+            .defaultAdvisors(SessionAdvisors.builder(sessionService)
+                    .memory(memory -> memory.order(Ordered.HIGHEST_PRECEDENCE + 210))
+                    .build())
             .build();
 
     KnowledgeRagAdvisorTest() {
@@ -315,7 +327,7 @@ class KnowledgeRagAdvisorTest {
     void memoryStoresTheQuestionNotTheAugmentedPrompt() {
         ask("How long do refunds take?");
 
-        assertThat(chatMemory.get("c1"))
+        assertThat(sessionService.getMessages("c1"))
                 .extracting(Message::getText)
                 .containsExactly("How long do refunds take?", "Done.");
     }
@@ -333,8 +345,8 @@ class KnowledgeRagAdvisorTest {
     private void ask(String question) {
         chatClient.prompt()
                 .user(question)
+                .advisors(SessionAdvisors.session("c1"))
                 .advisors(advisor -> advisor
-                        .param(ChatMemory.CONVERSATION_ID, "c1")
                         .param(VectorStoreDocumentRetriever.FILTER_EXPRESSION, KnowledgeFilters.customerDocuments("billing")))
                 .call()
                 .content();

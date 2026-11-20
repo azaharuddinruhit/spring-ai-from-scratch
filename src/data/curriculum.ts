@@ -53,7 +53,7 @@ export const CURRICULUM: Module[] = [
     lessons: [
       { slug: 'advisor-chain-internals', title: 'Advisor Chain Internals' },
       { slug: 'custom-advisors', title: 'Built-in & Custom Advisors' },
-      { slug: 'chat-memory', title: 'Conversation Memory with ChatMemory' },
+      { slug: 'chat-memory', title: 'Conversation Memory with Sessions' },
     ],
   },
   {
