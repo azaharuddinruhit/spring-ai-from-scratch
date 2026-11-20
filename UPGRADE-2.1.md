@@ -152,9 +152,12 @@ Not before 2.1.0 is on Maven Central (the owner chose on 2026-11-19 to wait rath
       (62 and 88 tests). The decision filter stays out of the app (the owner's choice on 2026-11-20): the app runs on
       OpenAI, whose `OpenAiDecisionModel` can't be checked here, so it would need a second runtime for `d1-omni:600m`, which
       missed both planted injections in Lesson 4.4. Lesson 4.4 keeps its own example.
-- [ ] Re-record `TraceLab` and `AttackLab` with the Qwen model instead of `llama3.2:3b`, and rewrite what Testing & Evals,
+- [x] Re-record `TraceLab` and `AttackLab` with the Qwen model instead of `llama3.2:3b`, and rewrite what Testing & Evals,
       Security & Data Protection and CLAUDE.md say about the recorded behaviour (for example which attacks `llama3.2:3b` fell for).
-- [ ] `VERSION` 2.0, merge.
+      Done on 2.1.0: the model refused four attacks and called `refundOrder` on the forced refund, which the confirmation held;
+      the traces show the Module 5 rewrite returning the first question unchanged (6.3 s, one call in three). Observability,
+      Security, `findings.md` and CLAUDE.md now describe these runs; `AnswerCheckLab` keeps its labelled `llama3.2:3b` recording.
+- [x] `VERSION` 2.0, merge.
 
 ## What step 1 changed
 

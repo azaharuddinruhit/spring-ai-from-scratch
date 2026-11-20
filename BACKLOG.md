@@ -29,12 +29,10 @@ Tasks, biggest gain first:
 4. **Consider marking lessons foundational or advanced**, so learners know what they can skim on a first pass.
 5. **Consider fewer gotchas per lesson on a first read** (now 6–8): keep the most important ones visible and fold the rest.
 
-## Spring AI 2.1 (phase 1 shipped, phase 2 waits for the release)
+## Spring AI 2.1 (done)
 
-Agreed on 2026-11-19; the plan and its checklist are in `UPGRADE-2.1.md`, the work is on the `spring-ai-2.1` branch. Phase 1
-shipped four preview lessons on 2.1.0-RC2 / Boot 4.2.0-RC2 (message parts and reasoning, Decision Models, the decision filter
-and reranker, `DecisionToolIndex`). Phase 2, at GA, moves the rest of the course and replaces `ChatMemory` (deprecated for
-removal) with Session Memory.
+The course runs on Spring AI 2.1.0 / Boot 4.2.0 since site version 2.0; `UPGRADE-2.1.md` holds the plan and what each phase
+found. Module 3 teaches Session Memory instead of `ChatMemory` (deprecated for removal).
 
 - File the upstream report drafted in `lesson-src/preview-2.1/upstream/tool-search-maxresults.md` (a `maxResults` of 0 fails
   the request with the Lucene tool index; still on `main` on 2026-11-19). The owner files it from their GitHub account.

@@ -10,6 +10,19 @@ import json, os, re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, '..', '..', '..', 'src', 'data', 'recorded-attacks.json')
+LABEL = 'qwen-27b'  # the 27B Qwen 3 reasoning model the recordings ran on
+
+def redacted(text):
+    """The recording ran on a private server: its model alias becomes a neutral label, and no server value may remain."""
+    model = os.environ.get('QWEN_MODEL')
+    if model:
+        assert model != LABEL
+        text = text.replace(model, LABEL)
+    host = re.sub(r'^[a-z]+://|[:/].*$', '', os.environ.get('QWEN_BASE_URL', ''))
+    for secret in filter(None, (model, os.environ.get('QWEN_API_KEY'), host)):
+        assert secret not in text, 'a server value leaked into the sandbox data'
+    return text
+
 
 
 def received(sent):
@@ -17,6 +30,12 @@ def received(sent):
     user = [s[len('USER: '):] for s in sent if s.startswith('USER: ')][-1].replace('\r', '')
     m = re.search(r'\nQuery: (.*?)\n\nAnswer:', user, re.S)
     return m.group(1) if m else user
+
+
+def stored(row):
+    """A memory row without carriage returns or the blank lines before the reply text."""
+    role, _, text = row.replace('\r', '').partition(': ')
+    return f'{role}: {text.strip()}'
 
 
 attacks = []
@@ -29,12 +48,12 @@ for r in json.load(open(os.path.join(HERE, 'attacks.json'), encoding='utf8')):
             steps.append({'model': e['model'], 'received': received(e['sent']), 'toolCalls': e['toolCalls']})
     attacks.append({
         'attack': r['attack'],
-        'answer': r['answer'],
+        'answer': r['answer'].strip(),  # the reasoning model starts its text with blank lines
         'sources': r['sources'],
         'steps': steps,
-        'memory': [m.replace('\r', '') for m in r['memory']],
+        'memory': [stored(m) for m in r['memory']],
         'refunds': r['refunds'],
         'paymentCalls': r['paymentCalls'],
     })
-open(OUT, 'w', encoding='utf8', newline='\n').write(json.dumps(attacks, ensure_ascii=False, separators=(',', ':')))
+open(OUT, 'w', encoding='utf8', newline='\n').write(redacted(json.dumps(attacks, ensure_ascii=False, separators=(',', ':'))))
 print('wrote', os.path.normpath(OUT), os.path.getsize(OUT), 'bytes,', [len(a['steps']) for a in attacks], 'steps')

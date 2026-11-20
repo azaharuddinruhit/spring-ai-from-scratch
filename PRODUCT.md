@@ -45,10 +45,8 @@ links into the official Spring AI reference documentation for depth.
   recap.
 - Sandboxes are simulations and must say so. They never call a model provider.
 - Gradle examples use the Groovy DSL only.
-- Code must match the real Spring AI 2.0.x API; names are verified before they are written.
-- Exception: lessons marked "2.1 preview" teach Spring AI 2.1 features against its release candidate (2.1.0-RC2, Boot 4.2.0-RC2).
-  They say so on the page, are verified against those jars the same way, and move to the release when it ships. Never present
-  them as tested on a release.
+- Code must match the real Spring AI 2.1.x API; names are verified before they are written.
+- Facts recorded on a release candidate say so (a few 2.1 recordings ran on 2.1.0-RC2 and were re-checked on 2.1.0).
 
 ## Brand Commitments
 
@@ -59,7 +57,7 @@ links into the official Spring AI reference documentation for depth.
 
 ## Evidence on Hand
 
-- The Module 1 to 6 lessons, the 2.1 preview lessons and their sandboxes in `src/content/lessons/`.
+- The Module 1 to 6 lessons and their sandboxes in `src/content/lessons/`.
 - The source repository on GitHub.
 - There are no testimonials, learner counts, endorsements or benchmarks. Do not invent any.
 
