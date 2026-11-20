@@ -20,7 +20,7 @@ they are done.
   | 4.4 Decision Filter & Reranker | `DecisionDocumentFilter` (injection, contradiction, relevance, evidence), `DecisionDocumentReranker`, fail open / closed, concurrency and virtual threads, filter before rerank | The filter policy over recorded scores |
   | 5.4 Tool Search & DecisionToolIndex | `ToolSearchToolCallingAdvisor` with the regex, Lucene, vector and decision indexes | Which tools each index picks for recorded questions |
 
-  Each keeps the five-section layout. The 4.4 examples stand alone; the support app gets the filter in phase 2.
+  Each keeps the five-section layout. The 4.4 examples stand alone (phase 2 kept them so, see below).
 - **Preview marking.** A preview lesson says "Preview: Spring AI 2.1.0-RC2, Spring Boot 4.2.0-RC2" where the other lessons say
   "Written for …", and the course navigation marks it. Its build snippets use the preview pins.
 - **Memory waits.** `ChatMemory`, `MessageChatMemoryAdvisor`, `MessageWindowChatMemory`, `ChatMemoryRepository` and
@@ -145,11 +145,13 @@ Not before 2.1.0 is on Maven Central (the owner chose on 2026-11-19 to wait rath
       Modules 1 and 2: Anthropic drops sampling options on API 2026-10-21 (the architecture lesson and `OptionsMergeLab` now
       use `maxTokens` and `stopSequences`), `DeepSeekAssistantMessage` is deprecated, the converters are byte-identical,
       Bedrock also takes native output, and `entity()` throws `ContentFilteredException` / `GuardrailRefusalException`.
-- [ ] Rewrite Module 3 Chat Memory for Session Memory, migrate the Module 5 and 6 support app (`MemoryAdvisor.CONVERSATION_ID`,
+- [x] Rewrite Module 3 Chat Memory for Session Memory, migrate the Module 5 and 6 support app (`MemoryAdvisor.CONVERSATION_ID`,
       tool calls kept, erasure and retention on the session tables), add the decision filter to the app, regenerate the Module 5
       and 6 lessons. Done: Module 3 (sessions, `EventFilter`, the JDBC session starter), Modules 4-6 on sessions, the refund
       moved to `@Tool(requiresConfirmation = true)`, erasure and retention on the session tables, Module 5 and 6 suites green
-      (62 and 88 tests). Left: the decision filter in the app.
+      (62 and 88 tests). The decision filter stays out of the app (the owner's choice on 2026-11-20): the app runs on
+      OpenAI, whose `OpenAiDecisionModel` can't be checked here, so it would need a second runtime for `d1-omni:600m`, which
+      missed both planted injections in Lesson 4.4. Lesson 4.4 keeps its own example.
 - [ ] Re-record `TraceLab` and `AttackLab` with the Qwen model instead of `llama3.2:3b`, and rewrite what Testing & Evals,
       Security & Data Protection and CLAUDE.md say about the recorded behaviour (for example which attacks `llama3.2:3b` fell for).
 - [ ] `VERSION` 2.0, merge.
