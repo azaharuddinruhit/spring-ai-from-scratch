@@ -16,7 +16,7 @@ nearest chunks. The metadata filter on that search is where most RAG data leaks 
 
 A vector store is a repository whose `WHERE` clause has one extra condition, "close in meaning":
 
-| Spring you know | Spring AI 2.0 | In short |
+| Spring you know | Spring AI 2.1 | In short |
 | --- | --- | --- |
 | A Spring Data repository | `VectorStore` | `add`, `delete(ids)`, `delete(filter)`, `similaritySearch(request)` |
 | A query with `WHERE` and `LIMIT` | `SearchRequest` | `query`, `topK` (default 4), `similarityThreshold` (default 0.0, accept all), `filterExpression` |

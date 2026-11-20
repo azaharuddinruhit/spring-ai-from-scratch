@@ -80,11 +80,17 @@ options are immutable (`mutate()`, no `copy()`); `ChatClient.options()` / `defau
 auto-registered at `HIGHEST_PRECEDENCE + 300`, after the session turn (`+ 200`) and the course's memory (`+ 210`) and before RAG and logging (order 0); tool limits are `spring.ai.tools.limits.*` / `maxCallsPerTool` (there is no `maxToolCalls`);
 advisors use `ChatClientRequest` / `ChatClientResponse` (not `AdvisedRequest`); the `.options` segment is gone from property keys;
 a session id (`SessionAdvisors.session(id)`) is mandatory for session memory; MCP annotations live in `org.springframework.ai.mcp.annotation`.
-Structured output (verified by running the 2.0.2 classes): `entity(Type, spec -> spec.useProviderStructuredOutput().validateSchema())`;
+Providers on 2.1.0: Anthropic moves to `anthropic-java` 3.8 (API version 2026-10-21) and drops `temperature`, `topP` and `topK`
+with a WARN (setters and properties deprecated for removal), so Module 1 shows `maxTokens` and `stopSequences`; prompt options
+still replace the model defaults in `ChatModel.call`; `DeepSeekAssistantMessage` is deprecated for removal (use
+`AssistantMessage.getReasoning()`).
+Structured output (verified by running the 2.0.2 classes; the 2.1.0 converters are byte-identical on the same victools 5.0.0):
+`entity(Type, spec -> spec.useProviderStructuredOutput().validateSchema())`;
 `ChatModelCallAdvisor` appends `getFormat()` to the last user message, or sets `outputSchema` when the options implement
-`StructuredOutputChatOptions` (OpenAI, Anthropic, Google GenAI, Mistral AI, Ollama) and silently falls back otherwise;
+`StructuredOutputChatOptions` (OpenAI, Anthropic, Google GenAI, Mistral AI, Ollama, Bedrock; not DeepSeek) and silently falls back otherwise;
 `StructuredOutputValidationAdvisor` sits at `LOWEST_PRECEDENCE - 2000`, retries 3 times by default and returns the last reply when they
-run out; schema properties are sorted by name unless `@JsonPropertyOrder`, and a bare `@JsonProperty("x")` makes the field optional.
+run out (since 2.1 it stops early on a guardrail refusal or a `FILTERED` finish reason, and `entity()` throws
+`GuardrailRefusalException` / its parent `ContentFilteredException` instead of converting); schema properties are sorted by name unless `@JsonPropertyOrder`, and a bare `@JsonProperty("x")` makes the field optional.
 `RecordSchemaLab` reproduces the generator exactly; re-check it against `BeanOutputConverter.getJsonSchema()` when Spring AI is upgraded.
 Advisors and memory (verified by running the 2.1.0 classes, equal orders also on 2.0.2): advisors with equal orders run in reverse
 registration order before `ToolCallingAdvisor` and in registration order after it (a lambda `ChatModel` has no tool loop and

@@ -193,7 +193,14 @@ auto-configured `ChatClient.Builder` then fails at startup with a `NoUniqueBeanD
 The Java code is portable. Model behavior is not. Default `max-tokens`, whether `temperature` is supported (OpenAI's GPT-5 family rejects it),
 JSON-schema strictness, multimodal support and tool-calling quality all differ between providers. Run the same evaluation suite against each
 provider you switch to (Module 6) rather than assuming parity. Reasoning models also return their thinking, which the
-<a href={lessonHref('01-foundations/message-parts-and-reasoning')}>Message Parts & Reasoning</a> preview lesson reads on Spring AI 2.1.
+<a href={lessonHref('01-foundations/message-parts-and-reasoning')}>Message Parts & Reasoning</a> lesson reads.
+</Gotcha>
+
+<Gotcha kind="migration" title="Provider changes in 2.1">
+Spring AI 2.1 moves Anthropic to `anthropic-java` 3.x, which calls API version 2026-10-21. That version rejects sampling options,
+so `AnthropicChatModel` no longer sends `temperature`, `topP` or `topK`: it logs a warning and drops them, and the option
+setters are deprecated for removal. Steer Claude with the prompt and `maxTokens` instead. `DeepSeekAssistantMessage` is
+deprecated for removal too: read DeepSeek's reasoning with `AssistantMessage.getReasoning()`, like any other provider's.
 </Gotcha>
 
 <Gotcha kind="security" title="'Local' doesn't automatically mean private">

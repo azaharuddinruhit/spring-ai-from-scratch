@@ -136,13 +136,15 @@ For every lesson in step 2, before it merges:
 Not before 2.1.0 is on Maven Central (the owner chose on 2026-11-19 to wait rather than move the course to RC2).
 
 - [x] Move the preview pins to 2.1.0 and Boot 4.2.0 GA, re-run the preview tests and recordings, drop the preview marks.
-- [ ] Move the existing lessons to 2.1: re-check what CLAUDE.md says to re-check on an upgrade and every fact in its "Content
+- [x] Move the existing lessons to 2.1: re-check what CLAUDE.md says to re-check on an upgrade and every fact in its "Content
       accuracy" section; update the provider notes in Module 1 (Anthropic sampling and header, `DeepSeekAssistantMessage`).
       Done so far (findings in `lesson-src/module-5/findings.md`, "Re-checked on 2.1.0"): Modules 3 and 4 (code compiled and
       tested on 2.1.0; the splitter and text formatter give identical output, the filter parser adds a depth limit of 100,
       `PgVectorStore` asks the model for dimensions only when it creates the table), Module 5 MCP, tool and limit facts, Module 6
       testing and evaluator facts. Equal orders turned out to run in registration order inside the tool loop (also on 2.0.2).
-      Left: Module 1 and 2 provider and structured-output facts.
+      Modules 1 and 2: Anthropic drops sampling options on API 2026-10-21 (the architecture lesson and `OptionsMergeLab` now
+      use `maxTokens` and `stopSequences`), `DeepSeekAssistantMessage` is deprecated, the converters are byte-identical,
+      Bedrock also takes native output, and `entity()` throws `ContentFilteredException` / `GuardrailRefusalException`.
 - [ ] Rewrite Module 3 Chat Memory for Session Memory, migrate the Module 5 and 6 support app (`MemoryAdvisor.CONVERSATION_ID`,
       tool calls kept, erasure and retention on the session tables), add the decision filter to the app, regenerate the Module 5
       and 6 lessons. Done: Module 3 (sessions, `EventFilter`, the JDBC session starter), Modules 4-6 on sessions, the refund
