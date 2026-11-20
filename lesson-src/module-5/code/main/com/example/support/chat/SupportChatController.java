@@ -1,15 +1,18 @@
 package com.example.support.chat;
 
 import java.security.Principal;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -32,6 +35,20 @@ class SupportChatController {
         return new AnswerResponse(chatService.ask(principal.getName(), chatId, request.product(), request.question(), locale));
     }
 
+    /** What the model wants to do and waits for the customer to confirm: tool names and the exact arguments. */
+    @GetMapping("/confirmation")
+    List<PendingCall> awaitingConfirmation(@PathVariable UUID chatId, Principal principal) {
+        return chatService.awaitingConfirmation(principal.getName(), chatId).stream()
+                .map(call -> new PendingCall(call.name(), call.arguments()))
+                .toList();
+    }
+
+    @PostMapping("/confirmation")
+    AnswerResponse confirm(@PathVariable UUID chatId, @Valid @RequestBody ConfirmRequest request, Principal principal,
+                           Locale locale) {
+        return new AnswerResponse(chatService.confirm(principal.getName(), chatId, request.approved(), locale));
+    }
+
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void forget(@PathVariable UUID chatId, Principal principal) {
@@ -42,5 +59,11 @@ class SupportChatController {
     }
 
     record AnswerResponse(String answer) {
+    }
+
+    record PendingCall(String tool, String arguments) {
+    }
+
+    record ConfirmRequest(@NotNull Boolean approved) {
     }
 }

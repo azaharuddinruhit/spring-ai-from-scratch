@@ -4,7 +4,7 @@ import { CodeView, LabFrame, Pill } from './LabFrame';
 import { prettyJson } from '../../lib/json-format';
 
 /*
- * Simulates .entity(Answer.class, spec -> …) in Spring AI 2.0.2 against OpenAI. The behaviour and every message come from the
+ * Simulates .entity(Answer.class, spec -> …) in Spring AI 2.1.0 against OpenAI (the converter is unchanged since 2.0.2). The behaviour and every message come from the
  * real classes: ChatModelCallAdvisor appends getFormat() to the user message, or with useProviderStructuredOutput() sets
  * outputSchema (OpenAI sends json_schema with strict: true); StructuredOutputValidationAdvisor validates the raw reply text,
  * appends "Output JSON validation failed because of: …" and calls the model again, up to 3 more times, then hands the last

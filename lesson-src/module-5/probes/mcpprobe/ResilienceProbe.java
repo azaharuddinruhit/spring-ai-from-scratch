@@ -31,7 +31,7 @@ public class ResilienceProbe {
 
     static void run() {
         String[] common = { "--spring.ai.openai.api-key=dummy", "--spring.ai.model.chat=none", "--spring.ai.model.embedding=none", "--spring.ai.vectorstore.type=none",
-                "--spring.ai.chat.memory.repository.jdbc.initialize-schema=never", "--logging.level.root=OFF" };
+                "--spring.ai.session.repository.jdbc.initialize-schema=never", "--logging.level.root=OFF" };
         List<String> c = new ArrayList<>(List.of(common));
         c.addAll(List.of("--spring.main.web-application-type=none", "--spring.ai.mcp.server.enabled=false", "--spring.ai.mcp.client.initialized=false",
                 "--spring.ai.mcp.client.request-timeout=5s", "--spring.ai.mcp.client.streamable-http.connections.orders.url=http://localhost:18083"));

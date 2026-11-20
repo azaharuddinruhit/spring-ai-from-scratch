@@ -284,10 +284,6 @@ interactive. Gotchas keep a 4px colored left edge because the hue encodes the go
   tabular figures, reading `v1.0.37` on a deploy and `dev` on any other build.
 - **Sidebar:** modules with tabular numbers, lessons in a 1px rail. The current lesson takes an emerald rail segment and emerald
   text. Unwritten lessons are muted with an italic lowercase "soon".
-- **Preview pill:** a lesson that teaches a Spring AI release candidate (`preview: true` in the curriculum) carries "2.1 preview"
-  after its title in the sidebar, the course sheet and the home list (`PreviewPill.astro`): the version pill's slate outline at
-  11px, fully round, never emerald, so it reads as a version label and not as the current lesson. On the lesson itself the line
-  under the lede starts "Preview, written for …" with the release-candidate versions.
 - **Course sheet (below lg):** the header's menu button opens the sidebar as a bottom sheet on a modal `<dialog>`: paper,
   a 1px top hairline, 12px top corners, no shadow, a 50% slate-950 scrim, at most 85dvh. A grab bar and "Course contents"
   with a close button head it; dragging that head down past a quarter of its height (at most 120px) closes it, as do the

@@ -3,8 +3,9 @@
 python lesson-src/module-6/probes/trace-to-sandbox.py
 
 trace-before.json: the Module 5 RAG config (rewrite on every question, same model), content switches off.
-trace-after.json + trace-run-after.log: this lesson's config (rewrite only follow-ups, on the smaller model), with
-log-prompt, log-completion and tools include-content on. Prompt and completion log lines carry the span id, which is
+trace-after.json + trace-run-after.log: this lesson's config (rewrite only follow-ups, on support.knowledge.rewrite-model;
+the recording set it to the chat model, the only one on the server), with log-prompt, log-completion and tools
+include-content on. Prompt and completion log lines carry the span id, which is
 how they are matched to their span here.
 """
 import json, re, os
@@ -13,6 +14,20 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, '..', '..', '..', 'src', 'data', 'recorded-traces.json')
 CONTENT_KEYS = {'spring.ai.tool.call.arguments', 'spring.ai.tool.call.result'}
 DROP_KEYS = {'spring.ai.tool.definition.schema'}
+HTTP_SPANS = {'http.client.requests', 'okhttp.requests'}  # the HTTP call under each model call (RestClient, OpenAI's OkHttp)
+LABEL = 'qwen-27b'  # the 27B Qwen 3 reasoning model the recordings ran on
+
+def redacted(text):
+    """The recording ran on a private server: its model alias becomes a neutral label, and no server value may remain."""
+    model = os.environ.get('QWEN_MODEL')
+    if model:
+        assert model != LABEL
+        text = text.replace(model, LABEL)
+    host = re.sub(r'^[a-z]+://|[:/].*$', '', os.environ.get('QWEN_BASE_URL', ''))
+    for secret in filter(None, (model, os.environ.get('QWEN_API_KEY'), host)):
+        assert secret not in text, 'a server value leaked into the sandbox data'
+    return text
+
 
 
 def kind(span):
@@ -42,7 +57,7 @@ def logged_content(log_path):
 
 
 def turn_data(turn, content):
-    spans = [s for s in turn['spans'] if s['name'] != 'http.client.requests']
+    spans = [s for s in turn['spans'] if s['name'] not in HTTP_SPANS]
     ids = {s['spanId'] for s in spans}
     root = min(spans, key=lambda s: s['startNanos'])
     out = []
@@ -74,5 +89,5 @@ for name, log in [('before', None), ('after', os.path.join(HERE, 'trace-run-afte
     runs[name] = [turn_data(t, content) for t in json.load(open(os.path.join(HERE, f'trace-{name}.json'), encoding='utf8'))]
     matched = sum(1 for t in runs[name] for s in t['spans'] if 'logged' in s)
     print(name, [len(t['spans']) for t in runs[name]], 'spans per turn;', matched, 'spans with logged content')
-open(OUT, 'w', encoding='utf8', newline='\n').write(json.dumps(runs, ensure_ascii=False, separators=(',', ':')))
+open(OUT, 'w', encoding='utf8', newline='\n').write(redacted(json.dumps(runs, ensure_ascii=False, separators=(',', ':'))))
 print('wrote', os.path.normpath(OUT), os.path.getsize(OUT), 'bytes')

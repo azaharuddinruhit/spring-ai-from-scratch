@@ -8,7 +8,6 @@ import Gotcha from '@/components/Gotcha.astro';
 import MessagePartsLab from '@/components/islands/MessagePartsLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 import { buildGradle } from '@/data/snippets';
-import { PREVIEW_STACK } from '@/data/versions';
 
 **You'll need:** an OpenAI-compatible server with a reasoning model that calls tools. This lesson's recordings used a 27B Qwen 3
 reasoning model. Ollama's `/v1` works for the reasoning, but `deepseek-r1:1.5b` ignored the tool in our runs. This lesson is its own
@@ -59,7 +58,7 @@ The parts live in `org.springframework.ai.chat.messages.part`:
 | `MediaPart` | a `Media` | `getMedia()` |
 | `UnknownPart` | a provider's part Spring AI has no type for: `provider`, `kind`, `rawJson` | `getParts()` |
 
-These rules come from the 2.1.0-RC2 classes and from running them:
+These rules come from the 2.1.0 classes and from running them:
 
 - `getParts()` is declared on `AbstractMessage`, not on the `Message` interface, and `MessagePart` isn't sealed. A `switch` over
   parts needs a `default` branch.
@@ -94,7 +93,7 @@ Things to try:
 
 One starter: the OpenAI one talks to any OpenAI-compatible server.
 
-<CodeFile title="build.gradle" lang="groovy" lines="3,22,28" code={buildGradle(['spring-ai-starter-model-openai'], PREVIEW_STACK)} />
+<CodeFile title="build.gradle" lang="groovy" lines="3,22,28" code={buildGradle(['spring-ai-starter-model-openai'])} />
 
 <CodeFile title="src/main/resources/application.yaml">
 ```yaml {7,12}
@@ -625,10 +624,10 @@ after `ToolCallingAdvisor`, which runs once per model call.
 The recorded server put two newlines before every answer, after the reasoning. `getText()` keeps them; `Reply` strips them.
 </Gotcha>
 
-<Gotcha kind="migration" title="Written against a release candidate">
-Message parts are new in Spring AI 2.1, and this lesson was checked against 2.1.0-RC2. `getToolCalls()` and `getMedia()` now return
-unmodifiable lists, and message `equals()` compares parts. Names can still change before the release. The lesson moves to the
-release when it's out.
+<Gotcha kind="migration" title="Coming from 2.0">
+Message parts are new in Spring AI 2.1. `getToolCalls()` and `getMedia()` now return unmodifiable lists, and message `equals()`
+compares parts. `OpenAiChatModel` still puts the reasoning in the `reasoningContent` metadata entry too, so 2.0 code that read it
+keeps working; read `getReasoning()` in new code.
 </Gotcha>
 
 ## Recap

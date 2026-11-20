@@ -1,6 +1,5 @@
 ---
 import Breakable from '@/components/Breakable.astro';
-import PreviewPill from '@/components/PreviewPill.astro';
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import HeroTrace from '@/components/HeroTrace.astro';
 import { getNavigation, publishedSequence } from '@/lib/course';
@@ -109,12 +108,10 @@ const anatomy = [
                           >
                             <Breakable text={lesson.title} />
                           </a>
-                          {lesson.preview && <PreviewPill />}
                         </li>
                       ) : (
                         <li class="text-slate-400 dark:text-slate-500">
-                          {lesson.title}
-                          {lesson.preview && <PreviewPill />} <span class="text-sm italic">soon</span>
+                          {lesson.title} <span class="text-sm italic">soon</span>
                         </li>
                       ),
                     )}

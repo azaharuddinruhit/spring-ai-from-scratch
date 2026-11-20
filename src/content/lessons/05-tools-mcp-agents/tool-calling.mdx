@@ -32,7 +32,7 @@ flowchart LR
 `}
 />
 
-These rules come from the 2.0.2 classes and from tests we ran against them:
+These rules come from the 2.1.0 classes and from tests we ran against them:
 
 - `ChatClient` registers `ToolCallingAdvisor` itself, at `HIGHEST_PRECEDENCE + 300`. Every model call in the loop sends the whole
   exchange so far, including earlier tool calls and their results. Advisors ordered after it run once per model call (Module 3).
@@ -291,7 +291,7 @@ Register the tools on the support client from Module 4. The system prompt now sa
 which the tools answer:
 
 <CodeFile title="src/main/java/com/example/support/chat/SupportChatConfig.java">
-```java {24,28,30,42}
+```java {25,29,31,49}
 package com.example.support.chat;
 
 import java.time.Clock;
@@ -300,11 +300,12 @@ import java.util.List;
 import com.example.support.order.OrderTools;
 
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SafeGuardAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
-import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import org.springframework.ai.session.EventFilter;
+import org.springframework.ai.session.SessionService;
+import org.springframework.ai.session.advisor.SessionAdvisors;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -314,7 +315,7 @@ import org.springframework.core.Ordered;
 class SupportChatConfig {
 
     @Bean
-    ChatClient supportChatClient(ChatClient.Builder builder, ChatMemory chatMemory,
+    ChatClient supportChatClient(ChatClient.Builder builder, SessionService sessionService,
                                 RetrievalAugmentationAdvisor knowledgeRagAdvisor, OrderTools orderTools) {
         return builder
                 .defaultSystem("""
@@ -329,10 +330,16 @@ class SupportChatConfig {
                                 .build(),
                         new TokenBudgetAdvisor(200_000, Clock.systemUTC()),   // + 50
                         new PiiRedactionAdvisor(),                            // + 100
-                        MessageChatMemoryAdvisor.builder(chatMemory).build(), // + 200
                         knowledgeRagAdvisor,                                  // + 225
                         new AnswerLanguageAdvisor(),                          // + 250
                         new SimpleLoggerAdvisor())                            // 0
+                // The turn (+ 200) and the memory (+ 210) run before RAG, so the memory stores the question rather than
+                // the augmented prompt, and RAG sees the history. The prompt gets the last 40 messages, in whole turns.
+                .defaultAdvisors(SessionAdvisors.builder(sessionService)
+                        .memory(memory -> memory
+                                .order(Ordered.HIGHEST_PRECEDENCE + 210)
+                                .eventFilter(EventFilter.lastN(40)))
+                        .build())
                 .defaultTools(orderTools)
                 .build();
     }
@@ -387,7 +394,7 @@ class KnowledgeRagConfig {
                 // An order question finds no documents. The default would then replace it with a refusal, and the model
                 // would never call a tool. The system prompt keeps policy answers to the documents instead.
                 .queryAugmenter(ContextualQueryAugmenter.builder().allowEmptyContext(true).build())
-                // After memory (+ 200), so memory stores the question rather than the augmented prompt,
+                // After memory (+ 210), so memory stores the question rather than the augmented prompt,
                 // and before tool calling (+ 300), so it retrieves once per question.
                 .order(Ordered.HIGHEST_PRECEDENCE + 225)
                 .build();
@@ -400,7 +407,7 @@ The service sets the tool context and reads the finish reason. Without that chec
 "Tool call limit (5) exceeded for tool 'findOrder'" as the answer:
 
 <CodeFile title="src/main/java/com/example/support/chat/SupportChatService.java">
-```java {38,51}
+```java {39,52}
 package com.example.support.chat;
 
 import java.nio.charset.StandardCharsets;
@@ -413,11 +420,12 @@ import com.example.support.tools.CustomerToolContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.model.tool.ToolCallLimitExceededException;
 import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
+import org.springframework.ai.session.SessionService;
+import org.springframework.ai.session.advisor.SessionAdvisors;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -428,19 +436,19 @@ public class SupportChatService {
     private static final Logger log = LoggerFactory.getLogger(SupportChatService.class);
 
     private final ChatClient supportChatClient;
-    private final ChatMemory chatMemory;
+    private final SessionService sessionService;
 
-    public SupportChatService(ChatClient supportChatClient, ChatMemory chatMemory) {
+    public SupportChatService(ChatClient supportChatClient, SessionService sessionService) {
         this.supportChatClient = supportChatClient;
-        this.chatMemory = chatMemory;
+        this.sessionService = sessionService;
     }
 
     public String ask(String userId, UUID chatId, String product, String question, Locale language) {
         ChatResponse response = supportChatClient.prompt()
                 .user(question)
                 .toolContext(CustomerToolContext.of(userId))
+                .advisors(SessionAdvisors.session(sessionId(userId, chatId)))
                 .advisors(advisor -> advisor
-                        .param(ChatMemory.CONVERSATION_ID, conversationId(userId, chatId))
                         .param(TokenBudgetAdvisor.USER_ID, userId)
                         .param(AnswerLanguageAdvisor.LANGUAGE, language)
                         // Replaces the retriever's default filter, so it must keep the audience condition.
@@ -459,11 +467,11 @@ public class SupportChatService {
     }
 
     public void forget(String userId, UUID chatId) {
-        chatMemory.clear(conversationId(userId, chatId));
+        sessionService.delete(sessionId(userId, chatId));
     }
 
-    /** A UUID that only this user's chat maps to, and that fits the 36-character JDBC column. */
-    static String conversationId(String userId, UUID chatId) {
+    /** A session id that only this user's chat maps to, so a chat id alone never reaches another user's session. */
+    static String sessionId(String userId, UUID chatId) {
         return UUID.nameUUIDFromBytes((userId + ":" + chatId).getBytes(StandardCharsets.UTF_8)).toString();
     }
 }
@@ -664,7 +672,7 @@ class ModelSafeToolErrorsTest {
 The first four tests come from Module 3. The last two script a model that asks for Bob's order, and one that never stops asking:
 
 <CodeFile title="src/test/java/com/example/support/chat/SupportChatServiceTest.java">
-```java {100,106,116,124}
+```java {105,111,121,129}
 package com.example.support.chat;
 
 import static com.example.support.ScriptedChatModel.toolCall;
@@ -689,10 +697,7 @@ import com.example.support.order.OrderTools;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.ToolCallingAdvisor;
-import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
@@ -700,21 +705,29 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.DefaultToolCallingManager;
+import org.springframework.ai.session.DefaultSessionService;
+import org.springframework.ai.session.InMemorySessionRepository;
+import org.springframework.ai.session.SessionService;
+import org.springframework.ai.session.advisor.SessionAdvisors;
+import org.springframework.core.Ordered;
 
 class SupportChatServiceTest {
 
     private final List<Prompt> prompts = new ArrayList<>();
-    private final ChatMemory chatMemory = MessageWindowChatMemory.builder().build();
+    private final SessionService sessionService = DefaultSessionService.builder()
+            .sessionRepository(InMemorySessionRepository.builder().build())
+            .build();
     private final UUID chatId = UUID.fromString("0f8e2a4c-6b1d-4c3e-9a7f-5d2b8c1e4a60");
 
-    private final SupportChatService service = new SupportChatService(
-            ChatClient.builder(prompt -> {
-                        prompts.add(prompt);
-                        return new ChatResponse(List.of(new Generation(new AssistantMessage("Noted."))));
-                    })
-                    .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
-                    .build(),
-            chatMemory);
+    private final SupportChatService service = new SupportChatService(ChatClient.builder(prompt -> {
+                prompts.add(prompt);
+                return new ChatResponse(List.of(new Generation(new AssistantMessage("Noted."))));
+            })
+            .defaultAdvisors(SessionAdvisors.builder(sessionService)
+                    .memory(memory -> memory.order(Ordered.HIGHEST_PRECEDENCE + 210))
+                    .build())
+            .build(),
+            sessionService);
 
     @Test
     void usersWithTheSameChatIdDoNotShareAConversation() {
@@ -737,21 +750,21 @@ class SupportChatServiceTest {
     }
 
     @Test
-    void conversationIdsFitTheJdbcColumn() {
-        String id = SupportChatService.conversationId("alice.long-name@customer.example.com", chatId);
-
-        assertThat(id).hasSize(36).isEqualTo(SupportChatService.conversationId("alice.long-name@customer.example.com", chatId));
+    void sessionIdsBelongToOneUsersChat() {
+        assertThat(SupportChatService.sessionId("alice", chatId))
+                .isEqualTo(SupportChatService.sessionId("alice", chatId))
+                .isNotEqualTo(SupportChatService.sessionId("bob", chatId));
     }
 
     @Test
-    void forgetClearsOnlyThatUsersChat() {
+    void forgetDeletesOnlyThatUsersSession() {
         service.ask("alice", chatId, "billing", "Hello", Locale.ENGLISH);
         service.ask("bob", chatId, "billing", "Hello", Locale.ENGLISH);
 
         service.forget("alice", chatId);
 
-        assertThat(chatMemory.get(SupportChatService.conversationId("alice", chatId))).isEmpty();
-        assertThat(chatMemory.get(SupportChatService.conversationId("bob", chatId))).hasSize(2);
+        assertThat(sessionService.findById(SupportChatService.sessionId("alice", chatId))).isNull();
+        assertThat(sessionService.getMessages(SupportChatService.sessionId("bob", chatId))).hasSize(2);
     }
 
     @Test
@@ -766,7 +779,7 @@ class SupportChatServiceTest {
                           "orderNumber": "1042",
                           "customerId": "bob"
                         }"""));
-        var service = new SupportChatService(ChatClient.builder(model).defaultTools(new OrderTools(orders)).build(), chatMemory);
+        var service = new SupportChatService(ChatClient.builder(model).defaultTools(new OrderTools(orders)).build(), sessionService);
 
         assertThat(service.ask("alice", chatId, "billing", "Where is order 1042?", Locale.ENGLISH))
                 .isEqualTo("Order 1042 has shipped.");
@@ -784,7 +797,7 @@ class SupportChatServiceTest {
                 .build();
         var service = new SupportChatService(
                 ChatClient.builder(model).defaultAdvisors(limited).defaultTools(new OrderTools(mock(OrderRepository.class))).build(),
-                chatMemory);
+                sessionService);
 
         assertThat(service.ask("alice", chatId, "billing", "Show my orders", Locale.ENGLISH))
                 .isEqualTo(SupportChatService.TOOL_LIMIT_ANSWER);
@@ -824,14 +837,15 @@ what a real question takes, and keep tool results small: return a record with th
 Every tool definition goes with every model call. With dozens of tools, consider `ToolSearchToolCallingAdvisor`
 (`spring-ai-starter-tool-search-advisor`, enabled with `spring.ai.chat.client.tool-search-advisor.enabled=true`). It sends only a
 `toolSearchTool` at first, then adds the tools the model's searches find. In our test, a scripted model searched for "order" and the next
-call carried `findOrder` and `toolSearchTool`. It needs `ChatMemory.CONVERSATION_ID` on the request, and fails without it. The
-<a href={lessonHref('05-tools-mcp-agents/tool-search')}>Tool Search</a> preview lesson measures its indexes on Spring AI 2.1.
+call carried `findOrder` and `toolSearchTool`. It keeps the found tools per conversation, under the id that
+`SessionAdvisors.session(...)` sets, and fails without one. The <a href={lessonHref('05-tools-mcp-agents/tool-search')}>Tool
+Search</a> lesson measures its indexes.
 </Gotcha>
 
 <Gotcha kind="security" title="Keep tools that change things out of the model's reach">
 The model calls a tool whenever the conversation makes it seem right, and the conversation can include a customer's
 instructions or a poisoned document. Read-only tools scoped to the signed-in customer are safe to expose. A tool that refunds,
-cancels or deletes should only prepare the action for the customer to confirm. Lesson 3 builds that.
+cancels or deletes should wait until the customer confirms it. Lesson 3 marks the refund tool with `requiresConfirmation`.
 </Gotcha>
 
 <Gotcha kind="migration" title="defaultToolCallbacks is deprecated for removal">

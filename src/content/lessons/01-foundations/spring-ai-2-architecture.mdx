@@ -80,7 +80,7 @@ If the `Prompt` carries options, they replace the defaults entirely.
 Things to try:
 
 1. With `chatClient.prompt()…` selected, uncheck every request option. The client and model defaults fill the gaps.
-2. Switch to `chatModel.call(prompt)` and set only `maxTokens`. `model` and `temperature` become `null`, which means the provider falls back
+2. Switch to `chatModel.call(prompt)` and set only `maxTokens`. `model` and `stopSequences` become `null`, which means the provider falls back
    to its own defaults and ignores your `application.yml`.
 3. Click **`getStopSequences().add(…)`** and then **`mutate()…build()`** to see the 2.x immutability rules.
 
@@ -112,7 +112,6 @@ spring:
       api-key: ${ANTHROPIC_API_KEY}
       chat:
         model: claude-haiku-4-5
-        temperature: 0.7
         max-tokens: 4096     # In 2.x the .options segment is gone; spring.ai.anthropic.chat.options.* is deprecated
 ```
 </CodeFile>
@@ -148,7 +147,7 @@ class AiConfig {
         return builder
                 .defaultSystem("You are a support assistant. Be concise and cite ticket IDs.")
                 .defaultOptions(AnthropicChatOptions.builder()
-                        .temperature(0.2))
+                        .maxTokens(1024))                  // summaries are short; the yml allows 4096
                 .build();
     }
 }
@@ -199,14 +198,14 @@ public class TicketSummarizer {
         return Objects.requireNonNullElse(summary, "");
     }
 
-    /** Low-level call with deterministic settings, derived from the model's defaults rather than built from scratch. */
+    /** Low-level call with a one-line answer, derived from the model's defaults rather than built from scratch. */
     public ChatResponse classify(String ticket) {
-        ChatOptions deterministic = chatModel.getOptions()
+        ChatOptions oneLine = chatModel.getOptions()
                 .mutate()                                     // copy-on-write: the defaults stay untouched
-                .temperature(0.0)
                 .maxTokens(20)
+                .stopSequences(List.of("\n"))                 // a new list, not getStopSequences().add(...)
                 .build();
-        return chatModel.call(new Prompt("Classify as BUG, BILLING or OTHER: " + ticket, deterministic));
+        return chatModel.call(new Prompt("Classify as BUG, BILLING or OTHER: " + ticket, oneLine));
     }
 
     /** Fans out across virtual threads; resultNow() throws IllegalStateException if any task failed. */
@@ -235,8 +234,8 @@ public class TicketSummarizer {
 ## 4. Production gotchas & security
 
 <Gotcha kind="reliability" title="ChatModel.call() silently drops your application.yml defaults">
-If you build `new Prompt(text, ChatOptions.builder().maxTokens(20).build())`, the model receives **only** `maxTokens`, and model and
-temperature fall back to the provider's defaults. Portable `ChatOptions.builder()` can also produce a `DefaultChatOptions` that a provider
+If you build `new Prompt(text, ChatOptions.builder().maxTokens(20).build())`, the model receives **only** `maxTokens`, and the model and
+everything else fall back to the provider's defaults. Portable `ChatOptions.builder()` can also produce a `DefaultChatOptions` that a provider
 casts to its own type, which fails with a `ClassCastException`. Derive variants with `chatModel.getOptions().mutate()`, or use `ChatClient`, which merges.
 </Gotcha>
 

@@ -3,15 +3,17 @@ import type { ReactNode } from 'react';
 import { CodeView, LabFrame, Pill } from './LabFrame';
 
 /*
- * A support conversation through SafeGuardAdvisor, a PII redaction advisor, MessageChatMemoryAdvisor and SimpleLoggerAdvisor,
- * as Spring AI 2.0.2 runs them. Checked against the real classes:
+ * A support conversation through SafeGuardAdvisor, a PII redaction advisor, session memory and SimpleLoggerAdvisor, as Spring AI
+ * 2.1.0 runs them with a tool-calling model. Checked against the real classes:
  * - SafeGuardAdvisor lower-cases Prompt.getContents() (every message, system and history included) and each sensitive word with
  *   Locale.ROOT and blocks on String.contains, so it matches inside other words. A blocked call never reaches the model and gets
- *   the fixed failure response below. Its default order is 0.
- * - MessageChatMemoryAdvisor (HIGHEST_PRECEDENCE + 200) sends the stored window plus the new message, saves the new message as it
- *   reached it and saves the reply on the way back, so whatever runs before it decides what is stored. MessageWindowChatMemory
- *   trims to the newest maxMessages messages when it saves.
- * - Advisors that share an order run in reverse registration order.
+ *   the fixed failure response below, with finish reason guardrailRefusal. Its default order is 0.
+ * - SessionMemoryAdvisor, ordered at HIGHEST_PRECEDENCE + 210 as in the lesson, sends the system message, the events that
+ *   EventFilter.lastN(6) picks (whole turns) and the new message, saves the new message as it reached it and saves the reply on
+ *   the way back, so whatever runs before it decides what is stored. The session keeps every event; the filter only limits
+ *   what is sent.
+ * - Advisors that share an order run in reverse registration order before ToolCallingAdvisor (+ 300) and in registration order
+ *   after it, where SafeGuardAdvisor and SimpleLoggerAdvisor sit at 0.
  * The redaction patterns are the ones in PiiRedactionAdvisor in the lesson.
  */
 
@@ -19,6 +21,7 @@ const HIGHEST = -2147483648;
 const FAILURE = "I'm unable to respond to that due to sensitive content. Could we rephrase or discuss something else?";
 const SYSTEM_TEXT = 'You are the support assistant for Acme Cloud.';
 const WINDOW = 6;
+const TOOL_CALLING = HIGHEST + 300;
 
 const SUGGESTIONS = [
   'I forgot my password',
@@ -71,12 +74,12 @@ function chainFor(config: Config): AdvisorId[] {
   const registered: { id: AdvisorId; order: number }[] = [
     { id: 'guard', order: GUARD_ORDER[config.guard] },
     ...(config.redaction === 'off' ? [] : [{ id: 'redact' as const, order: REDACTION_ORDER[config.redaction] }]),
-    { id: 'memory', order: HIGHEST + 200 },
+    { id: 'memory', order: HIGHEST + 210 },
     { id: 'logger', order: 0 },
   ];
   return registered
     .map((a, index) => ({ ...a, index }))
-    .sort((a, b) => a.order - b.order || b.index - a.index)
+    .sort((a, b) => a.order - b.order || (a.order > TOOL_CALLING ? a.index - b.index : b.index - a.index))
     .map((a) => a.id);
 }
 
@@ -104,8 +107,6 @@ function send(text: string, memoryBefore: Msg[], config: Config, modelCalls: num
   let block: Block | null = null;
   let modelSaw: Msg[] | null = null;
 
-  const keepWindow = () => memory.splice(0, Math.max(0, memory.length - WINDOW));
-
   function run(i: number, prompt: Msg[]): string {
     if (i === chain.length) {
       modelSaw = prompt;
@@ -122,14 +123,13 @@ function send(text: string, memoryBefore: Msg[], config: Config, modelCalls: num
           prompt.map((m, k) => (k === prompt.length - 1 && m.role === 'user' ? { ...m, text: redact(m.text) } : m)),
         );
       case 'memory': {
-        // The prompt is the stored window plus the new message; the window is trimmed when the message is saved.
+        // The prompt is the last WINDOW stored events plus the new message. Every turn here is a user and an assistant message,
+        // so lastN(WINDOW) is exactly the newest WINDOW messages. Nothing stored is ever trimmed.
         const message = prompt[prompt.length - 1];
-        const next = [...prompt.filter((m) => m.role === 'system'), ...memory, message];
+        const next = [...prompt.filter((m) => m.role === 'system'), ...memory.slice(-WINDOW), message];
         memory.push(message);
-        keepWindow();
         const reply = run(i + 1, next);
         memory.push({ role: 'assistant', text: reply });
-        keepWindow();
         return reply;
       }
       case 'logger': {
@@ -158,9 +158,11 @@ function javaFor(config: Config): string {
                 SafeGuardAdvisor.builder()
                                 .sensitiveWords(List.of(${words}))${guardOrder}
                                 .build(),${redaction}
-                // chatMemory is a MessageWindowChatMemory with maxMessages(${WINDOW})
-                MessageChatMemoryAdvisor.builder(chatMemory).build(),
-                new SimpleLoggerAdvisor())`;
+                new SimpleLoggerAdvisor())
+        .defaultAdvisors(SessionAdvisors.builder(sessionService)
+                .memory(memory -> memory.order(Ordered.HIGHEST_PRECEDENCE + 210)
+                        .eventFilter(EventFilter.lastN(${WINDOW})))
+                .build())`;
 }
 
 function Highlight({ text, word }: { text: string; word: string }) {
@@ -240,7 +242,7 @@ export default function GuardrailLab() {
   return (
     <LabFrame
       title="SafeGuard, redaction and memory"
-      hint="Pick the advisor orders, then chat. Each message goes through the advisors in order, and memory keeps the last 6 messages."
+      hint="Pick the advisor orders, then chat. Each message goes through the advisors in order, and memory sends the last 6 stored messages."
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block min-w-0">
@@ -343,7 +345,7 @@ export default function GuardrailLab() {
               {t.block && (
                 <p className="mt-1.5 text-xs text-slate-600 [overflow-wrap:anywhere] dark:text-slate-400">
                   SafeGuardAdvisor matched "{t.block.word}" {WHERE[t.block.where]}: <Highlight text={t.block.text} word={t.block.word} />. The model was not
-                  called.
+                  called, and the finish reason is <code className="code-mono">guardrailRefusal</code>.
                 </p>
               )}
             </div>
@@ -351,7 +353,7 @@ export default function GuardrailLab() {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Panel title={`Conversation in ChatMemory (${memory.length} of ${WINDOW})`}>
+          <Panel title={`Stored in the session (${memory.length}; the last ${Math.min(WINDOW, memory.length)} are sent)`}>
             <Messages messages={memory} empty="Nothing stored." />
           </Panel>
           <Panel title="What the model received last">

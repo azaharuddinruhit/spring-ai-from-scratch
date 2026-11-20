@@ -13,6 +13,7 @@ import com.example.support.chat.SupportChatService.SupportAnswer;
 import com.example.support.security.SecurityConfig;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -98,5 +99,66 @@ class SupportChatControllerTest {
         assertThat(mvc.delete().uri("/api/chats/{chatId}", CHAT_ID).with(jwt().jwt(token -> token.subject("alice"))))
                 .hasStatus(HttpStatus.NO_CONTENT);
         then(chatService).should().forget("alice", CHAT_ID);
+    }
+
+    @Test
+    void showsTheCallWaitingForConfirmation() {
+        given(chatService.awaitingConfirmation("alice", CHAT_ID)).willReturn(List.of(new AssistantMessage.ToolCall(
+                "call-1", "function", "refundOrder", "{\"orderNumber\":\"1042\",\"amount\":59.90}")));
+
+        assertThat(mvc.get().uri("/api/chats/{chatId}/confirmation", CHAT_ID).with(jwt().jwt(token -> token.subject("alice"))))
+                .hasStatusOk()
+                .bodyJson()
+                .isLenientlyEqualTo("""
+                        [
+                          {
+                            "tool": "refundOrder",
+                            "arguments": "{\\"orderNumber\\":\\"1042\\",\\"amount\\":59.90}"
+                          }
+                        ]
+                        """);
+    }
+
+    @Test
+    void resumesWithTheCustomersDecision() {
+        given(chatService.confirm("alice", CHAT_ID, true, Locale.ENGLISH)).willReturn(new SupportAnswer("Your refund is on its way.", List.of()));
+
+        assertThat(mvc.post().uri("/api/chats/{chatId}/confirmation", CHAT_ID)
+                .with(jwt().jwt(token -> token.subject("alice")))
+                .header(HttpHeaders.ACCEPT_LANGUAGE, "en")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "approved": true
+                        }
+                        """))
+                .hasStatusOk()
+                .bodyJson().extractingPath("$.answer").isEqualTo("Your refund is on its way.");
+    }
+
+    @Test
+    void reportsNothingToConfirmAs409() {
+        given(chatService.confirm("alice", CHAT_ID, true, Locale.ENGLISH)).willThrow(new NothingToConfirmException());
+
+        assertThat(mvc.post().uri("/api/chats/{chatId}/confirmation", CHAT_ID)
+                .with(jwt().jwt(token -> token.subject("alice")))
+                .header(HttpHeaders.ACCEPT_LANGUAGE, "en")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "approved": true
+                        }
+                        """))
+                .hasStatus(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void rejectsAConfirmationWithoutADecision() {
+        assertThat(mvc.post().uri("/api/chats/{chatId}/confirmation", CHAT_ID)
+                .with(jwt().jwt(token -> token.subject("alice")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+                .hasStatus(HttpStatus.BAD_REQUEST);
+        then(chatService).shouldHaveNoInteractions();
     }
 }

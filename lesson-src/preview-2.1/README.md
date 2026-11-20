@@ -1,11 +1,11 @@
-# Spring AI 2.1 preview sources
+# Spring AI 2.1 lesson sources
 
-The four preview lessons (1.5 Message Parts & Reasoning, 2.3 Decision Models, 4.4 Decision Filter & Reranker, 5.4 Tool Search &
+The four lessons added for Spring AI 2.1 (1.5 Message Parts & Reasoning, 2.3 Decision Models, 4.4 Decision Filter & Reranker, 5.4 Tool Search &
 DecisionToolIndex) are generated from this folder, on the same workflow as `lesson-src/module-5` and `module-6`. Everything here
-targets Spring AI 2.1.0-RC2 and Spring Boot 4.2.0-RC2 (`pom.xml`, and `PREVIEW_STACK` in `src/data/versions.ts`). The plan is in
+targets Spring AI 2.1.0 and Spring Boot 4.2.0 (`pom.xml`; they were written on 2.1.0-RC2 and re-run on the release). The plan is in
 `UPGRADE-2.1.md`.
 
-- `code/<lesson>/main`, `test`, `main-resources`, `test-resources`: each preview lesson is its own small project
+- `code/<lesson>/main`, `test`, `main-resources`, `test-resources`: each of these lessons is its own small project
   (`decision-models`, `decision-filter`, ...), with its own `application.yaml`. `code/probe-only.properties` (and a lesson's own `code/<lesson>/probe-only.properties`) holds settings the
   shared workspace classpath needs and the lessons never show.
 - `templates/*.mdx`: the lesson sources. Generate a lesson with

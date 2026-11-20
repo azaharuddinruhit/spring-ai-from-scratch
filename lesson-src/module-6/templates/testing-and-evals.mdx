@@ -7,6 +7,7 @@ import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
 import AnswerCheckLab from '@/components/islands/AnswerCheckLab';
 import ProjectTree from '@/components/ProjectTree.astro';
+import { lessonHref } from '@/lib/course';
 
 **You'll need:** JUnit 5 and Testcontainers basics, and the support app from Module 5.
 
@@ -39,12 +40,14 @@ flowchart LR
 `}
 />
 
-These rules come from the 2.0.2 classes and from running the tests below:
+These rules come from the 2.1.0 classes and from running the tests below:
 
 - `@ServiceConnection` replaces URL properties. Boot's PostgreSQL support connects the datasource, and pgvector needs nothing
   more because it is PostgreSQL. `spring-ai-spring-boot-testcontainers` adds the Ollama connection, which sets only the base URL.
 - A new Ollama container has no models, and `spring.ai.ollama.init.pull-model-strategy` defaults to `never`. Set
   `when_missing`, and allow more than the default 5-minute `timeout` for the first download.
+- The Ollama starter also configures a <a href={lessonHref('02-structured-outputs/decision-models')}>decision model</a>, and with
+  a pull strategy it downloads `d1-omni:600m` for it. Set `spring.ai.model.decision: none` when the app doesn't use one.
 - Model output changes from run to run, so assert on what doesn't: the tool that ran and its arguments, a value only the tool
   result holds, the documents retrieved. Never the wording.
 - An evaluator takes an `EvaluationRequest` of question, documents and answer. `RelevancyEvaluator` asks the judge whether the

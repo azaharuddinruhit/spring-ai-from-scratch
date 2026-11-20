@@ -10,7 +10,7 @@ import org.springframework.ai.tool.toolsearch.ToolSearchResponse;
 /**
  * Keeps every search between one and {@code maxResults} tools. The model chooses how many tools a search returns, and the
  * advisor's max-results applies only when it doesn't: a model that asks for 10 gets 10, and one that asks for 0 fails the
- * request with the Lucene index (Spring AI 2.1.0-RC2).
+ * request with the Lucene index (Spring AI 2.1.0).
  */
 record BoundedToolIndex(ToolIndex delegate, int maxResults) implements ToolIndex {
 

@@ -7,6 +7,7 @@ import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
 import AdvisorChainLab from '@/components/islands/AdvisorChainLab';
 import ProjectTree from '@/components/ProjectTree.astro';
+import { lessonHref } from '@/lib/course';
 
 Every `ChatClient` call you have made so far went through advisors, even when you registered none: Module 2's format text came
 from `ChatModelCallAdvisor`, and `validateSchema()` added `StructuredOutputValidationAdvisor`. This lesson opens the chain itself:
@@ -17,7 +18,7 @@ the order advisors run in, what they can change, and the one advisor that makes 
 Advisors are servlet filters for model calls. Each one gets the request, can change it, passes it on, and gets the response on the
 way back.
 
-| Spring you know | Spring AI 2.0 | In short |
+| Spring you know | Spring AI 2.1 | In short |
 | --- | --- | --- |
 | `Filter` | `CallAdvisor` | Wraps the rest of the chain. Not calling `nextCall` stops the call. |
 | `HandlerInterceptor` | `BaseAdvisor` | `before` and `after`, for both `call()` and `stream()`. |
@@ -30,12 +31,13 @@ The interfaces are small. `CallAdvisor.adviseCall(ChatClientRequest, CallAdvisor
 `getName()` and `getOrder()`. `ChatClientRequest` is a record of the `Prompt` and the context map; `ChatClientResponse` holds the
 `ChatResponse` and the context.
 
-These are the default orders in 2.0.2, read from the classes and from the chain a running `ChatClient` printed:
+These are the default orders in 2.1.0, read from the classes and from the chain a running `ChatClient` printed:
 
 | Advisor | Order | Who adds it |
 | --- | --- | --- |
-| `MessageChatMemoryAdvisor`, `VectorStoreChatMemoryAdvisor` | `HIGHEST_PRECEDENCE + 200` | You |
+| `SessionTurnAdvisor`, `VectorStoreChatMemoryAdvisor` | `HIGHEST_PRECEDENCE + 200` | You (the first through `SessionAdvisors`) |
 | `ToolCallingAdvisor` | `HIGHEST_PRECEDENCE + 300` | `ChatClient`, on every client |
+| `SessionMemoryAdvisor` | `HIGHEST_PRECEDENCE + 1000`, inside the tool loop | You, through `SessionAdvisors` |
 | `SimpleLoggerAdvisor`, `SafeGuardAdvisor`, `QuestionAnswerAdvisor`, `RetrievalAugmentationAdvisor` | `0` | You |
 | `StructuredOutputValidationAdvisor` | `LOWEST_PRECEDENCE - 2000` | `validateSchema()` |
 | `ChatModelCallAdvisor` | `LOWEST_PRECEDENCE` | `ChatClient`, always last |
@@ -45,10 +47,10 @@ again, so everything ordered after it runs once per model call. Advisors ordered
 the finished answer, with the token usage of every round added up.
 
 <Mermaid
-  caption="One call with a tool. Memory runs once; the logger runs once per model call, inside the tool loop."
+  caption="One call with a tool, as this course orders memory. Memory runs once; the logger runs once per model call, inside the tool loop."
   code={`
 flowchart LR
-  C["ChatClient<br/>.call()"] --> M["MessageChat<br/>MemoryAdvisor<br/>+200"]
+  C["ChatClient<br/>.call()"] --> M["Session advisors<br/>turn +200<br/>memory +210"]
   M --> T["ToolCalling<br/>Advisor<br/>+300"]
   subgraph L["Once per model call"]
     direction LR
@@ -60,10 +62,17 @@ flowchart LR
 `}
 />
 
+Where memory sits is a choice. `SessionAdvisors` puts the memory advisor inside the loop by default, so it stores every tool
+call and result and rebuilds each round's prompt from the session. This course orders it at `HIGHEST_PRECEDENCE + 210`, just
+after the turn advisor and before the loop: it runs once per call, stores the question and the final answer, and the advisors
+between it and the loop see the whole history. Module 4's RAG advisor needs exactly that.
+
 Three more rules, all checked against the running code:
 
-- **Equal orders.** `SimpleLoggerAdvisor` and `SafeGuardAdvisor` both default to `0`, and so does a custom advisor that returns 0.
-  In 2.0.2 advisors with the same order run in reverse registration order. That is an implementation detail, not a contract.
+- **Equal orders.** `SimpleLoggerAdvisor`, `SafeGuardAdvisor` and the RAG advisors all default to `0`, and so does a custom
+  advisor that returns 0. Before the tool loop, advisors with the same order run in reverse registration order. Inside it, which
+  is where an order of `0` puts them with any real model, they run in registration order. Both are implementation details, not
+  a contract.
 - **Short-circuiting.** An advisor that returns a response without calling `nextCall` ends the call there. Nothing below it runs,
   including the model. `SafeGuardAdvisor` works this way.
 - **Streaming.** `BaseAdvisor` runs `before` on `getScheduler()`, which defaults to `Schedulers.boundedElastic()`, and runs `after`
@@ -75,18 +84,31 @@ Three more rules, all checked against the running code:
 
 Things to try:
 
-- Step through the default configuration with the tool call. `SimpleLoggerAdvisor` and `RetrievalAugmentationAdvisor` both run
-  twice, once for each model call, and memory runs once.
+- Step through the starting configuration, this course's, with the tool call. `SimpleLoggerAdvisor` and
+  `RetrievalAugmentationAdvisor` both run twice, once for each model call, and memory runs once.
 - Move `RetrievalAugmentationAdvisor` to `HIGHEST_PRECEDENCE + 100`. It now runs before memory, so the documents are saved in the
   conversation and sent again with every later question.
-- Move memory to `0`. It now sits inside the tool loop and stores the tool call and the tool result as well.
-- Leave the logger and RAG at `0` and watch which one runs first: the logger, because it is registered last.
+- Move memory to `HIGHEST_PRECEDENCE + 1000`, its default. It now sits inside the tool loop and stores the tool call and the
+  tool result as well.
+- Leave the logger and RAG at `0` and watch which one runs first: RAG, because inside the tool loop equal orders keep their
+  registration order, and RAG is registered before the logger.
 
 ## 3. Idiomatic Java 25 & Gradle 9 code
 
 <ProjectTree />
 
-There are no new dependencies: the advisor API is part of `spring-ai-client-chat`, which every model starter brings in.
+The advisor API is part of `spring-ai-client-chat`, which every model starter brings in. The session advisors that give the
+client its memory are a separate module; the <a href={lessonHref('03-advisors-and-memory/chat-memory')}>Chat Memory</a> lesson
+explains them:
+
+<CodeFile
+  title="build.gradle"
+  lang="groovy"
+  lines="2"
+  code={`dependencies {
+    implementation 'org.springframework.ai:spring-ai-session-advisor'
+}`}
+/>
 
 Most custom advisors only need to change the request or the response, so extend `BaseAdvisor`. It works for both `call()` and
 `stream()`. This one adds a language instruction to the system message when the caller passes a `Locale`:
@@ -138,27 +160,41 @@ public final class AnswerLanguageAdvisor implements BaseAdvisor {
 Register advisors once on the client. The comments record each order, so the chain can be read from the configuration:
 
 <CodeFile title="src/main/java/com/example/support/chat/SupportChatConfig.java">
-```java {17}
+```java {19-23,32-35}
 package com.example.support.chat;
 
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
-import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.session.DefaultSessionService;
+import org.springframework.ai.session.InMemorySessionRepository;
+import org.springframework.ai.session.SessionService;
+import org.springframework.ai.session.advisor.SessionAdvisors;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 
 @Configuration(proxyBeanMethods = false)
 class SupportChatConfig {
 
+    /** Conversations in memory for now; the Chat Memory lesson keeps them in PostgreSQL. */
     @Bean
-    ChatClient supportChatClient(ChatClient.Builder builder, ChatMemory chatMemory) {
+    SessionService sessionService() {
+        return DefaultSessionService.builder()
+                .sessionRepository(InMemorySessionRepository.builder().build())
+                .build();
+    }
+
+    @Bean
+    ChatClient supportChatClient(ChatClient.Builder builder, SessionService sessionService) {
         return builder
                 .defaultSystem("You are the support assistant for Acme Cloud.")
                 .defaultAdvisors(
-                        MessageChatMemoryAdvisor.builder(chatMemory).build(), // HIGHEST_PRECEDENCE + 200
                         new AnswerLanguageAdvisor(),                          // HIGHEST_PRECEDENCE + 250
-                        new SimpleLoggerAdvisor())                            // 0, below the tool loop
+                        new SimpleLoggerAdvisor())                            // 0, in the tool loop
+                // The turn (+ 200) and memory (+ 210) before the tool loop, so memory runs once per call.
+                .defaultAdvisors(SessionAdvisors.builder(sessionService)
+                        .memory(memory -> memory.order(Ordered.HIGHEST_PRECEDENCE + 210))
+                        .build())
                 .build();
     }
 }
@@ -225,9 +261,10 @@ class AnswerLanguageAdvisorTest {
 ## 4. Production gotchas & security
 
 <Gotcha kind="reliability" title="Two advisors with the same order">
-`SimpleLoggerAdvisor`, `SafeGuardAdvisor` and the RAG advisors all default to `0`. With equal orders, 2.0.2 runs the advisor you
-registered last first, so a logger registered after RAG logs the prompt without its documents. Give every advisor its own order,
-and pass it to the builder (`.order(...)`) rather than relying on registration order.
+`SimpleLoggerAdvisor`, `SafeGuardAdvisor` and the RAG advisors all default to `0`. Whether a logger registered after RAG logs the
+prompt with its documents depends on where the two sit: inside the tool loop the one registered first runs first, before it the
+one registered last. Give every advisor its own order, and pass it to the builder (`.order(...)`) rather than relying on
+registration order.
 </Gotcha>
 
 <Gotcha kind="cost" title="Advisors after ToolCallingAdvisor run on every model call">
@@ -264,8 +301,9 @@ building a changed request with `request.mutate()` and calling `chain.nextCall(.
 
 - An advisor wraps the rest of the chain: `CallAdvisor` for `call()`, `StreamAdvisor` for `stream()`, `BaseAdvisor` for both
   through `before` and `after`.
-- Lower `getOrder()` runs first on the way in. Built-ins sit at `+200` (memory), `+300` (tool calling), `0` (logging, guard, RAG)
-  and `LOWEST_PRECEDENCE` (the model call). Give your advisors distinct orders.
+- Lower `getOrder()` runs first on the way in. Built-ins sit at `+200` (the session turn), `+300` (tool calling), `+1000`
+  (session memory, inside the loop), `0` (logging, guard, RAG) and `LOWEST_PRECEDENCE` (the model call). Give your advisors
+  distinct orders.
 - Advisors after `ToolCallingAdvisor` run once per model call; advisors before it run once and see the total usage.
 - Requests are immutable: change them with `mutate()` and the prompt's `augmentUserMessage` and `augmentSystemMessage`, and pass
   per-call values through `.advisors(a -> a.param(...))`.

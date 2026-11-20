@@ -16,7 +16,7 @@ nearest chunks. The metadata filter on that search is where most RAG data leaks 
 
 A vector store is a repository whose `WHERE` clause has one extra condition, "close in meaning":
 
-| Spring you know | Spring AI 2.0 | In short |
+| Spring you know | Spring AI 2.1 | In short |
 | --- | --- | --- |
 | A Spring Data repository | `VectorStore` | `add`, `delete(ids)`, `delete(filter)`, `similaritySearch(request)` |
 | A query with `WHERE` and `LIMIT` | `SearchRequest` | `query`, `topK` (default 4), `similarityThreshold` (default 0.0, accept all), `filterExpression` |
@@ -24,7 +24,7 @@ A vector store is a repository whose `WHERE` clause has one extra condition, "cl
 | A `Converter` | `EmbeddingModel` | `embed(String)` returns a `float[]`; `dimensions()` returns its length |
 
 On PostgreSQL, `PgVectorStore` stores each chunk in one row of `vector_store`: an `id`, the `content`, the `metadata` as JSON and
-the `embedding` as `vector(n)`. A search with a filter sends this SQL, read from the 2.0.2 class:
+the `embedding` as `vector(n)`. A search with a filter sends this SQL, read from the 2.1.0 class:
 
 <Mermaid
   caption="One similaritySearch on PgVectorStore. The score Spring AI returns is 1 minus the cosine distance."
@@ -44,7 +44,7 @@ sequenceDiagram
 `}
 />
 
-The 2.0.2 BOM has 21 vector store starters, among them `spring-ai-starter-vector-store-pgvector`, `-qdrant`, `-redis`, `-oracle`,
+The 2.1.0 BOM has 21 vector store starters, among them `spring-ai-starter-vector-store-pgvector`, `-qdrant`, `-redis`, `-oracle`,
 `-mongodb-atlas`, `-elasticsearch`, `-opensearch`, `-milvus`, `-weaviate` and `-pinecone`. Your code only sees `VectorStore`, and
 `Filter.Expression` is converted by each store, so moving between them is mostly a dependency and configuration change.
 
@@ -54,7 +54,7 @@ runs an ONNX model locally. Anthropic has no embedding model, so
 with Claude for chat you add a second provider for embeddings and set `spring.ai.model.chat=anthropic` and
 `spring.ai.model.embedding=openai` to choose which one serves which.
 
-Filters can be written as text or with the builder. The text grammar, checked against the 2.0.2 parser:
+Filters can be written as text or with the builder. The text grammar, checked against the 2.0.2 and 2.1.0 parsers:
 
 - Comparisons `==`, `!=`, `>`, `>=`, `<`, `<=`, lists with `in` and `nin` (or `NOT IN`), and `&&`/`AND`/`and`, `||`/`OR`/`or`.
   Strings take single or double quotes.
@@ -62,6 +62,8 @@ Filters can be written as text or with the builder. The text grammar, checked ag
 - `NOT` has the lowest precedence and takes everything to its right: `NOT a == 1 && b == 2` means `NOT (a == 1 && b == 2)`.
 - `!` is not an operator. The lexer skips it, so `! audience == 'STAFF'` parses as `audience == 'STAFF'`.
 - A key with a dot, such as `meta.region`, is one key named `meta.region`, not a nested field.
+- Since 2.1 the parser rejects an expression more than 100 levels deep, counting every `AND` and `OR` as a level, with
+  `FilterExpressionParseException`. Long `in` lists don't count.
 
 ## 2. Interactive sandbox
 
@@ -388,8 +390,9 @@ to standard error, so `! audience == 'STAFF'` selects the staff documents. Use p
 </Gotcha>
 
 <Gotcha kind="reliability" title="Set the dimensions yourself">
-Without `dimensions`, `PgVectorStore` embeds the string "Test String" at startup to measure the model, which is an API call on
-every boot. If that call fails, it logs a warning and uses 1536. PgVector's HNSW index takes at most 2,000 dimensions, so
+Without `dimensions`, `PgVectorStore` embeds the string "Test String" to measure the model when it creates its table. (2.0 did
+it on every boot; 2.1 reads an existing table's column size instead.) If that call fails, it logs a warning and creates a
+`vector(1536)` column, which a model of another size can't write to. PgVector's HNSW index takes at most 2,000 dimensions, so
 `text-embedding-3-large` (3,072) fails at startup with "column cannot have more than 2000 dimensions for hnsw index": set
 `spring.ai.openai.embedding.dimensions: 1536` to shorten its vectors, or use a smaller model.
 </Gotcha>

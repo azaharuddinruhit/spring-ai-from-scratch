@@ -18,7 +18,7 @@ as its client.
 MCP does for tools what JDBC does for databases. It is one protocol, and either side can be swapped. A server offers three kinds of
 things:
 
-| Server offers | Annotation (2.0.2) | Who uses it |
+| Server offers | Annotation (2.1.0) | Who uses it |
 | --- | --- | --- |
 | Tools: functions with a JSON schema | `@McpTool`, `@McpToolParam` | The model, through `ChatClient`, like any `@Tool` |
 | Resources: documents addressed by a URI | `@McpResource` | The client application, which chooses what to attach |
@@ -48,7 +48,7 @@ sequenceDiagram
 `}
 />
 
-These rules come from the 2.0.2 classes and from tests we ran against them:
+These rules come from the 2.1.0 classes and from tests we ran against them:
 
 - A WebMVC server without `spring.ai.mcp.server.protocol` starts the old SSE transport, which serves `/sse` and `/mcp/message`. A
   Streamable HTTP client then gets a `404` for `POST /mcp`, and with `initialized: true` (the default) the client app fails to start.
@@ -269,7 +269,7 @@ The support app's own API now checks the customer's JWT. The `Principal` the con
 The Module 3 controller test now imports that configuration and sends a JWT instead of a plain principal:
 
 <CodeFile title="src/test/java/com/example/support/chat/SupportChatControllerTest.java">
-@@CODE test/com/example/support/chat/SupportChatControllerTest.java | @Import\(SecurityConfig; \.with\(jwt\(\)\.jwt\(token -> token\.subject\("alice"\)\)\)$@@
+@@CODE lesson2/SupportChatControllerTest.java | @Import\(SecurityConfig; \.with\(jwt\(\)\.jwt\(token -> token\.subject\("alice"\)\)\)$@@
 </CodeFile>
 
 <CodeFile title="src/test/java/com/example/support/mcp/BestEffortToolCallbacksTest.java">

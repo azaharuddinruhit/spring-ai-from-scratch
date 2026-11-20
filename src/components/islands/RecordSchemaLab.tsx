@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { CodeEditor, CodeView, LabFrame, Pill } from './LabFrame';
 
 /*
- * A browser-side copy of the rules BeanOutputConverter (Spring AI 2.0.2) uses to turn a record into JSON Schema, checked
+ * A browser-side copy of the rules BeanOutputConverter (Spring AI 2.1.0, byte-identical to 2.0.2 and on the same victools 5.0.0) uses to turn a record into JSON Schema, checked
  * against the real generator: draft 2020-12, properties sorted by name unless @JsonPropertyOrder says otherwise,
  * "additionalProperties": false on every object, a type used more than once moved to $defs, and these required rules in order:
  * @JsonProperty decides with its required flag (false by default), then @Schema (required unless NOT_REQUIRED),

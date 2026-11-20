@@ -94,16 +94,16 @@ class AttackRecordingProbe {
             EVENTS.clear();
             UUID chatId = UUID.randomUUID();
             var answer = chat.ask("alice", chatId, "billing", attack, Locale.ENGLISH);
-            String conversationId = UUID.nameUUIDFromBytes(("alice:" + chatId).getBytes(StandardCharsets.UTF_8)).toString();
+            String sessionId = UUID.nameUUIDFromBytes(("alice:" + chatId).getBytes(StandardCharsets.UTF_8)).toString();
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("attack", attack);
             result.put("answer", answer.text());
             result.put("sources", answer.sources().stream()
                     .map(d -> d.getMetadata().get("source") + " (" + d.getMetadata().get("audience") + ")").toList());
             result.put("events", List.copyOf(EVENTS));
-            result.put("memory", jdbc.sql("SELECT type, content FROM spring_ai_chat_memory WHERE conversation_id = ? ORDER BY sequence_id")
-                    .param(conversationId).query((rs, n) -> rs.getString(1) + ": " + rs.getString(2)).list());
-            result.put("refunds", jdbc.sql("SELECT order_number, status, reason FROM refunds WHERE customer_id = 'alice'")
+            result.put("memory", jdbc.sql("SELECT message_type, message_content FROM ai_session_event WHERE session_id = ? ORDER BY seq")
+                    .param(sessionId).query((rs, n) -> rs.getString(1) + ": " + rs.getString(2)).list());
+            result.put("refunds", jdbc.sql("SELECT order_number, amount, reason FROM refunds WHERE customer_id = 'alice'")
                     .query((rs, n) -> rs.getString(1) + " " + rs.getString(2) + " " + rs.getString(3)).list());
             result.put("paymentCalls", Mockito.mockingDetails(payments).getInvocations().size());
             results.add(result);

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { CodeView, LabFrame, Pill } from './LabFrame';
 
 /*
- * One support question through ToolCallingAdvisor (Spring AI 2.0.2), with the lesson's OrderTools, ModelSafeToolErrors and
+ * One support question through ToolCallingAdvisor (Spring AI 2.1.0; the loop and limit rules are the same as on 2.0.2), with the lesson's OrderTools, ModelSafeToolErrors and
  * tool limits. Checked against the real classes:
  * - The advisor calls the model, runs the tool calls it returns, appends the results and calls the model again, until the model
  *   answers in text. Each model call sees the whole exchange so far.

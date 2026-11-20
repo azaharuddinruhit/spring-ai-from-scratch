@@ -1,7 +1,7 @@
 #!/bin/bash
 # Compiles the lesson code in code/main and code/test, and runs its JUnit tests.
 # Needs cp.arg, the classpath of pom.xml (Windows separators), written once with:
-#   mvn -q dependency:build-classpath -Dmdep.outputFile=cp.txt && printf -- '-cp "out;%s"' "$(cat cp.txt)" > cp.arg
+#   mvn -q dependency:build-classpath -Dmdep.outputFile=cp.txt && printf -- '-cp "out;%s"' "$(tr '\\' / < cp.txt)" > cp.arg
 cd "$(dirname "$0")" || exit 1
 rm -rf out && mkdir -p out
 find code/main code/test -name "*.java" > out/sources.txt

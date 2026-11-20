@@ -13,7 +13,7 @@ import ProjectTree from '@/components/ProjectTree.astro';
 A customer says the assistant gave a wrong answer. Your logs hold the question and the reply. Between them were an advisor
 chain, a query rewrite, an embedding call, a vector search, two or three model calls and a tool, and none of it left a trace.
 Spring AI already measures every one of those steps. This lesson exports them as OpenTelemetry traces and metrics, then puts a
-price on each model call. The first trace we recorded found a bug in the support app that no test had caught.
+price on each model call. The first trace we recorded showed a model call on every question that nobody had planned for.
 
 ## 1. Spring mental model
 
@@ -32,15 +32,16 @@ the way the calls nest:
   caption="The first support question as one trace (advisor spans left out). The tool loop adds one model call per tool call."
   code={`
 flowchart LR
-  C["spring.ai.chat.client<br/>7.5 s"] --> V["db.vector.client.operation<br/>pg_vector query"]
+  C["spring.ai.chat.client<br/>10.5 s"] --> V["db.vector.client.operation<br/>pg_vector query"]
   V --> E["gen_ai.client.operation<br/>embedding"]
-  C --> M1["gen_ai.client.operation<br/>chat, 412 tokens in"]
+  C --> M1["gen_ai.client.operation<br/>chat, 710 tokens in"]
   M1 -->|"tool call"| T["spring.ai.tool<br/>findOrder"]
-  T --> M2["gen_ai.client.operation<br/>chat, 201 tokens in"]
+  T --> M2["gen_ai.client.operation<br/>chat, 838 tokens in"]
 `}
 />
 
-These rules come from the 2.0.2 and Boot 4.1.2 classes and from running the support app:
+These rules come from the 2.0.2 and Boot 4.1.2 classes and from running the support app; the recordings on 2.1.0 and Boot 4.2.0
+show the same spans:
 
 - Boot 4 has one starter for this: `spring-boot-starter-opentelemetry`. It brings the OpenTelemetry SDK, the Micrometer tracing
   bridge and OTLP exporters for traces and metrics. The actuator isn't needed.
@@ -58,10 +59,11 @@ These rules come from the 2.0.2 and Boot 4.1.2 classes and from running the supp
 
 <TraceLab client:visible />
 
-Both versions are real recordings of the same two-question chat. With the Module 5 config, open `pg_vector query` on the first
-question: the vector store searched for the rewrite model's reply, not the customer's question. The answer still came out right,
-because the order question needed a tool rather than documents. Then switch to this lesson's config, turn the content switches on and open `execute_tool proposeRefund` on the second question.
-Only the tool's arguments show that the model proposed a refund nobody asked for.
+Both versions are real recordings of the same two-question chat. With the Module 5 config, look at the first question: before
+`pg_vector query`, a nested `spring_ai chat_client` sent the question to the model to be rewritten, and it came back unchanged.
+That was one model call in three and 6.3 seconds, for a question with no history to resolve. Then switch to this lesson's config:
+the first question goes straight to the search, and with the content switches on, `execute_tool findOrder` shows the order the
+tool returned. Only the follow-up is rewritten.
 
 ## 3. Idiomatic Java 25 & Gradle 9 code
 
@@ -165,7 +167,7 @@ class KnowledgeRagConfig {
                 // An order question finds no documents. The default would then replace it with a refusal, and the model
                 // would never call a tool. The system prompt keeps policy answers to the documents instead.
                 .queryAugmenter(ContextualQueryAugmenter.builder().allowEmptyContext(true).build())
-                // After memory (+ 200), so memory stores the question rather than the augmented prompt,
+                // After memory (+ 210), so memory stores the question rather than the augmented prompt,
                 // and before tool calling (+ 300), so it retrieves once per question.
                 .order(Ordered.HIGHEST_PRECEDENCE + 225)
                 .build();
@@ -389,15 +391,14 @@ for `gpt-5-nano`. To see your own traces locally, run any OpenTelemetry collecto
 ## 4. Production gotchas & security
 
 <Gotcha kind="cost" title="A query rewrite you didn't know you were paying for">
-`CompressionQueryTransformer` calls the model for every question. In our recording that was one call in three, and on the first
-question it searched for the model's reply, "Can you please provide the follow-up query to synthesize into a concise query?",
-instead of the question. Look at a trace of each `ChatClient` you build: advisors and transformers can make model calls of their
+`CompressionQueryTransformer` calls the model for every question. In our recording that was one call in three on the first
+question, to get the question back unchanged. With a 3B model, an earlier recording was worse: the search used the model's reply,
+"Can you please provide the follow-up query to synthesize into a concise query?", instead of the question. Look at a trace of each `ChatClient` you build: advisors and transformers can make model calls of their
 own, and they show up as nested `spring.ai.chat.client` spans.
 </Gotcha>
 
 <Gotcha kind="security" title="The content switches send customer data to your trace backend">
-With `include-content`, the `findOrder` span held the order's total, date and tracking number, and the `proposeRefund` span the
-refund. `log-prompt` and `log-completion` write the whole conversation into your logs. Turn them on to debug, in one environment,
+With `include-content`, the `findOrder` span held the order's total, date and tracking number. `log-prompt` and `log-completion` write the whole conversation into your logs. Turn them on to debug, in one environment,
 for a short time. The vector span's query text is recorded whatever you set. The question is redacted by then, because
 `PiiRedactionAdvisor` runs before retrieval; Lesson 3 covers the rest.
 </Gotcha>
@@ -415,9 +416,9 @@ token metric overstate a cached prompt. `TokenCostMeter` reads `Usage.getCacheRe
 </Gotcha>
 
 <Gotcha kind="cost" title="Read the token counts, don't estimate them">
-The same tool loop sent 412 input tokens to the model, then 201 after the tool ran, although the second prompt was longer:
-llama3.2's chat template puts the tool definitions only into a prompt that ends with a user message. Templates, tokenizers and
-providers all count differently. Budget from `gen_ai.client.token.usage`, not from the length of your prompts.
+The follow-up's rewrite returned a question of about 15 tokens and reported 252 output tokens: a reasoning model's output
+count includes the reasoning, which the reply never shows. Templates, tokenizers, reasoning and providers all change the count.
+Budget from `gen_ai.client.token.usage`, not from the length of your prompts and replies.
 </Gotcha>
 
 ## Recap

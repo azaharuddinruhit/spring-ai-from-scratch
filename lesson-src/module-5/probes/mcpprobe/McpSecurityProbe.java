@@ -108,7 +108,7 @@ public class McpSecurityProbe {
 
     static String[] common(String... more) {
         List<String> a = new ArrayList<>(List.of("--spring.ai.openai.api-key=dummy", "--spring.ai.model.chat=none", "--spring.ai.model.embedding=none",
-                "--spring.ai.vectorstore.type=none", "--spring.ai.chat.memory.repository.jdbc.initialize-schema=never", "--logging.level.root=ERROR"));
+                "--spring.ai.vectorstore.type=none", "--spring.ai.session.repository.jdbc.initialize-schema=never", "--logging.level.root=ERROR"));
         a.addAll(List.of(more));
         return a.toArray(String[]::new);
     }

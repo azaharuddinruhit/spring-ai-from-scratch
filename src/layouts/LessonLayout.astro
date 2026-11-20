@@ -4,7 +4,7 @@ import BaseLayout from './BaseLayout.astro';
 import Sidebar from '@/components/Sidebar.astro';
 import Breakable from '@/components/Breakable.astro';
 import { publishedSequence, withBase, type NavModule } from '@/lib/course';
-import { PREVIEW_STACK, STACK } from '@/data/versions';
+import { STACK as stack } from '@/data/versions';
 
 interface Props {
   nav: NavModule[];
@@ -18,8 +18,6 @@ interface Props {
 
 const { nav, id, title, description, headings, sectionMinutes } = Astro.props;
 const module = nav.find((m) => m.navLessons.some((l) => l.id === id))!;
-const preview = module.navLessons.find((l) => l.id === id)!.preview === true;
-const stack = preview ? PREVIEW_STACK : STACK;
 const sequence = publishedSequence(nav);
 const index = sequence.findIndex((l) => l.id === id);
 const previous = sequence[index - 1];
@@ -57,18 +55,7 @@ const sections = toc.map((h, i) => ({ slug: h.slug, text: h.text, minutes: secti
         <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.5rem] sm:leading-[1.1] dark:text-white"><Breakable text={title} /></h1>
         <p class="mt-4 text-lg leading-relaxed text-slate-600 dark:text-slate-400">{description}</p>
         <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">
-          {
-            preview ? (
-              <>
-                Preview, written for Java {stack.java}, Spring Boot {stack.springBoot}, Spring AI {stack.springAi} and Gradle {stack.gradle}.
-                These are release candidates: the code was checked against them, and the lesson moves to the release when it is out.
-              </>
-            ) : (
-              <>
-                Written for Java {stack.java}, Spring Boot {stack.springBoot}, Spring AI {stack.springAi} and Gradle {stack.gradle}.
-              </>
-            )
-          }
+          Written for Java {stack.java}, Spring Boot {stack.springBoot}, Spring AI {stack.springAi} and Gradle {stack.gradle}.
         </p>
 
         <div class="lesson-prose mt-6">

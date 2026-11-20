@@ -8,7 +8,6 @@ import Gotcha from '@/components/Gotcha.astro';
 import ToolSearchLab from '@/components/islands/ToolSearchLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 import { buildGradle } from '@/data/snippets';
-import { PREVIEW_STACK } from '@/data/versions';
 
 **You'll need:** an OpenAI-compatible chat model that calls tools; this lesson's recordings used a 27B Qwen 3 reasoning model.
 For the decision profile, Ollama with `d1-omni:600m`. Lesson 2.3 introduces decision models. This lesson is its own small project.
@@ -57,7 +56,7 @@ sequenceDiagram
 | `vector` | embedding similarity in a `VectorStore` | none | a `VectorStore` bean |
 | `decision` | one decision-model call: the best tool, and whether any tool applies | applicability 0.5 | a `DecisionModel` bean |
 
-These rules come from the 2.1.0-RC2 classes and from running them:
+These rules come from the 2.1.0 classes and from running them:
 
 - The advisor keeps one index per session and reads the session from the request context, under
   `chat_memory_conversation_id` unless you set `session-id-key-name`. A request without it fails with
@@ -97,7 +96,7 @@ Things to try:
 The chat model goes through the OpenAI starter, so any OpenAI-compatible server works. The Ollama starter is there for the
 decision profile, and the tool search starter brings the advisor, its auto-configuration and Lucene:
 
-<CodeFile title="build.gradle" lang="groovy" lines="3,22,28,29,30" code={buildGradle(['spring-ai-starter-model-openai', 'spring-ai-starter-model-ollama', 'spring-ai-starter-tool-search-advisor'], PREVIEW_STACK)} />
+<CodeFile title="build.gradle" lang="groovy" lines="3,22,28,29,30" code={buildGradle(['spring-ai-starter-model-openai', 'spring-ai-starter-model-ollama', 'spring-ai-starter-tool-search-advisor'])} />
 
 The configuration turns tool search on with Lucene and three tools per search, and sets the app's own session key:
 
@@ -127,7 +126,7 @@ spring:
           tool-index-type: lucene
           # Spring AI uses it only when the model doesn't say how many tools it wants; BoundedToolIndex makes it a limit.
           max-results: 3
-          # The default key is ChatMemory.CONVERSATION_ID, which 2.1 deprecates for removal.
+          # The default key is the memory advisors' conversation id; this app has no memory, so it names its own.
           session-id-key-name: support_session_id
 ```
 </CodeFile>
@@ -309,7 +308,7 @@ import org.springframework.ai.tool.toolsearch.ToolSearchResponse;
 /**
  * Keeps every search between one and {@code maxResults} tools. The model chooses how many tools a search returns, and the
  * advisor's max-results applies only when it doesn't: a model that asks for 10 gets 10, and one that asks for 0 fails the
- * request with the Lucene index (Spring AI 2.1.0-RC2).
+ * request with the Lucene index (Spring AI 2.1.0).
  */
 record BoundedToolIndex(ToolIndex delegate, int maxResults) implements ToolIndex {
 
@@ -591,10 +590,10 @@ Tool search hides tool definitions from the prompt. It doesn't take tools away f
 the customer from the tool context, and confirmation before anything happens.
 </Gotcha>
 
-<Gotcha kind="migration" title="Written against a release candidate">
-`DecisionToolIndex` is new in Spring AI 2.1, and this lesson was checked against 2.1.0-RC2. The default session key is the value
-of `ChatMemory.CONVERSATION_ID`, which 2.1 deprecates for removal, so the app sets its own. Names and defaults can still change
-before the release. The lesson moves to the release when it's out.
+<Gotcha kind="reliability" title="One id for the search and the memory">
+The advisor's default session key, `chat_memory_conversation_id`, is the key session memory reads (`MemoryAdvisor.CONVERSATION_ID`).
+In an app with memory, leave `session-id-key-name` unset and pass the conversation id once: the tool index and the history then
+follow the same conversation. This app has no memory, so it names its own key.
 </Gotcha>
 
 ## Recap

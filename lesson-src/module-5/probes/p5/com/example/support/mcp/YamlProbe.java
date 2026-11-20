@@ -15,7 +15,7 @@ public class YamlProbe {
         try (var ctx = new SpringApplicationBuilder(App.class).run("--spring.config.location=file:yaml/support-application.yaml",
                 "--spring.main.web-application-type=none", "--SHIPPING_MCP_CLIENT_SECRET=x", "--logging.level.root=WARN",
                 "--spring.ai.mcp.server.enabled=false", "--spring.ai.openai.api-key=dummy", "--spring.ai.model.chat=none",
-                "--spring.ai.model.embedding=none", "--spring.ai.vectorstore.type=none", "--spring.ai.chat.memory.repository.jdbc.initialize-schema=never")) {
+                "--spring.ai.model.embedding=none", "--spring.ai.vectorstore.type=none", "--spring.ai.session.repository.jdbc.initialize-schema=never")) {
             System.out.println("allowed=" + ctx.getBean(SupportMcpProperties.class).allowedTools());
             var common = ctx.getBean(McpClientCommonProperties.class);
             System.out.println("initialized=" + common.isInitialized() + " timeout=" + common.getRequestTimeout());

@@ -20,11 +20,11 @@ spring:
         dimensions: 1536
         distance-type: cosine-distance
         index-type: hnsw
-    chat:
-      memory:
-        repository:
-          jdbc:
-            initialize-schema: always
+    session:
+      time-to-live: 30d   # a conversation is deleted this long after it started
+      repository:
+        jdbc:
+          initialize-schema: always
     tools:
       limits:
         max-calls-per-tool-default: 5
@@ -74,8 +74,6 @@ management:
 support:
   mcp:
     allowed-tools: track_shipment
-  privacy:
-    chat-retention: 30d   # a conversation nobody has used for this long is deleted
   knowledge:
     rewrite-model: gpt-5-nano
   cost:

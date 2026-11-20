@@ -1,14 +1,22 @@
 import { useState } from 'react';
 import { CodeView, LabFrame, Pill } from './LabFrame';
 
-type Field = 'model' | 'temperature' | 'maxTokens';
+/*
+ * Anthropic since Spring AI 2.1 (API 2026-10-21) drops temperature, topP and topK with a warning, so the lab uses the options it
+ * still sends. ChatModel.call(Prompt) merges nothing: Prompt options replace the model defaults (unchanged from 2.0).
+ */
+type Field = 'model' | 'maxTokens' | 'stopSequences';
 type Layer = Record<Field, string | null>;
 type Mode = 'chatClient' | 'chatModel';
 type Source = 'request' | 'client' | 'model' | 'none';
 
-const FIELDS: Field[] = ['model', 'temperature', 'maxTokens'];
+const FIELDS: Field[] = ['model', 'maxTokens', 'stopSequences'];
 
-const MODEL_DEFAULTS: Layer = { model: 'claude-haiku-4-5', temperature: '0.7', maxTokens: '4096' };
+/** application.yml from the lesson: no stop sequences. */
+const MODEL_DEFAULTS: Layer = { model: 'claude-haiku-4-5', maxTokens: '4096', stopSequences: null };
+
+/** What a field starts at when you tick it in an editable layer. */
+const NEW_VALUE: Record<Field, string> = { model: 'claude-haiku-4-5', maxTokens: '1024', stopSequences: 'END' };
 
 const SOURCE_STYLE: Record<Source, { label: string; className: string }> = {
   request: { label: '.options(...) on the request', className: 'bg-brand-100 text-brand-800 dark:bg-brand-500/20 dark:text-brand-200' },
@@ -29,19 +37,37 @@ function resolve(mode: Mode, client: Layer, request: Layer): Record<Field, { val
     FIELDS.map((f) => {
       if (mode === 'chatModel') {
         // ChatModel.call(Prompt) doesn't merge: a non-null Prompt options object is used as-is.
-        if (!requestHasOptions) return [f, { value: MODEL_DEFAULTS[f], source: 'model' }];
+        if (!requestHasOptions) return [f, { value: MODEL_DEFAULTS[f], source: MODEL_DEFAULTS[f] === null ? 'none' : 'model' }];
         return [f, request[f] !== null ? { value: request[f], source: 'request' } : { value: null, source: 'none' }];
       }
       if (request[f] !== null) return [f, { value: request[f], source: 'request' }];
       if (client[f] !== null) return [f, { value: client[f], source: 'client' }];
-      return [f, { value: MODEL_DEFAULTS[f], source: 'model' }];
+      return [f, { value: MODEL_DEFAULTS[f], source: MODEL_DEFAULTS[f] === null ? 'none' : 'model' }];
     }),
   ) as Record<Field, { value: string | null; source: Source }>;
 }
 
+/** Stop sequences are typed comma-separated. */
+const stopList = (value: string) =>
+  value
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+
+function argument(f: Field, value: string): string {
+  if (f === 'model') return `"${value}"`;
+  if (f === 'stopSequences') return `List.of(${stopList(value).map((v) => `"${v}"`).join(', ')})`;
+  return value;
+}
+
+function shown(f: Field, value: string | null): string {
+  if (value === null) return 'null';
+  return f === 'stopSequences' ? `[${stopList(value).join(', ')}]` : value;
+}
+
 function builderLines(layer: Layer, indent: string): string {
   return FIELDS.filter((f) => layer[f] !== null)
-    .map((f) => `${indent}.${f}(${f === 'model' ? `"${layer[f]}"` : layer[f]})`)
+    .map((f) => `${indent}.${f}(${argument(f, layer[f] as string)})`)
     .join('\n');
 }
 
@@ -100,9 +126,9 @@ function LayerEditor({
               type="checkbox"
               className="accent-brand-600"
               checked={layer[f] !== null}
-              onChange={(e) => onChange({ ...layer, [f]: e.target.checked ? MODEL_DEFAULTS[f] : null })}
+              onChange={(e) => onChange({ ...layer, [f]: e.target.checked ? NEW_VALUE[f] : null })}
             />
-            <span className="w-20 font-mono text-slate-600 dark:text-slate-400">{f}</span>
+            <span className="w-24 shrink-0 font-mono text-slate-600 dark:text-slate-400">{f}</span>
             <input
               className="min-w-0 flex-1 rounded border border-slate-300 bg-white px-2 py-1 font-mono text-xs text-slate-900 disabled:bg-slate-100 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:disabled:bg-slate-800"
               value={layer[f] ?? ''}
@@ -120,8 +146,8 @@ function LayerEditor({
 
 export default function OptionsMergeLab() {
   const [mode, setMode] = useState<Mode>('chatClient');
-  const [client, setClient] = useState<Layer>({ model: null, temperature: '0.2', maxTokens: null });
-  const [request, setRequest] = useState<Layer>({ model: null, temperature: null, maxTokens: '256' });
+  const [client, setClient] = useState<Layer>({ model: null, maxTokens: '1024', stopSequences: null });
+  const [request, setRequest] = useState<Layer>({ model: null, maxTokens: null, stopSequences: 'END' });
   const [log, setLog] = useState<LogEntry[]>([]);
 
   const effective = resolve(mode, client, request);
@@ -148,8 +174,8 @@ export default function OptionsMergeLab() {
           <dl className="space-y-2 text-xs">
             {FIELDS.map((f) => (
               <div key={f} className="flex gap-2">
-                <dt className="w-20 font-mono text-slate-500">{f}</dt>
-                <dd className="font-mono text-slate-900 dark:text-slate-100">{MODEL_DEFAULTS[f]}</dd>
+                <dt className="w-24 shrink-0 font-mono text-slate-500">{f}</dt>
+                <dd className="font-mono text-slate-900 dark:text-slate-100">{MODEL_DEFAULTS[f] === null ? 'not set' : shown(f, MODEL_DEFAULTS[f])}</dd>
               </div>
             ))}
           </dl>
@@ -171,7 +197,7 @@ export default function OptionsMergeLab() {
             {FIELDS.map((f) => (
               <tr key={f} className="border-t border-slate-100 dark:border-slate-800">
                 <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400">{f}</td>
-                <td className="px-3 py-2 font-mono font-semibold text-slate-900 dark:text-white">{effective[f].value ?? 'null'}</td>
+                <td className="px-3 py-2 font-mono font-semibold text-slate-900 dark:text-white">{shown(f, effective[f].value)}</td>
                 <td className="px-3 py-2">
                   <span className={`rounded px-1.5 py-0.5 text-[0.7rem] font-medium ${SOURCE_STYLE[effective[f].source].className}`}>
                     {SOURCE_STYLE[effective[f].source].label}
@@ -222,8 +248,8 @@ export default function OptionsMergeLab() {
             active={false}
             onClick={() =>
               record({
-                call: 'var strict = options.mutate().temperature(0.0).build()',
-                outcome: `New instance: temperature=0.0. The original options object still has temperature=${effective.temperature.value ?? 'null'}`,
+                call: 'var shorter = options.mutate().maxTokens(20).build()',
+                outcome: `New instance: maxTokens=20. The original options object still has maxTokens=${effective.maxTokens.value ?? 'null'}`,
                 ok: true,
               })
             }

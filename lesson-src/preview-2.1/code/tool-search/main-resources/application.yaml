@@ -22,5 +22,5 @@ spring:
           tool-index-type: lucene
           # Spring AI uses it only when the model doesn't say how many tools it wants; BoundedToolIndex makes it a limit.
           max-results: 3
-          # The default key is ChatMemory.CONVERSATION_ID, which 2.1 deprecates for removal.
+          # The default key is the memory advisors' conversation id; this app has no memory, so it names its own.
           session-id-key-name: support_session_id

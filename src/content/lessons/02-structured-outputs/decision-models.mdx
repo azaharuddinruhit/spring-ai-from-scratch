@@ -8,7 +8,6 @@ import Gotcha from '@/components/Gotcha.astro';
 import DecisionLab from '@/components/islands/DecisionLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 import { buildGradle } from '@/data/snippets';
-import { PREVIEW_STACK } from '@/data/versions';
 
 **You'll need:** Ollama with `d1-omni:600m` (849 MB; we ran Ollama 0.40.16). This lesson is its own small project.
 
@@ -46,7 +45,7 @@ flowchart LR
 `}
 />
 
-These rules come from the 2.1.0-RC2 classes and from running `d1-omni:600m` in Ollama:
+These rules come from the 2.1.0 classes and from running `d1-omni:600m` in Ollama:
 
 - `spring-ai-starter-model-ollama` gives you an `OllamaDecisionModel`, which calls Ollama's `/v1/systemone` endpoint.
   `spring.ai.model.decision` picks the implementation and defaults to `ollama`; `spring.ai.ollama.decision.model` sets the model.
@@ -81,9 +80,9 @@ Things to try:
 
 <ProjectTree />
 
-The build needs only the Ollama starter. The preview lessons use the release candidates:
+The build needs only the Ollama starter:
 
-<CodeFile title="build.gradle" lang="groovy" lines="3,22,28" code={buildGradle(['spring-ai-starter-model-ollama'], PREVIEW_STACK)} />
+<CodeFile title="build.gradle" lang="groovy" lines="3,22,28" code={buildGradle(['spring-ai-starter-model-ollama'])} />
 
 The thresholds are configuration, because you set them from your own tickets:
 
@@ -511,11 +510,6 @@ is what sends nonsense to a person, so don't set it to zero.
 The first call after startup took about 10 seconds while Ollama loaded the model; later calls took well under one. With
 `pull-model-strategy: when_missing`, a fresh machine also downloads 849 MB at startup. Pull the model when you build the image,
 and send one warm-up call before the app takes traffic.
-</Gotcha>
-
-<Gotcha kind="migration" title="Written against a release candidate">
-`DecisionModel` is new in Spring AI 2.1, and this lesson was checked against 2.1.0-RC2. Class and property names can still
-change before the release. The lesson moves to the release when it's out.
 </Gotcha>
 
 ## Recap

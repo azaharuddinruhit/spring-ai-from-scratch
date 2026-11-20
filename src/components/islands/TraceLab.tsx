@@ -4,9 +4,10 @@ import recorded from '../../data/recorded-traces.json';
 
 /*
  * Recorded, not invented (lesson-src/module-6/probes/trace-to-sandbox.py): every span of a two-turn conversation with the
- * support app, Spring AI 2.0.2 and Boot 4.1.2, llama3.2:3b and nomic-embed-text in Ollama, pgvector in PostgreSQL 17, on a
- * CPU. "before" is the Module 5 RAG config; "after" is this lesson's, recorded with log-prompt, log-completion and the tools'
- * include-content switched on. Span ids, names, attributes and timings are as the tracer saw them.
+ * support app, Spring AI 2.1.0 and Boot 4.2.0, chat on a 27B Qwen 3 reasoning model (labelled qwen-27b; the rewrite ran on the
+ * same model, because the server has no smaller one), nomic-embed-text in Ollama, pgvector in PostgreSQL 17. "before" is the
+ * Module 5 RAG config; "after" is this lesson's, recorded with log-prompt, log-completion and the tools' include-content switched
+ * on. Span ids, names, attributes and timings are as the tracer saw them.
  */
 
 type Kind = 'client' | 'advisor' | 'model' | 'embedding' | 'vector' | 'tool';
@@ -33,8 +34,11 @@ interface Turn {
 
 const RUNS = recorded as unknown as Record<Version, Turn[]>;
 
-/** The models the recording used, and the OpenAI models the support app uses in production. */
-const PRODUCTION_MODEL: Record<string, string> = { 'llama3.2:3b': 'gpt-5-mini', 'qwen2.5:1.5b': 'gpt-5-nano' };
+/**
+ * The OpenAI model the support app uses in production for each recorded call: gpt-5-mini answers, and from this lesson on the
+ * query rewrite runs on gpt-5-nano (support.knowledge.rewrite-model). The recording ran both on one model.
+ */
+const productionModel = (version: Version, rewrite: boolean) => (version === 'after' && rewrite ? 'gpt-5-nano' : 'gpt-5-mini');
 /** USD per million tokens, OpenAI Standard tier list prices on 19 November 2026. */
 const PRICE: Record<string, { input: number; output: number }> = {
   'gpt-5-mini': { input: 0.25, output: 2.0 },
@@ -64,17 +68,17 @@ const BAR: Record<Kind, string> = {
 /** What to look at first in each recording. */
 const STORY: Record<Version, [string, string]> = {
   before: [
-    'Before the search, CompressionQueryTransformer sent this first question to the model, and the vector store searched for its reply: "Can you please provide the follow-up query to synthesize into a concise query?". Nothing in the answer shows it; the db.vector.query.content attribute does.',
-    'Three model calls again: the rewrite, then the answer, then one more because the model called proposeRefund for a question about refund times. With content off, the trace shows that the tool ran but not what it was asked to do.',
+    'Before the search, CompressionQueryTransformer sent this first question to the model to be rewritten and got it back unchanged: one model call in three and 6.3 s spent on a question with no history. Nothing in the answer shows it; the nested chat_client span does, and db.vector.query.content holds what came back.',
+    'Two model calls: the rewrite, which folded order 1042 from the first turn into the question, then the answer. No tool this time: the refund time came from the knowledge base. With content off, the trace shows what was searched for but not what the model was sent.',
   ],
   after: [
-    'A first question has no earlier answer to resolve against, so it is searched as asked. One model call fewer, and the search finds what the customer typed. With content on, the tool span holds the order: total, date and tracking number.',
-    'A follow-up, so the rewrite runs, on the smaller model. Its 10.7 s is not how fast the small model is: Ollama first had to load a second model on this CPU-only machine (alone, a cold load took 2.8 s of a 3.5 s call), and a hosted model has no load step. With content on, the proposeRefund span shows the model proposing a refund of order 1042 that nobody asked for.',
+    'A first question has no earlier answer to resolve against, so it is searched as asked: one model call fewer than with the Module 5 config. With content on, the findOrder span holds the order: total, date and tracking number.',
+    'A follow-up, so the rewrite runs. In production it runs on gpt-5-nano; this recording ran it on the same 27B model, the only one on the server. The rewritten question is about 15 tokens, so most of its 252 output tokens and 11.8 s were the model reasoning. With content on, the logged completion shows the rewritten question.',
   ],
 };
 
-/** The first turn's story is the search, the second turn's the tool call. */
-const focusOf = (turn: Turn, index: number) => turn.spans.find((s) => s.kind === (index === 0 ? 'vector' : 'tool'))!.id;
+/** Both turns' story starts at the search: what was searched for shows whether the rewrite ran. */
+const focusOf = (turn: Turn) => turn.spans.find((s) => s.kind === 'vector')!.id;
 
 const attr = (span: Span, key: string) => span.attrs.find(([k]) => k === key)?.[1];
 
@@ -104,12 +108,12 @@ export default function TraceLab() {
   const [advisors, setAdvisors] = useState(false);
   const [content, setContent] = useState(true);
   const turn = RUNS[version][index];
-  const [selected, setSelected] = useState(() => focusOf(RUNS.before[0], 0));
+  const [selected, setSelected] = useState(() => focusOf(RUNS.before[0]));
 
   const pick = (v: Version, i: number) => {
     setVersion(v);
     setIndex(i);
-    setSelected(focusOf(RUNS[v][i], i));
+    setSelected(focusOf(RUNS[v][i]));
   };
 
   const byId = new Map(turn.spans.map((s) => [s.id, s]));
@@ -129,16 +133,22 @@ export default function TraceLab() {
   const tokens = (s: Span, key: string) => Number(attr(s, key) ?? 0);
   const input = calls.reduce((n, s) => n + tokens(s, 'gen_ai.usage.input_tokens'), 0);
   const output = calls.reduce((n, s) => n + tokens(s, 'gen_ai.usage.output_tokens'), 0);
+  /** The rewrite is a model call inside a nested ChatClient call: the query transformer's own client. */
+  const isRewrite = (s: Span) => {
+    let p = s.parent ? byId.get(s.parent) : undefined;
+    while (p && p.kind !== 'client') p = p.parent ? byId.get(p.parent) : undefined;
+    return !!p?.parent;
+  };
   const dollars = calls.reduce((sum, s) => {
-    const price = PRICE[PRODUCTION_MODEL[attr(s, 'gen_ai.request.model') ?? '']];
+    const price = PRICE[productionModel(version, isRewrite(s))];
     return sum + (tokens(s, 'gen_ai.usage.input_tokens') * price.input + tokens(s, 'gen_ai.usage.output_tokens') * price.output) / 1e6;
   }, 0);
-  const smaller = calls.some((s) => attr(s, 'gen_ai.request.model') === 'qwen2.5:1.5b');
+  const smaller = calls.some((s) => productionModel(version, isRewrite(s)) === 'gpt-5-nano');
 
   return (
     <LabFrame
       title="Trace a support request"
-      hint="Recorded from the support app with llama3.2:3b in Ollama: two turns of one chat, before and after this lesson. Pick a span to see what it records."
+      hint="Recorded from the support app with a 27B Qwen 3 reasoning model: two turns of one chat, before and after this lesson. Pick a span to see what it records."
     >
       <div className="grid gap-3 sm:grid-cols-[auto_1fr]">
         <fieldset className="min-w-0">
@@ -193,7 +203,7 @@ export default function TraceLab() {
         <span className="font-medium tabular-nums">${(dollars * 10_000).toFixed(2)}</span> per 10,000 such requests.
       </p>
       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-        Token counts are llama3.2's and OpenAI's tokenizer counts differently. Times are from a CPU-only machine, and output lengths vary run to run.
+        Token counts are the Qwen model's, and OpenAI's tokenizer counts differently. Output tokens include the model's reasoning, and lengths and times vary run to run.
       </p>
 
       <ol className="mt-3 rounded-md border border-slate-200 py-1 dark:border-slate-700/70" aria-label="Spans">

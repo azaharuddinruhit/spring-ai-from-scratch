@@ -4,7 +4,7 @@ import recorded from '../../data/recorded-decisions.json';
 
 /*
  * Recorded, not invented (lesson-src/preview-2.1/probes/recording-to-sandbox.py): twelve preset tickets sent to
- * OllamaDecisionModel with d1-omni:600m (Spring AI 2.1.0-RC2), the router's three questions in one call. The chat side asked
+ * OllamaDecisionModel with d1-omni:600m (recorded on Spring AI 2.1.0-RC2; TicketRouterIT gets the same routes on 2.1.0), the router's three questions in one call. The chat side asked
  * a 27B Qwen 3 reasoning model the injection and intent questions as text. The sliders re-route these numbers with the
  * rules of TicketRouter.choose(); nothing here calls a model.
  */

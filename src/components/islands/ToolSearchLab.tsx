@@ -4,7 +4,7 @@ import recorded from '../../data/recorded-tool-search.json';
 
 /*
  * Recorded, not invented (lesson-src/preview-2.1/probes/tool-search-to-sandbox.py): six customer requests answered by a 27B
- * Qwen 3 reasoning model through ToolSearchToolCallingAdvisor (Spring AI 2.1.0-RC2) with each tool index, with Lucene limited to
+ * Qwen 3 reasoning model through ToolSearchToolCallingAdvisor (recorded on Spring AI 2.1.0-RC2; 2.1.0 changed none of the classes involved) with each tool index, with Lucene limited to
  * three results, and with all ten tools and no search. The decision index used d1-omni:600m. Every model call, search and answer
  * is as recorded; only the decision threshold slider computes something: what DecisionToolIndex would have returned for the
  * recorded answers at another threshold.

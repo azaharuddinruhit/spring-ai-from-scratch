@@ -6,8 +6,8 @@
 export interface Lesson {
   slug: string;
   title: string;
-  /** Teaches a Spring AI release candidate (PREVIEW_STACK in src/data/versions.ts) and is marked as a preview. */
-  preview?: true;
+  /** Its own small project rather than a step of the module's app (the project tree then lists only its files). */
+  standalone?: true;
 }
 
 export interface Module {
@@ -30,7 +30,7 @@ export const CURRICULUM: Module[] = [
       { slug: 'chatclient-fluent-api', title: 'The ChatClient Fluent API' },
       { slug: 'multi-provider-portability', title: 'Multi-Provider Portability' },
       { slug: 'prompts-and-multimodality', title: 'Prompt Engineering & Multimodality' },
-      { slug: 'message-parts-and-reasoning', title: 'Message Parts & Reasoning', preview: true },
+      { slug: 'message-parts-and-reasoning', title: 'Message Parts & Reasoning', standalone: true },
     ],
   },
   {
@@ -42,7 +42,7 @@ export const CURRICULUM: Module[] = [
     lessons: [
       { slug: 'structured-output-converters', title: 'The StructuredOutputConverter Ecosystem' },
       { slug: 'native-json-schema', title: 'Native JSON Schema & Strict Mode' },
-      { slug: 'decision-models', title: 'Decision Models', preview: true },
+      { slug: 'decision-models', title: 'Decision Models', standalone: true },
     ],
   },
   {
@@ -53,7 +53,7 @@ export const CURRICULUM: Module[] = [
     lessons: [
       { slug: 'advisor-chain-internals', title: 'Advisor Chain Internals' },
       { slug: 'custom-advisors', title: 'Built-in & Custom Advisors' },
-      { slug: 'chat-memory', title: 'Conversation Memory with ChatMemory' },
+      { slug: 'chat-memory', title: 'Conversation Memory with Sessions' },
     ],
   },
   {
@@ -65,7 +65,7 @@ export const CURRICULUM: Module[] = [
       { slug: 'etl-pipeline', title: 'The ETL Pipeline' },
       { slug: 'embeddings-and-vector-stores', title: 'Embeddings & VectorStore' },
       { slug: 'modular-rag', title: 'Modular RAG with RetrievalAugmentationAdvisor' },
-      { slug: 'decision-filter-and-reranker', title: 'Decision Filter & Reranker', preview: true },
+      { slug: 'decision-filter-and-reranker', title: 'Decision Filter & Reranker', standalone: true },
     ],
   },
   {
@@ -79,7 +79,7 @@ export const CURRICULUM: Module[] = [
       { slug: 'model-context-protocol', title: 'Model Context Protocol (MCP)' },
       { slug: 'human-in-the-loop', title: 'Human in the Loop' },
       { slug: 'agentic-workflows', title: 'Agentic Workflows' },
-      { slug: 'tool-search', title: 'Tool Search & DecisionToolIndex', preview: true },
+      { slug: 'tool-search', title: 'Tool Search & DecisionToolIndex', standalone: true },
     ],
   },
   {

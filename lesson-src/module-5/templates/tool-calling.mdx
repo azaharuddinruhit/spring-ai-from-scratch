@@ -32,7 +32,7 @@ flowchart LR
 `}
 />
 
-These rules come from the 2.0.2 classes and from tests we ran against them:
+These rules come from the 2.1.0 classes and from tests we ran against them:
 
 - `ChatClient` registers `ToolCallingAdvisor` itself, at `HIGHEST_PRECEDENCE + 300`. Every model call in the loop sends the whole
   exchange so far, including earlier tool calls and their results. Advisors ordered after it run once per model call (Module 3).
@@ -157,7 +157,7 @@ The service sets the tool context and reads the finish reason. Without that chec
 "Tool call limit (5) exceeded for tool 'findOrder'" as the answer:
 
 <CodeFile title="src/main/java/com/example/support/chat/SupportChatService.java">
-@@CODE main/com/example/support/chat/SupportChatService.java | toolContext; FINISH_REASON@@
+@@CODE lesson1/SupportChatService.java | toolContext; FINISH_REASON@@
 </CodeFile>
 
 Set limits that fit your tools. The defaults allow 40 calls per tool and 150 per question, each one followed by a model call:
@@ -195,7 +195,7 @@ The tests call the tool methods directly, then run the real advisor against a sc
 The first four tests come from Module 3. The last two script a model that asks for Bob's order, and one that never stops asking:
 
 <CodeFile title="src/test/java/com/example/support/chat/SupportChatServiceTest.java">
-@@CODE test/com/example/support/chat/SupportChatServiceTest.java | "customerId": "bob"; should\(\)\.findForCustomer\("alice"; maxCallsPerTool\(3\); hasSize\(4\)@@
+@@CODE lesson1/SupportChatServiceTest.java | "customerId": "bob"; should\(\)\.findForCustomer\("alice"; maxCallsPerTool\(3\); hasSize\(4\)@@
 </CodeFile>
 
 ## 4. Production gotchas & security
@@ -228,14 +228,15 @@ what a real question takes, and keep tool results small: return a record with th
 Every tool definition goes with every model call. With dozens of tools, consider `ToolSearchToolCallingAdvisor`
 (`spring-ai-starter-tool-search-advisor`, enabled with `spring.ai.chat.client.tool-search-advisor.enabled=true`). It sends only a
 `toolSearchTool` at first, then adds the tools the model's searches find. In our test, a scripted model searched for "order" and the next
-call carried `findOrder` and `toolSearchTool`. It needs `ChatMemory.CONVERSATION_ID` on the request, and fails without it. The
-<a href={lessonHref('05-tools-mcp-agents/tool-search')}>Tool Search</a> preview lesson measures its indexes on Spring AI 2.1.
+call carried `findOrder` and `toolSearchTool`. It keeps the found tools per conversation, under the id that
+`SessionAdvisors.session(...)` sets, and fails without one. The <a href={lessonHref('05-tools-mcp-agents/tool-search')}>Tool
+Search</a> lesson measures its indexes.
 </Gotcha>
 
 <Gotcha kind="security" title="Keep tools that change things out of the model's reach">
 The model calls a tool whenever the conversation makes it seem right, and the conversation can include a customer's
 instructions or a poisoned document. Read-only tools scoped to the signed-in customer are safe to expose. A tool that refunds,
-cancels or deletes should only prepare the action for the customer to confirm. Lesson 3 builds that.
+cancels or deletes should wait until the customer confirms it. Lesson 3 marks the refund tool with `requiresConfirmation`.
 </Gotcha>
 
 <Gotcha kind="migration" title="defaultToolCallbacks is deprecated for removal">

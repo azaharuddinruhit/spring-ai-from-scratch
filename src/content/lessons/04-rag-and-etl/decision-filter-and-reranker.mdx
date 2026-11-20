@@ -8,7 +8,6 @@ import Gotcha from '@/components/Gotcha.astro';
 import ScreeningLab from '@/components/islands/ScreeningLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 import { buildGradle } from '@/data/snippets';
-import { PREVIEW_STACK } from '@/data/versions';
 
 **You'll need:** Ollama with `nomic-embed-text`, `d1-omni:600m` and `llama3.2:3b`. This lesson is its own small project; Lesson
 2.3 introduces the decision model.
@@ -47,7 +46,7 @@ applies its `Policy` in a fixed order, and the first rule that matches decides:
 | 3 | `is_relevant` | below 0.45 | `EXCLUDED` |
 | 4 | `contains_answer_evidence` | above 0.55 | `INCLUDED`, otherwise `EXCLUDED` |
 
-These rules come from the 2.1.0-RC2 classes and from running them:
+These rules come from the 2.1.0 classes and from running them:
 
 - Every comparison is strict: a passage with evidence exactly 0.55 is excluded. (`isYes(threshold)` in Lesson 2.3 is inclusive.)
 - A kept passage carries its class in the metadata key `decision.classification`. A `CONFLICTING` passage is kept, and the
@@ -85,7 +84,7 @@ Things to try:
 The decision post-processors live in `spring-ai-rag`, next to `RetrievalAugmentationAdvisor`; it also brings `SimpleVectorStore`.
 All three models run in Ollama:
 
-<CodeFile title="build.gradle" lang="groovy" lines="3,22,28,29" code={buildGradle(['spring-ai-starter-model-ollama', 'spring-ai-rag'], PREVIEW_STACK)} />
+<CodeFile title="build.gradle" lang="groovy" lines="3,22,28,29" code={buildGradle(['spring-ai-starter-model-ollama', 'spring-ai-rag'])} />
 
 Only the settings this app changes are in the configuration. The record's defaults are Spring AI's own:
 
@@ -584,11 +583,6 @@ base, and re-measure the policy on more questions before you rely on it.
 Six passages cost six filter calls of four questions each, then six reranker calls: about 6 and 2 seconds on this machine's CPU.
 Four calls at a time made no difference, because Ollama answered one request at a time. The 27B model behind the sandbox's labels
 took 6 to 47 seconds per passage, which is why it is the reference here, not the pipeline.
-</Gotcha>
-
-<Gotcha kind="migration" title="Written against a release candidate">
-`DecisionDocumentFilter` and `DecisionDocumentReranker` are new in Spring AI 2.1, and this lesson was checked against 2.1.0-RC2.
-Names and defaults can still change before the release. The lesson moves to the release when it's out.
 </Gotcha>
 
 ## Recap

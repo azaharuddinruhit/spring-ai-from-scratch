@@ -1,7 +1,6 @@
 ---
 import type { NavModule } from '@/lib/course';
 import Breakable from '@/components/Breakable.astro';
-import PreviewPill from '@/components/PreviewPill.astro';
 
 interface Section {
   slug: string;
@@ -67,7 +66,6 @@ const row = compact ? 'py-2' : 'py-1';
                   ]}
                 >
                   <Breakable text={lesson.title} />
-                  {lesson.preview && <PreviewPill />}
                 </a>
                 {lesson.id === currentId && sections && sections.length > 0 && (
                   <ol aria-label="On this page" class="-ml-px border-l border-brand-600 pb-1 dark:border-brand-400">
@@ -94,7 +92,6 @@ const row = compact ? 'py-2' : 'py-1';
               >
                 <span>
                   {lesson.title}
-                  {lesson.preview && <PreviewPill />}
                 </span>
                 <span class="shrink-0 text-xs italic">soon</span>
               </li>

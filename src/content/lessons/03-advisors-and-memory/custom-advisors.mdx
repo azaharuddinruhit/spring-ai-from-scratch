@@ -32,7 +32,8 @@ Two advisors ship in `spring-ai-client-chat`:
 - **`SafeGuardAdvisor`** blocks a call when the prompt contains a sensitive word. It lower-cases the text of every message in the
   prompt, system message and memory included, and checks each word with `String.contains`. On a match it returns its failure
   response (by default "I'm unable to respond to that due to sensitive content. Could we rephrase or discuss something else?")
-  and the model is never called.
+  and the model is never called. In 2.1 that reply's finish reason is `guardrailRefusal`, so `GuardrailRefusal.isRefusal(response)`
+  tells a blocked call from an answer.
 
 Both default to order `0`, which is rarely where you want them. Here is the order the lesson code uses, outermost first:
 
@@ -41,7 +42,7 @@ Both default to order `0`, which is rarely where you want them. Here is the orde
 | `HIGHEST_PRECEDENCE + 25` | `SafeGuardAdvisor` | A blocked call stops before anything is stored, logged or spent. |
 | `+ 50` | `TokenBudgetAdvisor` | Outside memory and the tool loop: a refused call stores nothing, and the usage it counts covers every tool round. |
 | `+ 100` | `PiiRedactionAdvisor` | Before memory and the logger, so neither ever holds the raw text. |
-| `+ 200` | `MessageChatMemoryAdvisor` | Its default. |
+| `+ 200`, `+ 210` | `SessionTurnAdvisor`, `SessionMemoryAdvisor` | The turn at its default; memory moved before the tool loop (previous lesson). |
 | `+ 250` | `AnswerLanguageAdvisor` | From the previous lesson: once per call, before the tool loop. |
 | `+ 280` | `SemanticCacheAdvisor` | On a separate FAQ client, just before tool calling, so a hit skips the tools and the model. |
 | `+ 300` | `ToolCallingAdvisor` | Added by `ChatClient`. |
@@ -55,8 +56,8 @@ Things to try:
 
 - Send **What is a classname?** The word `ssn` is inside `classname`, so the guard blocks a harmless question.
 - With the guard at `0`, send **I forgot my password**, then **Can you help with my invoice?** a few times. The guard runs after
-  memory, sees the earlier message in the prompt, and blocks every turn until the window drops it. Move the guard to
-  `HIGHEST_PRECEDENCE + 25` and the conversation recovers at once, because blocked calls are no longer stored.
+  memory, sees the earlier message in the prompt, and blocks every turn until `EventFilter.lastN(6)` stops sending it. Move the
+  guard to `HIGHEST_PRECEDENCE + 25` and the conversation recovers at once, because blocked calls are no longer stored.
 - Turn on redaction **after memory** and send the card number. The model gets `[card]`, but memory, and every later prompt,
   keep the real number. Move it **before memory**.
 
@@ -91,7 +92,7 @@ public final class PiiRedactionAdvisor implements BaseAdvisor {
 
     @Override
     public int getOrder() {
-        // Before memory (+200), so the conversation is stored already redacted.
+        // Before memory (+210), so the conversation is stored already redacted.
         return Ordered.HIGHEST_PRECEDENCE + 100;
     }
 
@@ -295,17 +296,19 @@ The configuration puts it all together. The support client gets the guard, budge
 FAQ client gets the cache, without memory:
 
 <CodeFile title="src/main/java/com/example/support/chat/SupportChatConfig.java">
-```java {26,40}
+```java {33-39}
 package com.example.support.chat;
 
 import java.time.Clock;
 import java.util.List;
 
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SafeGuardAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
-import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.session.DefaultSessionService;
+import org.springframework.ai.session.InMemorySessionRepository;
+import org.springframework.ai.session.SessionService;
+import org.springframework.ai.session.advisor.SessionAdvisors;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -314,8 +317,16 @@ import org.springframework.core.Ordered;
 @Configuration(proxyBeanMethods = false)
 class SupportChatConfig {
 
+    /** Conversations in memory for now; the Chat Memory lesson keeps them in PostgreSQL. */
     @Bean
-    ChatClient supportChatClient(ChatClient.Builder builder, ChatMemory chatMemory) {
+    SessionService sessionService() {
+        return DefaultSessionService.builder()
+                .sessionRepository(InMemorySessionRepository.builder().build())
+                .build();
+    }
+
+    @Bean
+    ChatClient supportChatClient(ChatClient.Builder builder, SessionService sessionService) {
         return builder
                 .defaultSystem("You are the support assistant for Acme Cloud.")
                 .defaultAdvisors(
@@ -325,9 +336,12 @@ class SupportChatConfig {
                                 .build(),
                         new TokenBudgetAdvisor(200_000, Clock.systemUTC()),   // + 50
                         new PiiRedactionAdvisor(),                            // + 100
-                        MessageChatMemoryAdvisor.builder(chatMemory).build(), // + 200
                         new AnswerLanguageAdvisor(),                          // + 250
-                        new SimpleLoggerAdvisor())                            // 0
+                        new SimpleLoggerAdvisor())                            // 0, in the tool loop
+                // The turn (+ 200) and memory (+ 210) before the tool loop, so memory runs once per call.
+                .defaultAdvisors(SessionAdvisors.builder(sessionService)
+                        .memory(memory -> memory.order(Ordered.HIGHEST_PRECEDENCE + 210))
+                        .build())
                 .build();
     }
 
@@ -345,7 +359,7 @@ class SupportChatConfig {
 The tests use the real `ChatClient` and memory, with a lambda as the model, so they check the order as well as the code:
 
 <CodeFile title="src/test/java/com/example/support/chat/PiiRedactionAdvisorTest.java">
-```java {40}
+```java {47}
 package com.example.support.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -355,37 +369,44 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.session.DefaultSessionService;
+import org.springframework.ai.session.InMemorySessionRepository;
+import org.springframework.ai.session.SessionService;
+import org.springframework.ai.session.advisor.SessionAdvisors;
+import org.springframework.core.Ordered;
 
 class PiiRedactionAdvisorTest {
 
     private final List<Prompt> prompts = new ArrayList<>();
-    private final ChatMemory chatMemory = MessageWindowChatMemory.builder().build();
+    private final SessionService sessionService = DefaultSessionService.builder()
+            .sessionRepository(InMemorySessionRepository.builder().build())
+            .build();
 
     private final ChatClient chatClient = ChatClient.builder(prompt -> {
                 prompts.add(prompt);
                 return new ChatResponse(List.of(new Generation(new AssistantMessage("Done."))));
             })
-            .defaultAdvisors(new PiiRedactionAdvisor(), MessageChatMemoryAdvisor.builder(chatMemory).build())
+            .defaultAdvisors(new PiiRedactionAdvisor())
+            .defaultAdvisors(SessionAdvisors.builder(sessionService)
+                    .memory(memory -> memory.order(Ordered.HIGHEST_PRECEDENCE + 210))
+                    .build())
             .build();
 
     @Test
     void theModelAndTheMemoryOnlySeeTheRedactedMessage() {
         chatClient.prompt()
                 .user("Refund card 4111 1111 1111 1111 and mail ada@example.com")
-                .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, "c-1"))
+                .advisors(SessionAdvisors.session("c-1"))
                 .call()
                 .content();
 
         String redacted = "Refund card [card] and mail [email]";
         assertThat(prompts.getLast().getUserMessage().getText()).isEqualTo(redacted);
-        assertThat(chatMemory.get("c-1").getFirst().getText()).isEqualTo(redacted);
+        assertThat(sessionService.getMessages("c-1").getFirst().getText()).isEqualTo(redacted);
     }
 
     @Test
@@ -496,8 +517,9 @@ and your tools, not in a list of words.
 
 <Gotcha kind="reliability" title="A guard after memory can block a whole conversation">
 At its default order `0`, `SafeGuardAdvisor` runs after memory and checks the stored history too. One blocked message is saved
-with the failure reply, and every later turn is blocked until the window drops it. It also checks the system message, so a
-sensitive word there blocks every request. Order it before memory, at `HIGHEST_PRECEDENCE + 25` or similar.
+with the failure reply, and every later turn is blocked: for good with the memory advisor's default `EventFilter.all()`, or
+until the event filter stops sending it. It also checks the system message, so a sensitive word there blocks every request.
+Order it before memory, at `HIGHEST_PRECEDENCE + 25` or similar.
 </Gotcha>
 
 <Gotcha kind="security" title="SimpleLoggerAdvisor logs everything">
@@ -527,7 +549,7 @@ budget also lives in one JVM: with several instances, keep the counters in Redis
 ## Recap
 
 - `SimpleLoggerAdvisor` logs full requests and responses at `DEBUG`; `SafeGuardAdvisor` blocks on a case-insensitive substring
-  match anywhere in the prompt. Both default to order `0`.
+  match anywhere in the prompt and marks its reply `guardrailRefusal`. Both default to order `0`.
 - Change requests with `BaseAdvisor`, wrap calls with `CallAdvisor`, and answer early by returning a `ChatClientResponse`
   without calling `nextCall`.
 - Order is the design: guards and budgets outermost, redaction before memory and logging, caches just before the tool loop.
