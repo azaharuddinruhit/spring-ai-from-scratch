@@ -43,6 +43,10 @@ found. Module 3 teaches Session Memory instead of `ChatMemory` (deprecated for r
 
 - Start the whole support app with a real model and PostgreSQL. So far each part has been checked on its own: the 63 tests, the MCP
   client–server run, and the repositories on PostgreSQL 17.
-- Build the Gradle dependency blocks shown in Module 5 with Gradle. The artifacts resolved with Maven; `spring-boot-starter-jdbc`
-  on the shipping server was not in that build.
+- ~~Build the Gradle dependency blocks shown in Module 5 with Gradle.~~ Done on 2026-11-21 with Gradle 9.9.1: the support app
+  (Module 3-5 blocks in lesson order, then the Module 6 additions), the shipping server and the four 2.1 lessons, each built from
+  exactly the blocks the lessons show, compile and pass their unit tests; `evalTest` finds its test. The check found Conversation
+  Memory's block missing `spring-boot-starter-validation` (the controller's `@Valid`), now added, and Module 6's
+  `application.yaml` still on the 2.0 memory key (now `spring.ai.session...`). The Gradle test runtime classpath holds every
+  artifact the green Maven `*IT` runs used, apart from probe-only extras.
 - Optional, not planned: publish the finished support app as a runnable project.

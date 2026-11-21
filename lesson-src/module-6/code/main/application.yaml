@@ -15,8 +15,7 @@ spring:
         dimensions: 1536
         distance-type: cosine-distance
         index-type: hnsw
-    chat:
-      memory:
-        repository:
-          jdbc:
-            initialize-schema: always
+    session:
+      repository:
+        jdbc:
+          initialize-schema: always

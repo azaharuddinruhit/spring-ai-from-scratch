@@ -92,15 +92,16 @@ Things to try:
 <ProjectTree />
 
 Replace the session advisor dependency from the first lesson with the JDBC session starter, which brings it in, and add your
-database driver:
+database driver. The controller checks its requests with Bean Validation (`@Valid`, `@NotBlank`), which needs its own starter:
 
 <CodeFile
   title="build.gradle"
   lang="groovy"
-  lines="2-3"
+  lines="2-4"
   code={`dependencies {
     implementation 'org.springframework.ai:spring-ai-starter-model-session-jdbc'
     runtimeOnly 'org.postgresql:postgresql'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
 }`}
 />
 
