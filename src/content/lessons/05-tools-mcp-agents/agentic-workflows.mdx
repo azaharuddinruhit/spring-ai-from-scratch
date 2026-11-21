@@ -5,8 +5,11 @@ description: Build a ticket-reply workflow from orchestrator, routing, parallel 
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import TicketWorkflowLab from '@/components/islands/TicketWorkflowLab';
 import ProjectTree from '@/components/ProjectTree.astro';
+
+**You'll need:** the support app from the MCP lesson, structured output from Module 2, and Java's virtual threads.
 
 A support ticket with several questions needs more than one tool loop. It needs several steps: split it, answer each part, merge
 the answers, then check the result. This lesson builds that workflow. Spring AI 2.1.0 has no workflow engine, and it doesn't need
@@ -617,16 +620,20 @@ A reviewer can keep finding problems. Fix the number of rounds and, when they ru
 person, as `needsAgent` does, instead of looping or failing the request.
 </Gotcha>
 
+<Gotcha kind="security" title="Drafts go to agents, not to customers">
+The workflow writes text for a person to check before it is sent. Protect the endpoint with an agent scope, as
+`SecurityConfig` does, and test that a customer's token gets `403`.
+</Gotcha>
+
+<MoreGotchas>
+
 <Gotcha kind="reliability" title="Parallel calls meet rate limits">
 Virtual threads make fan-out cheap, but your provider limits requests and tokens per minute. Many tickets at once multiply the
 calls. Keep the fan-out small and handle `429` responses with Spring AI's retry settings. A virtual thread also doesn't inherit
 the request's `SecurityContext`, so pass a worker anything it needs as an argument.
 </Gotcha>
 
-<Gotcha kind="security" title="Drafts go to agents, not to customers">
-The workflow writes text for a person to check before it is sent. Protect the endpoint with an agent scope, as
-`SecurityConfig` does, and test that a customer's token gets `403`.
-</Gotcha>
+</MoreGotchas>
 
 ## Recap
 

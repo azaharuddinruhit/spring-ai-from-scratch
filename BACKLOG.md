@@ -22,12 +22,14 @@ Tasks, biggest gain first:
 
 1. ~~**Split Agentic Workflows into two lessons.**~~ Done on 2026-11-19: Human in the Loop (`human-in-the-loop`, the refund,
    `RefundApprovalLab`) and Agentic Workflows (the ticket reply, `TicketWorkflowLab`).
-2. **Collapse files that barely change:** small records, exceptions, and tests carried over from earlier modules go behind a
-   "show full file" toggle in `CodeFile`, with the changed lines shown first. Follow DESIGN.md.
-3. **Add a "You'll need" line to each Module 5 lesson** (for example "Spring Security basics, OAuth2 client credentials"), so
-   learners see the step up before they hit it.
-4. **Consider marking lessons foundational or advanced**, so learners know what they can skim on a first pass.
-5. **Consider fewer gotchas per lesson on a first read** (now 6–8): keep the most important ones visible and fold the rest.
+2. ~~**Collapse files that barely change.**~~ Done on 2026-11-21, site-wide (the owner's choice): a long file opens folded to its
+   key lines with gap rows and a "Show full file" button (`src/lib/code-fold.mjs`). Module 5 reading time fell from 26-50 to
+   11-23 minutes a lesson.
+3. ~~**Add a "You'll need" line to each Module 5 lesson**~~ Done on 2026-11-20 (Tool Search already had one).
+4. ~~**Mark lessons foundational or advanced.**~~ Done on 2026-11-21: seven lessons carry `deepDive` (Message Parts, Decision
+   Models, Decision Filter, MCP, Human in the Loop, Agentic Workflows, Tool Search), tagged in the navigation.
+5. ~~**Fewer gotchas per lesson on a first read.**~~ Done on 2026-11-21: three visible per lesson, the rest in `MoreGotchas`.
+   Reading time with items 2 and 5: 8-21 minutes a lesson (was 11-50).
 
 ## Spring AI 2.1 (done)
 

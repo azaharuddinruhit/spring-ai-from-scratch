@@ -5,8 +5,12 @@ description: Build a Spring AI MCP server with @McpTool, @McpResource and @McpPr
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import McpLab from '@/components/islands/McpLab';
 import ProjectTree from '@/components/ProjectTree.astro';
+
+**You'll need:** the support app from Tool Calling, and Spring Security basics: OAuth2 client credentials, a JWT
+resource server and `@PreAuthorize`. This lesson also builds a second Spring Boot app, the shipping service.
 
 The order tools from the last lesson live in the support app. Parcel tracking doesn't: the shipping team owns it, in its own
 service. The Model Context Protocol (MCP) lets that team publish its tools once, and any MCP client can use them. That includes
@@ -278,12 +282,6 @@ The Module 3 controller test now imports that configuration and sends a JWT inst
 
 ## 4. Production gotchas & security
 
-<Gotcha kind="reliability" title="A WebMVC MCP server starts SSE unless you set the protocol">
-`McpServerProperties` declares `STREAMABLE`, but the WebMVC auto-configuration starts the SSE transport when
-`spring.ai.mcp.server.protocol` is missing. Streamable HTTP clients then get a `404` for `POST /mcp`. Set `protocol: STREAMABLE`
-on the server, and test it with a real client, as `ShippingMcpServerTest` does.
-</Gotcha>
-
 <Gotcha kind="security" title="The default converter sends your tool context to every MCP server">
 `ToolContext` holds what the model must not see, such as the customer id, and the default `ToolContextToMcpMetaConverter`
 copies all of it into `_meta` on every `tools/call`. In our test, a tenant API key in the tool context reached the server this
@@ -300,6 +298,14 @@ Annotation hints such as `readOnlyHint` are claims made by the server, not check
 A global `McpSyncHttpClientRequestCustomizer` adds its header to every connection. In our test, one header reached two servers, so
 a token for one server would be sent to every other. Use an `McpClientCustomizer<HttpClientStreamableHttpTransport.Builder>`,
 which gets the connection name, and request a client-credentials token per server with only the scopes that server needs.
+</Gotcha>
+
+<MoreGotchas>
+
+<Gotcha kind="reliability" title="A WebMVC MCP server starts SSE unless you set the protocol">
+`McpServerProperties` declares `STREAMABLE`, but the WebMVC auto-configuration starts the SSE transport when
+`spring.ai.mcp.server.protocol` is missing. Streamable HTTP clients then get a `404` for `POST /mcp`. Set `protocol: STREAMABLE`
+on the server, and test it with a real client, as `ShippingMcpServerTest` does.
 </Gotcha>
 
 <Gotcha kind="reliability" title="A server that is down breaks startup, or every chat">
@@ -325,6 +331,8 @@ On the transport builder, `httpRequestCustomizer` is deprecated: use `addHttpReq
 and `GetPromptRequest(String, Map)` constructors are deprecated: use their `builder(...)` methods. SSE is the older transport;
 new servers should use Streamable HTTP.
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 

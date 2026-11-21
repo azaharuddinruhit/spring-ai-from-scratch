@@ -5,6 +5,7 @@ description: Screen and rerank retrieved passages with a local decision model be
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import ScreeningLab from '@/components/islands/ScreeningLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 import { buildGradle } from '@/data/snippets';
@@ -572,6 +573,8 @@ passage 0.565. The filter dropped the planted ones for low evidence, not as inje
 when you ingest it (Module 4), and make tools check who may do what (Module 5): what reaches the prompt is still untrusted text.
 </Gotcha>
 
+<MoreGotchas>
+
 <Gotcha kind="reliability" title="These settings were tuned on three questions">
 A contradiction threshold of 1.0 and a minimum score of 0.4 give the right result for the three recorded questions, and they cost
 one: the address question loses its right passage and gets "can't answer". Turning `CONFLICTING` off also loses a useful label:
@@ -584,6 +587,8 @@ Six passages cost six filter calls of four questions each, then six reranker cal
 Four calls at a time made no difference, because Ollama answered one request at a time. The 27B model behind the sandbox's labels
 took 6 to 47 seconds per passage, which is why it is the reference here, not the pipeline.
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 

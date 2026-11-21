@@ -5,6 +5,7 @@ description: Read a reply as ordered parts, keep a reasoning model's thinking ap
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import MessagePartsLab from '@/components/islands/MessagePartsLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 import { buildGradle } from '@/data/snippets';
@@ -602,13 +603,6 @@ In the recordings the reasoning restated the tool result and the system prompt's
 `stream().content()` already leaves it out; a `stream().chatResponse()` carries the reasoning parts.
 </Gotcha>
 
-<Gotcha kind="reliability" title="Switch thinking off with a boolean, not a property">
-`spring.ai.openai.chat.extra-body.chat_template_kwargs.enable_thinking: false` binds into a `Map` as the string `"false"`. The
-server's chat template treats any non-empty string as true, so the model kept reasoning. Build the map in Java, as `quickReply` does,
-and the server receives a JSON `false`. The flag belongs to Qwen 3's chat template: `deepseek-r1:1.5b` on Ollama reasoned with it all
-the same.
-</Gotcha>
-
 <Gotcha kind="cost" title="Reasoning tokens are completion tokens">
 With reasoning, the two calls for "Where is my order A-1042?" took 125 completion tokens and 6.9 seconds; without it, 65 and 3.1. A
 question about one order needs no thought. Keep reasoning for the requests that do, and switch it off per request.
@@ -620,6 +614,15 @@ that chose the tool went back to the model, and the caller never gets it. If you
 after `ToolCallingAdvisor`, which runs once per model call.
 </Gotcha>
 
+<MoreGotchas>
+
+<Gotcha kind="reliability" title="Switch thinking off with a boolean, not a property">
+`spring.ai.openai.chat.extra-body.chat_template_kwargs.enable_thinking: false` binds into a `Map` as the string `"false"`. The
+server's chat template treats any non-empty string as true, so the model kept reasoning. Build the map in Java, as `quickReply` does,
+and the server receives a JSON `false`. The flag belongs to Qwen 3's chat template: `deepseek-r1:1.5b` on Ollama reasoned with it all
+the same.
+</Gotcha>
+
 <Gotcha kind="reliability" title="The answer starts with a blank line">
 The recorded server put two newlines before every answer, after the reasoning. `getText()` keeps them; `Reply` strips them.
 </Gotcha>
@@ -629,6 +632,8 @@ Message parts are new in Spring AI 2.1. `getToolCalls()` and `getMedia()` now re
 compares parts. `OpenAiChatModel` still puts the reasoning in the `reasoningContent` metadata entry too, so 2.0 code that read it
 keeps working; read `getReasoning()` in new code.
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 

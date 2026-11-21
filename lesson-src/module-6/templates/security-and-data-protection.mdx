@@ -5,6 +5,7 @@ description: Attack the support app with a real model, make every guarantee hold
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import AttackLab from '@/components/islands/AttackLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 
@@ -140,6 +141,8 @@ reason field pass through, and the model's replies repeat tool results. Treat se
 redact, and delete it on a schedule.
 </Gotcha>
 
+<MoreGotchas>
+
 <Gotcha kind="security" title="The FAQ cache keeps questions without an owner">
 `SemanticCacheAdvisor` from Module 3 stores each question and its answer in the shared vector store, with no customer id, so
 erasure can't find them. The questions are redacted, but a name or an address stays. Expire cache entries, or keep personal
@@ -157,6 +160,8 @@ Erasure deletes the sessions and their messages. The vector query text in your t
 and the model provider's own logs follow their own retention. Keep each one no longer than the chat retention, or leave the
 content out of it.
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 

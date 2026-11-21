@@ -2,9 +2,11 @@
 /**
  * The code viewer: the file name and a copy button above a code box with line numbers and highlighted key lines.
  * Wrap a Markdown fence (mark lines with ```java {12-14}), or pass `code` + `lang` (+ optional `lines`)
- * for snippets generated from src/data.
+ * for snippets generated from src/data. A long file opens folded to its key lines (see `code-fold.mjs`): each hidden run
+ * is a gap row that opens it, and "Show full file" opens them all. Copy always copies the whole file.
  */
 import { highlight } from '@/lib/highlight';
+import { foldRuns } from '@/lib/code-fold.mjs';
 import { codeFileAnchor } from '@/lib/project-tree';
 
 interface Props {
@@ -18,33 +20,86 @@ interface Props {
 const { title, code, lang, lines } = Astro.props;
 // Taken before any await, so blocks are numbered in page order.
 const anchor = codeFileAnchor(Astro.request, title);
-const html = code ? await highlight(code.trimEnd(), lang ?? 'text', lines) : null;
+const html = code ? await highlight(code.trimEnd(), lang ?? 'text', lines) : await Astro.slots.render('default');
+
+/** Marks the lines to fold and puts a gap row after each run. Shiki writes one `<span class="line">` per source line. */
+function fold(rendered: string): { html: string; hidden: number } {
+  const open = rendered.indexOf('<code>');
+  const close = rendered.lastIndexOf('</code>');
+  if (open < 0 || close < 0) return { html: rendered, hidden: 0 };
+  const rows = rendered.slice(open + 6, close).split('\n');
+  const keyLines = new Set(rows.flatMap((row, i) => (row.startsWith('<span class="line highlighted') ? [i + 1] : [])));
+  const runs = foldRuns(rows.length, keyLines);
+  if (runs.length === 0) return { html: rendered, hidden: 0 };
+  runs.forEach(([first, last], run) => {
+    for (let n = first; n <= last; n++) {
+      rows[n - 1] = rows[n - 1].replace('<span class="line', `<span data-run="${run}" class="fold-hidden line`);
+    }
+    // After the run, so it resets the line counter to the run's last number while the run is hidden.
+    rows[last - 1] +=
+      `<button type="button" class="fold-gap" data-run="${run}" data-count="${last - first + 1}" style="counter-set: line ${last}"` +
+      ` aria-label="Show lines ${first} to ${last}"></button>`;
+  });
+  return {
+    html: rendered.slice(0, open + 6) + rows.join('\n') + rendered.slice(close),
+    hidden: runs.reduce((sum, [first, last]) => sum + last - first + 1, 0),
+  };
+}
+
+const folded = fold(html);
 ---
 
-<figure id={anchor} class="not-prose my-5 scroll-mt-20" data-code-file>
+<figure id={anchor} class="not-prose my-5 scroll-mt-20" data-code-file data-folded={folded.hidden > 0 ? '' : undefined}>
   <figcaption class="mb-1.5 flex items-center justify-between gap-2">
-    <span class="code-mono min-w-0 truncate text-[0.8rem] font-medium text-slate-700 dark:text-slate-300">{title}</span>
-    <button type="button" class="copy-btn" data-copy aria-label={`Copy ${title}`} title="Copy code">
-      <svg class="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <rect x="9" y="9" width="12" height="12" rx="2"></rect>
-        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-      </svg>
-      <svg class="icon-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M20 6 9 17l-5-5"></path>
-      </svg>
-    </button>
+    <span class="code-file-title code-mono min-w-0 text-[0.8rem] font-medium text-slate-700 dark:text-slate-300" title={title}><bdi>{title}</bdi></span>
+    <span class="flex shrink-0 items-center gap-1">
+      {
+        folded.hidden > 0 && (
+          <button type="button" class="fold-toggle" data-fold-toggle aria-expanded="false" title={`${folded.hidden} lines are folded`}>
+            <span class="fold-label-folded"><span class="hidden sm:inline">Show full file</span><span class="sm:hidden">Full file</span></span>
+            <span class="fold-label-open"><span class="hidden sm:inline">Show key lines</span><span class="sm:hidden">Key lines</span></span>
+          </button>
+        )
+      }
+      <button type="button" class="copy-btn" data-copy aria-label={`Copy ${title}`} title="Copy code">
+        <svg class="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="9" y="9" width="12" height="12" rx="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+        <svg class="icon-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20 6 9 17l-5-5"></path>
+        </svg>
+      </button>
+    </span>
     <span class="sr-only" aria-live="polite" data-copy-status></span>
   </figcaption>
-  {html ? <Fragment set:html={html} /> : <slot />}
+  <Fragment set:html={folded.html} />
 </figure>
 
 <script>
-  // One delegated listener for every code viewer on the page.
+  // One delegated listener for every code viewer on the page: copy, open one folded run, or switch the whole file.
   document.addEventListener('click', async (event) => {
-    const button = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-copy]');
-    const code = button?.closest('[data-code-file]')?.querySelector('pre code');
+    const target = event.target as Element | null;
+    const figure = target?.closest<HTMLElement>('[data-code-file]');
+    if (!figure) return;
+
+    const gap = target?.closest<HTMLButtonElement>('.fold-gap');
+    if (gap) {
+      figure.querySelectorAll(`.fold-hidden[data-run="${gap.dataset.run}"]`).forEach((line) => line.classList.add('is-open'));
+      gap.classList.add('is-open');
+      if (!figure.querySelector('.fold-gap:not(.is-open)')) setFolded(figure, false);
+      return;
+    }
+
+    if (target?.closest('[data-fold-toggle]')) {
+      setFolded(figure, !figure.hasAttribute('data-folded'));
+      return;
+    }
+
+    const button = target?.closest<HTMLButtonElement>('[data-copy]');
+    const code = figure.querySelector('pre code');
     if (!button || !code) return;
-    const status = button.parentElement?.querySelector('[data-copy-status]');
+    const status = figure.querySelector('[data-copy-status]');
     try {
       await navigator.clipboard.writeText(code.textContent ?? '');
       button.classList.add('is-done');
@@ -58,4 +113,11 @@ const html = code ? await highlight(code.trimEnd(), lang ?? 'text', lines) : nul
       if (status) status.textContent = '';
     }, 1500);
   });
+
+  /** Folded shows the key lines and gap rows; unfolded shows every line. Folding again closes the runs opened one by one. */
+  function setFolded(figure: HTMLElement, folded: boolean) {
+    figure.toggleAttribute('data-folded', folded);
+    figure.querySelectorAll('.is-open').forEach((element) => element.classList.remove('is-open'));
+    figure.querySelector('[data-fold-toggle]')?.setAttribute('aria-expanded', String(!folded));
+  }
 </script>

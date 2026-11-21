@@ -5,8 +5,12 @@ description: Keep a person in the loop for actions that move money. The model as
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import RefundApprovalLab from '@/components/islands/RefundApprovalLab';
 import ProjectTree from '@/components/ProjectTree.astro';
+
+**You'll need:** the support app from the MCP lesson (it signs customers in), JDBC, and the idea of an idempotency key: a
+payment API that pays once per key however often it's called.
 
 The assistant can look things up. A refund is different: it moves money, so the model must not be the one who decides it. Spring
 AI 2.1 can pause a tool call until a person confirms it. This lesson marks the refund tool that way, shows the customer exactly
@@ -1178,11 +1182,15 @@ A reply can carry several tool calls, and only some of them may need confirmatio
 a decision, so build them from `ToolCallDecisions.toolCallKeys(reply)`, and pass the tools the allowed calls need in the prompt.
 </Gotcha>
 
+<MoreGotchas>
+
 <Gotcha kind="migration" title="Coming from 2.0">
 2.0 had no confirmation step. The usual way out was a tool that only proposed the action, a status column and a separate
 confirmation endpoint, because stopping the call with `toolExecutionEligibilityChecker` left an unanswered tool call in
 `ChatMemory`. In 2.1 the pause is a normal reply that the session stores and closes, so the proposal table can go.
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 

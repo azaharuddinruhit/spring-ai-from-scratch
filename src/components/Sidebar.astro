@@ -1,6 +1,7 @@
 ---
 import type { NavModule } from '@/lib/course';
 import Breakable from '@/components/Breakable.astro';
+import DeepDiveTag from '@/components/DeepDiveTag.astro';
 
 interface Section {
   slug: string;
@@ -58,14 +59,17 @@ const row = compact ? 'py-2' : 'py-1';
                   href={lesson.href}
                   aria-current={lesson.id === currentId ? 'page' : undefined}
                   class:list={[
-                    '-ml-px block border-l pr-2 pl-3 transition-colors',
+                    '-ml-px flex items-baseline justify-between gap-2 border-l pr-2 pl-3 transition-colors',
                     row,
                     lesson.id === currentId
                       ? 'border-brand-600 font-medium text-brand-700 dark:border-brand-400 dark:text-brand-300'
                       : 'border-transparent text-slate-600 hover:border-slate-400 hover:text-slate-900 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:text-white',
                   ]}
                 >
-                  <Breakable text={lesson.title} />
+                  <span class="min-w-0">
+                    <Breakable text={lesson.title} />
+                  </span>
+                  {lesson.deepDive && <DeepDiveTag />}
                 </a>
                 {lesson.id === currentId && sections && sections.length > 0 && (
                   <ol aria-label="On this page" class="-ml-px border-l border-brand-600 pb-1 dark:border-brand-400">

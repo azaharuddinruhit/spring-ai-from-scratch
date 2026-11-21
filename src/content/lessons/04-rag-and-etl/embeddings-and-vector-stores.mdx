@@ -5,6 +5,7 @@ description: How EmbeddingModel turns text into vectors, how VectorStore stores 
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import VectorSearchLab from '@/components/islands/VectorSearchLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 
@@ -383,18 +384,20 @@ staff ones included. `SimpleVectorStore` evaluates the expression tree instead, 
 `b.group(...)`, or use `b.in("product", "billing", "shipping")`, which the converter wraps for you.
 </Gotcha>
 
-<Gotcha kind="reliability" title="NOT and ! don't mean what they look like">
-In the text syntax `NOT` takes everything to its right, so `NOT audience == 'STAFF' && product == 'billing'` becomes
-`audience != 'STAFF' || product != 'billing'`. A lone `!` is skipped by the lexer, which only prints a "token recognition error"
-to standard error, so `! audience == 'STAFF'` selects the staff documents. Use parentheses with `NOT`, and `!=` for one key.
-</Gotcha>
-
 <Gotcha kind="reliability" title="Set the dimensions yourself">
 Without `dimensions`, `PgVectorStore` embeds the string "Test String" to measure the model when it creates its table. (2.0 did
 it on every boot; 2.1 reads an existing table's column size instead.) If that call fails, it logs a warning and creates a
 `vector(1536)` column, which a model of another size can't write to. PgVector's HNSW index takes at most 2,000 dimensions, so
 `text-embedding-3-large` (3,072) fails at startup with "column cannot have more than 2000 dimensions for hnsw index": set
 `spring.ai.openai.embedding.dimensions: 1536` to shorten its vectors, or use a smaller model.
+</Gotcha>
+
+<MoreGotchas>
+
+<Gotcha kind="reliability" title="NOT and ! don't mean what they look like">
+In the text syntax `NOT` takes everything to its right, so `NOT audience == 'STAFF' && product == 'billing'` becomes
+`audience != 'STAFF' || product != 'billing'`. A lone `!` is skipped by the lexer, which only prints a "token recognition error"
+to standard error, so `! audience == 'STAFF'` selects the staff documents. Use parentheses with `NOT`, and `!=` for one key.
 </Gotcha>
 
 <Gotcha kind="reliability" title="OpenAI embeds the metadata with the text">
@@ -408,6 +411,8 @@ Vectors from different models, or different dimensions, can't be compared, and t
 Changing the model means a new table and a full re-ingest. Score ranges differ between models too, so recalibrate every
 `similarityThreshold` on real questions.
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 

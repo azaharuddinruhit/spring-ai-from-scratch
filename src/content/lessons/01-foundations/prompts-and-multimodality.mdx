@@ -5,6 +5,7 @@ description: Message roles, .st prompt templates loaded as Spring Resources, few
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import PromptTemplateLab from '@/components/islands/PromptTemplateLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 
@@ -280,12 +281,6 @@ in it carry the same weight as yours. Always pass user input through `.param(…
 prompt to treat tagged content as data. Delimiting reduces injection risk but doesn't remove it. Module 6 adds real guardrails.
 </Gotcha>
 
-<Gotcha kind="reliability" title="JSON in a template needs different delimiters">
-Literal JSON braces in a `.st` template collide with the default `{ }` variable syntax. Configure
-`StTemplateRenderer.builder().startDelimiterToken('<').endDelimiterToken('>')` on the client with `.templateRenderer(…)`,
-or keep schemas out of templates and let `entity(…)` add format instructions (Module 2).
-</Gotcha>
-
 <Gotcha kind="cost" title="Images are billed as tokens">
 A full-resolution screenshot can cost more input tokens than the whole conversation. Downscale images before attaching them, limit upload size,
 and only attach media when the task actually needs it.
@@ -296,10 +291,20 @@ and only attach media when the task actually needs it.
 Download, validate and size-check the file yourself, then attach it as a `Resource`.
 </Gotcha>
 
+<MoreGotchas>
+
+<Gotcha kind="reliability" title="JSON in a template needs different delimiters">
+Literal JSON braces in a `.st` template collide with the default `{ }` variable syntax. Configure
+`StTemplateRenderer.builder().startDelimiterToken('<').endDelimiterToken('>')` on the client with `.templateRenderer(…)`,
+or keep schemas out of templates and let `entity(…)` add format instructions (Module 2).
+</Gotcha>
+
 <Gotcha kind="reliability" title="Not every model sees images or hears audio">
 Multimodal input works only with models that support it (for example Claude, GPT-4o/5, Gemini and Llava-family models on Ollama).
 A text-only model fails or silently ignores the media. Check the model's capabilities when you switch providers.
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 
