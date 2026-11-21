@@ -6,12 +6,20 @@ type Terminal = 'content' | 'chatResponse' | 'entity' | 'stream';
 const TERMINALS: Record<Terminal, { label: string; code: string; returns: string }> = {
   content: { label: '.call().content()', code: '.call()\n        .content();', returns: 'String' },
   chatResponse: { label: '.call().chatResponse()', code: '.call()\n        .chatResponse();', returns: 'ChatResponse' },
-  entity: { label: '.call().entity(Joke.class)', code: '.call()\n        .entity(Joke.class);', returns: 'Joke' },
+  entity: {
+    label: '.call().entity(SuggestedReply.class)',
+    code: '.call()\n        .entity(SuggestedReply.class);',
+    returns: 'SuggestedReply',
+  },
   stream: { label: '.stream().content()', code: '.stream()\n        .content();', returns: 'Flux<String>' },
 };
 
-const ANSWER = 'Why do Java developers wear glasses? Because they don’t C#.';
-const TOKENS = ['Why', ' do', ' Java', ' developers', ' wear', ' glasses', '?', ' Because', ' they', ' don’t', ' C', '#', '.'];
+// An invented reply to the message in the code below.
+const ANSWER = 'Sorry about the double charge on order A-1077. An agent will check the payment and confirm the next steps by email.';
+const TOKENS = [
+  'Sorry', ' about', ' the', ' double', ' charge', ' on', ' order', ' A', '-1077', '.', ' An', ' agent', ' will', ' check', ' the',
+  ' payment', ' and', ' confirm', ' the', ' next', ' steps', ' by', ' email', '.',
+];
 
 interface Stage {
   id: string;
@@ -21,7 +29,7 @@ interface Stage {
 
 function stagesFor(logger: boolean, terminal: Terminal): Stage[] {
   return [
-    { id: 'service', name: 'JokeService', detail: 'Your @Service builds the request through the fluent API.' },
+    { id: 'service', name: 'ReplyService', detail: 'Your @Service builds the request through the fluent API.' },
     { id: 'client', name: 'DefaultChatClient', detail: 'Collects the system/user text, options and advisors, then builds a ChatClientRequest.' },
     {
       id: 'tools',
@@ -38,7 +46,7 @@ function stagesFor(logger: boolean, terminal: Terminal): Stage[] {
         content: 'The last link in the chain calls ChatModel.call(prompt).',
         chatResponse: 'The last link in the chain calls ChatModel.call(prompt).',
         entity:
-          'Adds a JSON Schema for the Joke record as format instructions on the prompt, then calls ChatModel.call(prompt). On the way back, BeanOutputConverter parses the JSON into a Joke.',
+          'Adds a JSON Schema for the SuggestedReply record as format instructions on the prompt, then calls ChatModel.call(prompt). On the way back, BeanOutputConverter parses the JSON into a SuggestedReply.',
         stream: 'The last link in the chain calls ChatModel.stream(prompt), which returns a Flux<ChatResponse>.',
       }[terminal],
     },
@@ -94,11 +102,16 @@ export default function ChatClientLifecycle() {
 
   const visibleTokens = terminal === 'stream' ? (done ? TOKENS.length : tokenCount) : 0;
 
-  const java = `record Joke(String setup, String punchline) {}
+  const java = `record SuggestedReply(
+        String reply,
+        boolean needsAgent
+) {}
+
+String message = "I was charged twice for A-1077.";
 
 ${TERMINALS[terminal].returns} result = chatClient.prompt()
-        .system("You are a programmer comedian.")
-        .user("Tell me a joke about Java")
+        .user(u -> u.text("<message>{message}</message>")
+                .param("message", message))
         ${TERMINALS[terminal].code}`;
 
   return (
@@ -143,7 +156,7 @@ ${TERMINALS[terminal].returns} result = chatClient.prompt()
         </button>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <ol className="space-y-1.5">
           {stages.map((stage, i) => {
             const active = current?.index === i;
@@ -203,9 +216,9 @@ ${TERMINALS[terminal].returns} result = chatClient.prompt()
               {done && terminal === 'content' && <p>"{ANSWER}"</p>}
               {done && terminal === 'entity' && (
                 <p>
-                  Joke[setup=Why do Java developers wear glasses?,
+                  SuggestedReply[reply={ANSWER},
                   <br />
-                  &nbsp;&nbsp;&nbsp;&nbsp; punchline=Because they don’t C#.]
+                  &nbsp;&nbsp;&nbsp;&nbsp; needsAgent=true]
                 </p>
               )}
               {done && terminal === 'chatResponse' && (
@@ -217,9 +230,9 @@ ${TERMINALS[terminal].returns} result = chatClient.prompt()
     ├─ id               "msg_01HZ…"
     ├─ model            "claude-haiku-4-5"
     └─ usage
-        ├─ promptTokens      24
-        ├─ completionTokens  19
-        └─ totalTokens       43`}</pre>
+        ├─ promptTokens      118
+        ├─ completionTokens  27
+        └─ totalTokens       145`}</pre>
               )}
             </div>
           </div>

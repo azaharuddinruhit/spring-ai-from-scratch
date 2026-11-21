@@ -1,5 +1,5 @@
 ---
-description: Message roles, .st prompt templates loaded as Spring Resources, few-shot examples, and multimodal input and output with images, audio transcription and text-to-speech.
+description: Message roles, .st prompt templates loaded as Spring Resources, few-shot examples, screenshots as image input, and a voice channel with audio transcription and text-to-speech.
 ---
 
 import Mermaid from '@/components/Mermaid.astro';
@@ -21,10 +21,10 @@ the model supports it.
 | `PromptTemplate` + `.st` file | A Thymeleaf view in `templates/` | Logic-free StringTemplate rendering against a model map. Variables are written `{name}` by default. |
 | `.system(Resource)` / `@Value("classpath:…")` | `ResourceLoader` | Prompts are classpath resources, so they're versioned, diffable and testable. |
 | `Media` on a `UserMessage` | A multipart attachment | The `MimeType` plus a `Resource`, `URL` or `URI`. Only user messages carry media. |
-| `ImageModel`, `TranscriptionModel`, `TextToSpeechModel` | Specialized clients next to `RestClient` | Single-modality models with their own prompt and response types. |
+| `TranscriptionModel`, `TextToSpeechModel` | Specialized clients next to `RestClient` | Single-modality models with their own prompt and response types. `ImageModel` generates images the same way; a support app reads images rather than drawing them. |
 
 <Mermaid
-  caption="Templates and parameters render into typed messages. Media is attached to the UserMessage, and dedicated models handle image and audio generation."
+  caption="Templates and parameters render into typed messages. A screenshot is attached to the UserMessage as Media, and dedicated models turn audio into text and back."
   code={`
 flowchart LR
   ST["support-system.st<br/>(classpath Resource)"] --> R["StTemplateRenderer"]
@@ -38,7 +38,6 @@ flowchart LR
   PR --> CM["ChatModel"]
   subgraph single["Single-modality models"]
     direction TB
-    IM["ImageModel<br/>ImagePrompt → ImageResponse"]
     TR["TranscriptionModel<br/>audio Resource → text"]
     TTS["TextToSpeechModel<br/>text → byte[]"]
   end
@@ -184,8 +183,8 @@ class TriageController {
 ```
 </CodeFile>
 
-Audio and image generation use dedicated models. The OpenAI starter auto-configures `OpenAiAudioTranscriptionModel`,
-`OpenAiAudioSpeechModel` and `OpenAiImageModel` next to the chat model. Inject them through their portable interfaces.
+Audio goes through dedicated models. The OpenAI starter auto-configures `OpenAiAudioTranscriptionModel` and
+`OpenAiAudioSpeechModel` next to the chat model. Inject them through their portable interfaces.
 
 <CodeFile title="src/main/java/com/example/support/VoiceChannel.java">
 ```java {23-25}
@@ -219,43 +218,7 @@ public class VoiceChannel {
 ```
 </CodeFile>
 
-<CodeFile title="src/main/java/com/example/support/DiagramGenerator.java">
-```java
-package com.example.support;
-
-import java.util.Optional;
-
-import org.springframework.ai.image.ImageModel;
-import org.springframework.ai.image.ImagePrompt;
-import org.springframework.ai.image.ImageResponse;
-import org.springframework.ai.openai.OpenAiImageOptions;
-import org.springframework.stereotype.Service;
-
-@Service
-public class DiagramGenerator {
-
-    private final ImageModel imageModel;
-
-    public DiagramGenerator(ImageModel imageModel) {
-        this.imageModel = imageModel;
-    }
-
-    /** Returns base64 PNG data, or empty when the provider returned no image. */
-    public Optional<String> illustrate(String description) {
-        ImageResponse response = imageModel.call(new ImagePrompt(
-                "Clean, flat technical illustration: " + description,
-                OpenAiImageOptions.builder()
-                        .size("1024x1024")
-                        .responseFormat("b64_json")
-                        .build()));
-        return Optional.ofNullable(response.getResult())
-                .map(result -> result.getOutput().getB64Json());
-    }
-}
-```
-</CodeFile>
-
-<CodeFile title="src/main/resources/application.yml (audio and image)">
+<CodeFile title="src/main/resources/application.yml (uploads and audio)">
 ```yaml
 spring:
   servlet:
@@ -311,4 +274,4 @@ A text-only model fails or silently ignores the media. Check the model's capabil
 - Store prompts as `.st` resources and pass every dynamic value with `.param(…)`.
 - Few-shot `UserMessage`/`AssistantMessage` pairs teach format better than long instructions.
 - Attach media to the user message, and validate type and size first.
-- Image, transcription and speech have dedicated `ImageModel`, `TranscriptionModel` and `TextToSpeechModel` interfaces.
+- Transcription and speech have dedicated `TranscriptionModel` and `TextToSpeechModel` interfaces.
