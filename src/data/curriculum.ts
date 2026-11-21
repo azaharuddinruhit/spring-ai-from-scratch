@@ -8,6 +8,8 @@ export interface Lesson {
   title: string;
   /** Its own small project rather than a step of the module's app (the project tree then lists only its files). */
   standalone?: true;
+  /** Goes further than a first pass needs: marked "Deep dive" in the navigation, so learners know they can skim it. */
+  deepDive?: true;
 }
 
 export interface Module {
@@ -30,7 +32,7 @@ export const CURRICULUM: Module[] = [
       { slug: 'chatclient-fluent-api', title: 'The ChatClient Fluent API' },
       { slug: 'multi-provider-portability', title: 'Multi-Provider Portability' },
       { slug: 'prompts-and-multimodality', title: 'Prompt Engineering & Multimodality' },
-      { slug: 'message-parts-and-reasoning', title: 'Message Parts & Reasoning', standalone: true },
+      { slug: 'message-parts-and-reasoning', title: 'Message Parts & Reasoning', standalone: true, deepDive: true },
     ],
   },
   {
@@ -42,7 +44,7 @@ export const CURRICULUM: Module[] = [
     lessons: [
       { slug: 'structured-output-converters', title: 'The StructuredOutputConverter Ecosystem' },
       { slug: 'native-json-schema', title: 'Native JSON Schema & Strict Mode' },
-      { slug: 'decision-models', title: 'Decision Models', standalone: true },
+      { slug: 'decision-models', title: 'Decision Models', standalone: true, deepDive: true },
     ],
   },
   {
@@ -65,7 +67,7 @@ export const CURRICULUM: Module[] = [
       { slug: 'etl-pipeline', title: 'The ETL Pipeline' },
       { slug: 'embeddings-and-vector-stores', title: 'Embeddings & VectorStore' },
       { slug: 'modular-rag', title: 'Modular RAG with RetrievalAugmentationAdvisor' },
-      { slug: 'decision-filter-and-reranker', title: 'Decision Filter & Reranker', standalone: true },
+      { slug: 'decision-filter-and-reranker', title: 'Decision Filter & Reranker', standalone: true, deepDive: true },
     ],
   },
   {
@@ -76,10 +78,10 @@ export const CURRICULUM: Module[] = [
       'Letting the model call your Java methods, connecting MCP servers and clients, agent workflow patterns, and searching a large tool catalogue.',
     lessons: [
       { slug: 'tool-calling', title: 'Tool Calling & ToolCallingAdvisor' },
-      { slug: 'model-context-protocol', title: 'Model Context Protocol (MCP)' },
-      { slug: 'human-in-the-loop', title: 'Human in the Loop' },
-      { slug: 'agentic-workflows', title: 'Agentic Workflows' },
-      { slug: 'tool-search', title: 'Tool Search & DecisionToolIndex', standalone: true },
+      { slug: 'model-context-protocol', title: 'Model Context Protocol (MCP)', deepDive: true },
+      { slug: 'human-in-the-loop', title: 'Human in the Loop', deepDive: true },
+      { slug: 'agentic-workflows', title: 'Agentic Workflows', deepDive: true },
+      { slug: 'tool-search', title: 'Tool Search & DecisionToolIndex', standalone: true, deepDive: true },
     ],
   },
   {

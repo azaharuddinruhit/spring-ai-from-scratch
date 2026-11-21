@@ -5,6 +5,7 @@ description: Send the model one search tool instead of every tool, compare the r
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import ToolSearchLab from '@/components/islands/ToolSearchLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 import { buildGradle } from '@/data/snippets';
@@ -163,17 +164,25 @@ than the shop questions. The best tool also leaned toward whichever tool came fi
 12 queries. Measure a decision model on your own requests before you switch to it.
 </Gotcha>
 
-<Gotcha kind="cost" title="Ten tools don't need a search">
-The first call costs about 573 prompt tokens with search and 1,290 with all ten tools, but a search adds a model call and returns
-tools of its own. Over the six recorded requests, sending every tool took 17,171 prompt tokens. Unlimited searches took 21,886 to
-23,399, and Lucene with three results 15,780. Tool search pays off with dozens of tools, and only when each search returns few.
-</Gotcha>
-
 <Gotcha kind="reliability" title="The model decides how many tools come back">
 The model passes `maxResults` itself, and `max-results` applies only when it doesn't. The model asked for 5 and 10 in the
 recordings. A smaller model once asked for none, and the Lucene index threw `numHits must be > 0`. The advisor then read the error
 message as a list of tool names and failed the request with `IllegalStateException`. `BoundedToolIndex` keeps every search
 between one and `max-results`.
+</Gotcha>
+
+<Gotcha kind="security" title="Every tool is one search away">
+Tool search hides tool definitions from the prompt. It doesn't take tools away from the model. A model that searches for
+"refund" gets `refundOrder`, whatever the system prompt says. Keep tools that change things behind the checks Module 5 builds:
+the customer from the tool context, and confirmation before anything happens.
+</Gotcha>
+
+<MoreGotchas>
+
+<Gotcha kind="cost" title="Ten tools don't need a search">
+The first call costs about 573 prompt tokens with search and 1,290 with all ten tools, but a search adds a model call and returns
+tools of its own. Over the six recorded requests, sending every tool took 17,171 prompt tokens. Unlimited searches took 21,886 to
+23,399, and Lucene with three results 15,780. Tool search pays off with dozens of tools, and only when each search returns few.
 </Gotcha>
 
 <Gotcha kind="reliability" title="A small model searches, then answers without the tool">
@@ -189,17 +198,13 @@ Every index matches the model's query against tool names and descriptions. Asked
 delivery". Write descriptions in the words customers and models use, and keep names and descriptions distinct.
 </Gotcha>
 
-<Gotcha kind="security" title="Every tool is one search away">
-Tool search hides tool definitions from the prompt. It doesn't take tools away from the model. A model that searches for
-"refund" gets `refundOrder`, whatever the system prompt says. Keep tools that change things behind the checks Module 5 builds:
-the customer from the tool context, and confirmation before anything happens.
-</Gotcha>
-
 <Gotcha kind="reliability" title="One id for the search and the memory">
 The advisor's default session key, `chat_memory_conversation_id`, is the key session memory reads (`MemoryAdvisor.CONVERSATION_ID`).
 In an app with memory, leave `session-id-key-name` unset and pass the conversation id once: the tool index and the history then
 follow the same conversation. This app has no memory, so it names its own key.
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 

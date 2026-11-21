@@ -5,6 +5,7 @@ description: Synchronous call(), reactive stream() over SSE, reading ChatRespons
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import ChatClientLifecycle from '@/components/islands/ChatClientLifecycle';
 import ProjectTree from '@/components/ProjectTree.astro';
 
@@ -241,11 +242,15 @@ never in production by default. Alternatively, use the three-argument constructo
 functions that redact sensitive fields.
 </Gotcha>
 
+<MoreGotchas>
+
 <Gotcha kind="reliability" title="ChatClient.create(chatModel) skips observability">
 Clients built with `ChatClient.create(…)` or `ChatClient.builder(chatModel)` bypass the auto-configured builder. That means no Micrometer
 observations and no `ChatClientBuilderCustomizer` beans. Inject `ChatClient.Builder`, or use `ChatClientBuilderConfigurer` when you work with several models
 (see the next lesson).
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 

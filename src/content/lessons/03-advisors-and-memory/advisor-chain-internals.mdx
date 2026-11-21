@@ -5,6 +5,7 @@ description: How a ChatClient call travels through CallAdvisor, StreamAdvisor an
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import AdvisorChainLab from '@/components/islands/AdvisorChainLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 import { lessonHref } from '@/lib/course';
@@ -273,6 +274,14 @@ A question that takes three rounds of tool calls makes four model calls, and eve
 embeddings and four vector searches. Put an advisor that only needs the final answer before the tool loop.
 </Gotcha>
 
+<Gotcha kind="security" title="The context map travels with the request">
+Everything you pass with `.param(...)` sits in `request.context()`, which every advisor can read and `SimpleLoggerAdvisor`
+logs with the request. Pass identifiers, not secrets or tokens, and remember that a later advisor can't trust a value an earlier
+one could have changed.
+</Gotcha>
+
+<MoreGotchas>
+
 <Gotcha kind="reliability" title="before() runs on another thread when streaming">
 For `stream()`, `BaseAdvisor` moves `before` onto `Schedulers.boundedElastic()`. Thread-bound values such as the
 `SecurityContext` or the logging MDC aren't there. Read the user and anything else you need in the controller and pass it as an
@@ -285,17 +294,13 @@ piece of text. An advisor that inspects the answer must implement `StreamAdvisor
 A `CallAdvisor` alone doesn't run for `stream()` at all.
 </Gotcha>
 
-<Gotcha kind="security" title="The context map travels with the request">
-Everything you pass with `.param(...)` sits in `request.context()`, which every advisor can read and `SimpleLoggerAdvisor`
-logs with the request. Pass identifiers, not secrets or tokens, and remember that a later advisor can't trust a value an earlier
-one could have changed.
-</Gotcha>
-
 <Gotcha kind="migration" title="AdvisedRequest and aroundCall are gone">
 Advisors written for the 1.0 milestones used `CallAroundAdvisor`, `AdvisedRequest` and `aroundCall(...)`. In 2.0 the types are
 `CallAdvisor`, `ChatClientRequest` and `adviseCall(...)`, and the context is a plain `Map` on the request record. Port them by
 building a changed request with `request.mutate()` and calling `chain.nextCall(...)`.
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 

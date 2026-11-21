@@ -5,6 +5,7 @@ description: How .entity() turns model text into Java records, lists and maps. W
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import RecordSchemaLab from '@/components/islands/RecordSchemaLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 
@@ -235,6 +236,19 @@ Jackson builds the record with `null` there. When it adds a field the schema doe
 at all fails, with Jackson's unchecked `JacksonException`. Check the fields you depend on, or turn on schema validation (next lesson).
 </Gotcha>
 
+<Gotcha kind="cost" title="The schema is prompt text on every call">
+The full schema, with every description, is sent on each request and billed as input tokens. A large nested record used for a small
+answer costs on every call. Keep output records focused on one task, and keep descriptions short and specific.
+</Gotcha>
+
+<Gotcha kind="security" title="A typed answer is still untrusted input">
+An enum limits `priority` to four values, but a `String` holds whatever the model wrote, including text that came from the ticket
+itself. Escape `suggestedReply` before rendering it as HTML, never build SQL or shell commands from it, and add Bean Validation
+constraints (`@Size`, `@Pattern`) to the record when the values flow further into your system.
+</Gotcha>
+
+<MoreGotchas>
+
 <Gotcha kind="reliability" title='@JsonProperty("name") makes a field optional'>
 When a property has `@JsonProperty`, its `required` flag decides, and that flag defaults to `false`. Renaming a field with
 `@JsonProperty("account_id")` therefore removes it from `required`. Write `@JsonProperty(value = "account_id", required = true)`, and keep
@@ -247,22 +261,13 @@ and chat memory stores the user message without them, which keeps the conversati
 actually received, call `getFormat()` on the converter, or log at the model level (Module 6).
 </Gotcha>
 
-<Gotcha kind="cost" title="The schema is prompt text on every call">
-The full schema, with every description, is sent on each request and billed as input tokens. A large nested record used for a small
-answer costs on every call. Keep output records focused on one task, and keep descriptions short and specific.
-</Gotcha>
-
-<Gotcha kind="security" title="A typed answer is still untrusted input">
-An enum limits `priority` to four values, but a `String` holds whatever the model wrote, including text that came from the ticket
-itself. Escape `suggestedReply` before rendering it as HTML, never build SQL or shell commands from it, and add Bean Validation
-constraints (`@Size`, `@Pattern`) to the record when the values flow further into your system.
-</Gotcha>
-
 <Gotcha kind="migration" title="Jackson 3 in Spring AI 2.0">
 `BeanOutputConverter` now takes a Jackson 3 `tools.jackson.databind.json.JsonMapper` instead of a Jackson 2 `ObjectMapper`, and parse
 failures are Jackson 3's unchecked `tools.jackson.core.JacksonException`. The annotations keep their old package,
 `com.fasterxml.jackson.annotation`, so records written for 1.x compile unchanged.
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 

@@ -5,6 +5,7 @@ description: Load PDFs and Markdown with Spring AI's DocumentReaders, split them
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import TextSplitterLab from '@/components/islands/TextSplitterLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 
@@ -337,19 +338,6 @@ searches return duplicates. Tag chunks with their source and delete the old ones
 old revision after, as the service does: deleting first leaves nothing searchable if the embedding call then fails.
 </Gotcha>
 
-<Gotcha kind="cost" title="A PDF page brings its layout, header and footer">
-`PagePdfDocumentReader` keeps the page layout: a test page with about 300 characters of words came back as 1,508 characters,
-padded with spaces that the splitter counts as tokens. Running headers and page footers repeat in every chunk. Use `ExtractedTextFormatter` with
-`withLeftAlignment(true)` and delete the header and footer lines. The extracted text ends with a blank line, so a one-line footer
-needs `withNumberOfBottomTextLinesToDelete(2)`.
-</Gotcha>
-
-<Gotcha kind="reliability" title="Header and footer removal does nothing on Windows">
-`ExtractedTextFormatter` finds lines with `System.lineSeparator()`, which is `\r\n` on Windows, but PDFBox always returns `\n`.
-On a Windows laptop no line is deleted, and the same code works on the Linux server. Call `overrideLineSeparator("\n")` so it
-behaves the same everywhere.
-</Gotcha>
-
 <Gotcha kind="reliability" title="Markdown code blocks become documents of their own">
 By default `MarkdownDocumentReader` turns each fenced code block into a separate `Document` with `category: code_block`, away from
 the text that explains it, and it does the same with blockquotes. A blockquote's text is also joined to the next paragraph with
@@ -363,11 +351,28 @@ splitting 10,000 chunks makes 10,000 calls on every run. Run them before splitti
 that `KeywordMetadataEnricher.builder(model).build()` without `keywordCount(...)` throws `IllegalArgumentException`.
 </Gotcha>
 
+<MoreGotchas>
+
+<Gotcha kind="cost" title="A PDF page brings its layout, header and footer">
+`PagePdfDocumentReader` keeps the page layout: a test page with about 300 characters of words came back as 1,508 characters,
+padded with spaces that the splitter counts as tokens. Running headers and page footers repeat in every chunk. Use `ExtractedTextFormatter` with
+`withLeftAlignment(true)` and delete the header and footer lines. The extracted text ends with a blank line, so a one-line footer
+needs `withNumberOfBottomTextLinesToDelete(2)`.
+</Gotcha>
+
+<Gotcha kind="reliability" title="Header and footer removal does nothing on Windows">
+`ExtractedTextFormatter` finds lines with `System.lineSeparator()`, which is `\r\n` on Windows, but PDFBox always returns `\n`.
+On a Windows laptop no line is deleted, and the same code works on the Linux server. Call `overrideLineSeparator("\n")` so it
+behaves the same everywhere.
+</Gotcha>
+
 <Gotcha kind="migration" title="The TokenTextSplitter constructors are deprecated">
 The 1.x constructors, such as `new TokenTextSplitter(800, 350, 5, 10000, true)`, are deprecated for removal since 2.0.0-M3.
 Use `TokenTextSplitter.builder()` with `withChunkSize`, `withMinChunkSizeChars`, `withKeepSeparator` and the other `with...`
 methods.
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 

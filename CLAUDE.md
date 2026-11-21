@@ -33,10 +33,16 @@ There are no unit tests. `npm run build` is the gate.
   20 code lines a minute, rounds up, puts a `.section-time` label under the heading and passes `sectionMinutes` to `LessonLayout`
   for the "On this page" list. Sandboxes count only their surrounding text.
 - MDX components: `Mermaid` (renders client-side and re-renders on `themechange`), `CodeFile` (the code viewer), `Gotcha`
-  (`kind`: reliability | security | cost | migration).
+  (`kind`: reliability | security | cost | migration) and `MoreGotchas`: section 4 shows the three most important gotchas
+  (security and money first) and wraps the rest in `<MoreGotchas>` (closed; left out of reading time). Keep that when adding one.
+- Lessons that go further than a first pass needs have `deepDive: true` in `curriculum.ts`: a muted "Deep dive" tag in the
+  sidebar and course list and a note in the lesson header. Core is the default and unmarked.
 - Code viewer: every lesson code block goes inside `CodeFile`: the file name and an icon-only copy button (`.copy-btn`, shared with
   the sandboxes through `CopyButton`) above a 6px code box with line numbers. Line numbers are CSS counters, so copying never includes
-  them. Mark key lines with fence meta (```java {12-14}) or the `lines` prop when passing `code`. Themes and transformers live in
+  them. Mark key lines with fence meta (```java {12-14}) or the `lines` prop when passing `code`. A file of 25+ lines with key lines opens
+  folded to them (3 lines of context; runs of 4+ hidden lines become "⋯ N lines" gap rows; "Show full file" in the title line),
+  by the rule in `src/lib/code-fold.mjs`, which `section-reading-time.mjs` also uses to count only visible lines. Choose key
+  lines with that in mind: they decide what a reader sees first. Themes and transformers live in
   `shiki.config.mjs`, which both Markdown fences and `src/lib/highlight.ts` use: Catppuccin Latte with every colour under 4.6:1 darkened
   in OKLCH (`LATTE_DARKENED`) on `#f8fafc`, and Mocha on slate-800 in dark mode. Fences render as `pre.astro-code` and snippets as
   `pre.shiki`, so code CSS targets `pre:is(.shiki, .astro-code)`. Box colours are `--code-*` variables in `global.css`. The font is

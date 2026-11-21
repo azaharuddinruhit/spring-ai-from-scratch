@@ -4,6 +4,7 @@ description: What SimpleLoggerAdvisor and SafeGuardAdvisor really do, and how to
 
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import GuardrailLab from '@/components/islands/GuardrailLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 
@@ -515,13 +516,6 @@ synonym all pass. Use it to stop obvious mistakes. Authorization, data access an
 and your tools, not in a list of words.
 </Gotcha>
 
-<Gotcha kind="reliability" title="A guard after memory can block a whole conversation">
-At its default order `0`, `SafeGuardAdvisor` runs after memory and checks the stored history too. One blocked message is saved
-with the failure reply, and every later turn is blocked: for good with the memory advisor's default `EventFilter.all()`, or
-until the event filter stops sending it. It also checks the system message, so a sensitive word there blocks every request.
-Order it before memory, at `HIGHEST_PRECEDENCE + 25` or similar.
-</Gotcha>
-
 <Gotcha kind="security" title="SimpleLoggerAdvisor logs everything">
 At `DEBUG` it logs every message, including the full conversation history and retrieved documents, plus the context map. Keep
 it after redaction, keep that logger off in production unless your logs are cleared for personal data, or pass a
@@ -532,6 +526,15 @@ it after redaction, keep that logger off in production unless your logs are clea
 The semantic cache returns an answer written for someone else. Cache only answers that are the same for everyone, like FAQs,
 on a client without user-specific tools or documents. If answers differ per tenant, store the tenant in the document metadata
 and add a `filterExpression` to the search.
+</Gotcha>
+
+<MoreGotchas>
+
+<Gotcha kind="reliability" title="A guard after memory can block a whole conversation">
+At its default order `0`, `SafeGuardAdvisor` runs after memory and checks the stored history too. One blocked message is saved
+with the failure reply, and every later turn is blocked: for good with the memory advisor's default `EventFilter.all()`, or
+until the event filter stops sending it. It also checks the system message, so a sensitive word there blocks every request.
+Order it before memory, at `HIGHEST_PRECEDENCE + 25` or similar.
 </Gotcha>
 
 <Gotcha kind="reliability" title="The similarity threshold decides what counts as the same question">
@@ -545,6 +548,8 @@ the source documents change.
 a streaming endpoint would bypass the budget. Implement `StreamAdvisor` as well, or don't offer streaming on that client. The
 budget also lives in one JVM: with several instances, keep the counters in Redis or your database.
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 

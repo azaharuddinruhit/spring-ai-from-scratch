@@ -5,6 +5,7 @@ description: What changed in the Spring AI 2.x stack and why it matters. Boot 4 
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import OptionsMergeLab from '@/components/islands/OptionsMergeLab';
 import { buildGradle } from '@/data/snippets';
 import ProjectTree from '@/components/ProjectTree.astro';
@@ -244,6 +245,13 @@ casts to its own type, which fails with a `ClassCastException`. Derive variants 
 `UnsupportedOperationException` at runtime. Search your code for `copy()` and `fromOptions(` before you upgrade, and replace each one with `mutate()`.
 </Gotcha>
 
+<Gotcha kind="security" title="Keep API keys out of source and out of logs">
+Reference keys as `${ANTHROPIC_API_KEY}` and inject them from the environment or a secret manager. Never commit them in `application.yml`.
+Remember that `/actuator/env` and `/actuator/configprops` expose properties if you enable them over the web.
+</Gotcha>
+
+<MoreGotchas>
+
 <Gotcha kind="cost" title="Virtual threads remove your accidental rate limiter">
 With platform threads, Tomcat's 200-thread pool capped how many model calls ran at once. With virtual threads there's no such cap. A traffic spike
 or a `parallelStream()` fan-out can send thousands of simultaneous requests, which leads to HTTP 429s and a surprise bill. Bound concurrency
@@ -255,16 +263,13 @@ Some responses have no text, for example when they are filtered by the provider 
 `@Nullable`. Turn on NullAway (or IntelliJ's JSpecify inspections) so the compiler flags unchecked dereferences instead of production throwing NPEs.
 </Gotcha>
 
-<Gotcha kind="security" title="Keep API keys out of source and out of logs">
-Reference keys as `${ANTHROPIC_API_KEY}` and inject them from the environment or a secret manager. Never commit them in `application.yml`.
-Remember that `/actuator/env` and `/actuator/configprops` expose properties if you enable them over the web.
-</Gotcha>
-
 <Gotcha kind="migration" title="Jackson 2 modules on the classpath are silently ignored">
 Jackson 3 modules use new Maven coordinates and packages. A leftover `com.fasterxml.jackson.datatype:jackson-datatype-*` module still compiles,
 but Boot 4's `JsonMapper` never registers it. Customize JSON with a `JsonMapperBuilderCustomizer` bean
 (`org.springframework.boot.jackson.autoconfigure`) and use the Jackson 3 versions of modules.
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 

@@ -5,6 +5,7 @@ description: Ask a small local decision model typed questions and get probabilit
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import DecisionLab from '@/components/islands/DecisionLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 import { buildGradle } from '@/data/snippets';
@@ -500,6 +501,8 @@ With both starters on the classpath and no property, startup fails with `NoUniqu
 openAiDecisionModel`. Set `spring.ai.model.decision` explicitly.
 </Gotcha>
 
+<MoreGotchas>
+
 <Gotcha kind="reliability" title="Odd input: an exception, or a quiet guess">
 A blank message throws `IllegalArgumentException: text cannot be null or empty`, so check for it before you call. "asdfghjkl" was
 not refused: it came back as `other` with a confidence of 0.50. No question was refused in any of our runs. The minimum confidence
@@ -511,6 +514,8 @@ The first call after startup took about 10 seconds while Ollama loaded the model
 `pull-model-strategy: when_missing`, a fresh machine also downloads 849 MB at startup. Pull the model when you build the image,
 and send one warm-up call before the app takes traffic.
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 

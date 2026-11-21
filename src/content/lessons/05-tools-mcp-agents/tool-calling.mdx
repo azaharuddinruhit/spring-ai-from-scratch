@@ -5,9 +5,12 @@ description: Give the support assistant tools with @Tool and ToolContext, see ho
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import ToolLoopLab from '@/components/islands/ToolLoopLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 import { lessonHref } from '@/lib/course';
+
+**You'll need:** the support app from Module 4 and a chat model that calls tools. Nothing new outside Spring AI.
 
 The support assistant answers from the knowledge base, but it can't see a customer's orders. "Where is my order 1042?" needs
 data that lives in your database. With tool calling, the model asks your application to run a method, reads the result and then
@@ -815,16 +818,24 @@ text in a retrieved document. Take identity from the signed-in user, pass it wit
 it. A test that checks the tool's input schema for `customer` keeps it that way.
 </Gotcha>
 
-<Gotcha kind="security" title="The default processor sends exception messages to the model">
-`DefaultToolExecutionExceptionProcessor` returns the exception message as the tool result. For a JDBC failure that is your SQL,
-table and column names, and host names, and the model may repeat them to the customer. Define one
-`ToolExecutionExceptionProcessor` bean that passes only messages written for the model and logs the rest.
-</Gotcha>
-
 <Gotcha kind="reliability" title="A limit ends the loop with a technical message as the answer">
 With the default `THROW`, `.content()` returns "Tool call limit (3) exceeded for tool 'findOrder'. No further calls to this tool
 are allowed in this turn." No exception is thrown. Read the finish reason and compare it with
 `ToolCallLimitExceededException.FINISH_REASON`, as `SupportChatService` does, or the customer reads the limit message.
+</Gotcha>
+
+<Gotcha kind="security" title="Keep tools that change things out of the model's reach">
+The model calls a tool whenever the conversation makes it seem right, and the conversation can include a customer's
+instructions or a poisoned document. Read-only tools scoped to the signed-in customer are safe to expose. A tool that refunds,
+cancels or deletes should wait until the customer confirms it. Lesson 3 marks the refund tool with `requiresConfirmation`.
+</Gotcha>
+
+<MoreGotchas>
+
+<Gotcha kind="security" title="The default processor sends exception messages to the model">
+`DefaultToolExecutionExceptionProcessor` returns the exception message as the tool result. For a JDBC failure that is your SQL,
+table and column names, and host names, and the model may repeat them to the customer. Define one
+`ToolExecutionExceptionProcessor` bean that passes only messages written for the model and logs the rest.
 </Gotcha>
 
 <Gotcha kind="cost" title="Every tool round is another full model call">
@@ -842,16 +853,12 @@ call carried `findOrder` and `toolSearchTool`. It keeps the found tools per conv
 Search</a> lesson measures its indexes.
 </Gotcha>
 
-<Gotcha kind="security" title="Keep tools that change things out of the model's reach">
-The model calls a tool whenever the conversation makes it seem right, and the conversation can include a customer's
-instructions or a poisoned document. Read-only tools scoped to the signed-in customer are safe to expose. A tool that refunds,
-cancels or deletes should wait until the customer confirms it. Lesson 3 marks the refund tool with `requiresConfirmation`.
-</Gotcha>
-
 <Gotcha kind="migration" title="defaultToolCallbacks is deprecated for removal">
 In 2.0, `defaultToolCallbacks(...)` and `toolCallbacks(...)` are deprecated for removal. `defaultTools(...)` and `tools(...)`
 accept `@Tool` objects, `ToolCallback`s and `ToolCallbackProvider`s, so one call registers all of them.
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 

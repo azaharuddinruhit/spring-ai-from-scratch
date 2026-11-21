@@ -5,6 +5,7 @@ description: Test the support app against a real model and real pgvector with Te
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import AnswerCheckLab from '@/components/islands/AnswerCheckLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 import { lessonHref } from '@/lib/course';
@@ -543,14 +544,6 @@ With the same two tool definitions, `qwen2.5:1.5b` asked for the order number it
 your test model with one direct tool call before you build on it.
 </Gotcha>
 
-<Gotcha kind="cost" title="The first run downloads gigabytes">
-`ollama/ollama` is 8.5 GB unpacked, and the models come on top. On your machine, set `testcontainers.reuse.enable=true` in
-`~/.testcontainers.properties` so `withReuse(true)` keeps them. CI never reuses containers: cache the image, or build one with the
-models inside using `OllamaContainer.commitToImage`. On Docker Desktop with WSL, `OllamaContainer` may ask for a GPU that isn't
-there and fail with "WSL environment detected but no adapters were found". Clear the request with
-`.withCreateContainerCmdModifier(cmd -> cmd.getHostConfig().withDeviceRequests(List.of()))`.
-</Gotcha>
-
 <Gotcha kind="reliability" title="A weak judge fails good answers">
 In our run, a 3B judge said NO to every answer, correct ones included. When it answered in sentences, Spring AI read even
 "Yes. The claim is supported…" as a fail. Use a judge stronger than the model under test, and before you trust its gate, run it on
@@ -562,11 +555,23 @@ A registered `Test` task without `testClassesDirs` and `classpath` reports `NO-S
 without grading a single answer. Check that its report lists the tests.
 </Gotcha>
 
+<MoreGotchas>
+
+<Gotcha kind="cost" title="The first run downloads gigabytes">
+`ollama/ollama` is 8.5 GB unpacked, and the models come on top. On your machine, set `testcontainers.reuse.enable=true` in
+`~/.testcontainers.properties` so `withReuse(true)` keeps them. CI never reuses containers: cache the image, or build one with the
+models inside using `OllamaContainer.commitToImage`. On Docker Desktop with WSL, `OllamaContainer` may ask for a GPU that isn't
+there and fail with "WSL environment detected but no adapters were found". Clear the request with
+`.withCreateContainerCmdModifier(cmd -> cmd.getHostConfig().withDeviceRequests(List.of()))`.
+</Gotcha>
+
 <Gotcha kind="migration" title="Your test model is not your production model">
 Thresholds and dimensions belong to an embedding model. The 0.5 similarity threshold was set for `text-embedding-3-small`; with
 `nomic-embed-text`, "Where do I find my tracking number?" retrieved nothing. Integration tests prove the wiring. Only evals against
 the production model tell you whether the answers are good.
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 

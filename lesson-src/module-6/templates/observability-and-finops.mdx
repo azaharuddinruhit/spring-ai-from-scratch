@@ -5,6 +5,7 @@ description: Trace every ChatClient call, advisor, model call, vector search and
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import TraceLab from '@/components/islands/TraceLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 
@@ -181,6 +182,8 @@ Out of the box, Boot keeps one trace in ten, exports none until you set the trac
 spans" and keeps serving.
 </Gotcha>
 
+<MoreGotchas>
+
 <Gotcha kind="cost" title="The token metric prices cached input as new input">
 OpenAI's prompt-token count includes the tokens it read from its prompt cache, which cost a tenth as much. Spring AI reports those
 only as the span attribute `gen_ai.usage.cache_read.input_tokens`, not in `gen_ai.client.token.usage`. Dollars computed from the
@@ -192,6 +195,8 @@ The follow-up's rewrite returned a question of about 15 tokens and reported 252 
 count includes the reasoning, which the reply never shows. Templates, tokenizers, reasoning and providers all change the count.
 Budget from `gen_ai.client.token.usage`, not from the length of your prompts and replies.
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 

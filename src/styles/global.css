@@ -222,6 +222,47 @@ pre:is(.shiki, .astro-code) .line.diff-changed::before {
 .copy-btn.is-done {
   @apply text-brand-700 dark:text-brand-400;
 }
+/* A code file's path: when it doesn't fit, it is cut on the left, so the file name always shows (`bdi` keeps the path LTR). */
+.code-file-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+/* "Show full file" beside the copy button of a folded code file: a quiet text button, the secondary-link underline. Its label
+   follows the figure's state ("Full file" / "Key lines" on phones). */
+[data-folded] .fold-label-open,
+[data-code-file]:not([data-folded]) .fold-label-folded {
+  display: none;
+}
+.fold-toggle {
+  @apply cursor-pointer rounded-md px-1.5 py-1 text-xs font-medium text-slate-500 underline decoration-slate-300 underline-offset-4 transition-colors hover:text-slate-900 hover:decoration-brand-600 dark:text-slate-400 dark:decoration-slate-600 dark:hover:text-white dark:hover:decoration-brand-400;
+}
+/* A long code file folded to its key lines (CodeFile, code-fold.mjs): hidden runs, and one gap row in place of each run.
+   The gap row resets the line counter itself (inline counter-set), so the numbers after it stay true. */
+[data-folded] pre:is(.shiki, .astro-code) .line.fold-hidden:not(.is-open),
+pre:is(.shiki, .astro-code) .fold-gap {
+  display: none;
+}
+[data-folded] pre:is(.shiki, .astro-code) .fold-gap:not(.is-open) {
+  display: block;
+  min-height: 1lh;
+  padding: 0 14px 0 3rem;
+  border-block: 1px dashed var(--code-border);
+  margin-block: 2px;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  text-align: left;
+  color: var(--code-gutter);
+  cursor: pointer;
+}
+[data-folded] pre:is(.shiki, .astro-code) .fold-gap:not(.is-open):hover {
+  color: var(--code-highlight-bar);
+}
+pre:is(.shiki, .astro-code) .fold-gap::before {
+  content: '⋯ ' attr(data-count) ' lines';
+}
 /* Wide comparison tables scroll inside the column instead of widening the page on phones. Sandboxes (.not-prose) lay out
    their own tables. */
 .lesson-prose table:not(.not-prose table) {

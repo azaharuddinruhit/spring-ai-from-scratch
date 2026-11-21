@@ -249,12 +249,18 @@ interactive. Gotchas keep a 4px colored left edge because the hue encodes the go
 - **State:** the active pill is filled emerald (dark mode: a 20% emerald tint with light emerald text) and sets `aria-pressed`.
 
 ### Code file
-- **Title line:** above the box, outside it: the file path in mono (medium, slate-700) and, on the right, an icon-only copy button
+- **Title line:** above the box, outside it: the file path in mono (medium, slate-700; a path that doesn't fit is cut on the left,
+  so the file name always shows) and, on the right, an icon-only copy button
   (32px, transparent border that appears on hover, muted icon). After a copy the icon turns into an emerald check for 1.5s and a
   screen-reader status says "Copied". No window dots, no language badge.
 - **Box:** Code Paper or Code Night, 1px Code Rule border, 6px radius, 12px vertical padding, 0.8rem/1.65 JetBrains Mono, no
   ligatures, no italics. Scrollbars use the code palette (gutter-colored thumb on the code background).
 - **Lines:** CSS-counter line numbers in the gutter color, never copied. Key lines get the green band and a green number.
+- **Folding:** a file of 25 lines or more with key lines opens folded (`src/lib/code-fold.mjs`): its key lines with 3 lines
+  around each, and every hidden run of 4 or more lines becomes one gap row, "⋯ N lines" in Plex xs in the gutter color between
+  dashed Code Rule hairlines, aligned with the code. A gap row opens its run (hover turns its text green); "Show full file", a
+  quiet underlined xs text button left of the copy button ("Full file" on phones), opens them all and becomes "Show key lines". Gap rows reset the line
+  counter, so numbers stay true, and carry no text, so copy still copies the whole file. Reading time counts only the visible lines.
 - **Sandboxes:** `CodeView` uses the same box at the same size; the provider switcher uses the same title line and copy button.
 
 ### Project tree
@@ -277,13 +283,18 @@ interactive. Gotchas keep a 4px colored left edge because the hue encodes the go
 ### Gotcha
 - **Style:** an 8px callout with a 4px left edge in the kind's hue and a small sentence-case badge (Reliability, Security, Cost,
   1.x → 2.0).
+- **More gotchas:** a lesson shows its three most important gotchas (security and money first) and folds the rest into
+  `MoreGotchas`: a closed `<details>` with an 8px slate hairline, a chevron that turns 90° (none under reduced motion) and
+  "More gotchas (N)" as a medium sm label; open, a hairline separates the summary from the gotchas. Reading time leaves them out.
 
 ### Navigation
 - **Header:** sticky, 3.5rem, translucent paper with backdrop blur. The menu button (lesson pages, below lg) and the logo on the
   left; the version pill and the theme toggle on the right. The pill is a 1px slate outline, fully round, 0.75rem medium Plex with
   tabular figures, reading `v1.0.37` on a deploy and `dev` on any other build.
 - **Sidebar:** modules with tabular numbers, lessons in a 1px rail. The current lesson takes an emerald rail segment and emerald
-  text. Unwritten lessons are muted with an italic lowercase "soon".
+  text. Unwritten lessons are muted with an italic lowercase "soon". A deep-dive lesson carries a muted xs "Deep dive" on the
+  right (also after its title in the home course list, explained once above it), and its header adds one muted sentence; core
+  lessons carry no mark.
 - **Course sheet (below lg):** the header's menu button opens the sidebar as a bottom sheet on a modal `<dialog>`: paper,
   a 1px top hairline, 12px top corners, no shadow, a 50% slate-950 scrim, at most 85dvh. A grab bar and "Course contents"
   with a close button head it; dragging that head down past a quarter of its height (at most 120px) closes it, as do the

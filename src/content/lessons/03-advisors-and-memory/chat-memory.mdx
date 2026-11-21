@@ -5,6 +5,7 @@ description: Give the stateless model a conversation with Spring AI 2.1 session 
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import ChatMemoryLab from '@/components/islands/ChatMemoryLab';
 import ProjectTree from '@/components/ProjectTree.astro';
 
@@ -460,19 +461,6 @@ who pick the same id share one. Derive the id on the server from the authenticat
 or look up the session and check its owner.
 </Gotcha>
 
-<Gotcha kind="reliability" title="The schema is created only for embedded databases">
-`spring.ai.session.repository.jdbc.initialize-schema` defaults to `embedded`, so on PostgreSQL the tables don't exist and the
-first call fails. Set it to `always`, or, better in production, copy
-`org/springframework/ai/session/jdbc/schema-postgresql.sql` from the `spring-ai-session-jdbc` jar into a Flyway or Liquibase
-migration and set it to `never`.
-</Gotcha>
-
-<Gotcha kind="reliability" title="The app needs its database to start">
-The JDBC session repository connects at startup to detect the database dialect. A test context that loads the full
-configuration without a database fails before any test runs. `@WebMvcTest` doesn't load it; for `@SpringBootTest`, start
-PostgreSQL in Testcontainers, as Module 6 does.
-</Gotcha>
-
 <Gotcha kind="cost" title="By default every message is sent, every time">
 The memory advisor's default filter is `EventFilter.all()`, so a conversation's whole history goes to the model, and is billed,
 with every turn. Set `EventFilter.lastN(...)`, cap the input size as the controller does with `@Size`, and keep memory before
@@ -488,6 +476,21 @@ users a way to delete a chat, store messages after redaction as in the previous 
 both.
 </Gotcha>
 
+<MoreGotchas>
+
+<Gotcha kind="reliability" title="The schema is created only for embedded databases">
+`spring.ai.session.repository.jdbc.initialize-schema` defaults to `embedded`, so on PostgreSQL the tables don't exist and the
+first call fails. Set it to `always`, or, better in production, copy
+`org/springframework/ai/session/jdbc/schema-postgresql.sql` from the `spring-ai-session-jdbc` jar into a Flyway or Liquibase
+migration and set it to `never`.
+</Gotcha>
+
+<Gotcha kind="reliability" title="The app needs its database to start">
+The JDBC session repository connects at startup to detect the database dialect. A test context that loads the full
+configuration without a database fails before any test runs. `@WebMvcTest` doesn't load it; for `@SpringBootTest`, start
+PostgreSQL in Testcontainers, as Module 6 does.
+</Gotcha>
+
 <Gotcha kind="migration" title="ChatMemory is deprecated for removal">
 `ChatMemory`, `MessageWindowChatMemory`, `MessageChatMemoryAdvisor` and `ChatMemoryRepository` are deprecated for removal since
 2.1.0. Replace `MessageChatMemoryAdvisor` with `SessionAdvisors`, `ChatMemory.CONVERSATION_ID` with
@@ -495,6 +498,8 @@ both.
 The sessions live in new tables, so existing conversations aren't carried over, and the 36-character limit of the old
 `conversation_id` column is gone.
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 

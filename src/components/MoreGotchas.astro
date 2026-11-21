@@ -1,0 +1,27 @@
+---
+/**
+ * The gotchas a first read can skip, folded under one line: a lesson shows its three most important gotchas and wraps the
+ * rest in this. Closed by default; the count comes from the gotchas inside.
+ */
+const html = await Astro.slots.render('default');
+const count = html.match(/data-gotcha/g)?.length ?? 0;
+---
+
+<details class="more-gotchas group my-5 rounded-lg border border-slate-200 dark:border-slate-700/70">
+  <summary class="not-prose flex cursor-pointer list-none items-center gap-2 rounded-lg px-4 py-3 [&::-webkit-details-marker]:hidden">
+    <svg
+      class="size-3.5 shrink-0 text-slate-500 transition-transform group-open:rotate-90 motion-reduce:transition-none dark:text-slate-400"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2.5"
+      aria-hidden="true"
+    >
+      <path d="m9 6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+    <span class="text-sm font-medium text-slate-700 dark:text-slate-300">More gotchas ({count})</span>
+  </summary>
+  <div class="border-t border-slate-200 px-2 pb-1 sm:px-4 dark:border-slate-700/70">
+    <Fragment set:html={html} />
+  </div>
+</details>

@@ -5,6 +5,7 @@ description: Switch between OpenAI, Anthropic, Google GenAI, Amazon Bedrock, Dee
 import Mermaid from '@/components/Mermaid.astro';
 import CodeFile from '@/components/CodeFile.astro';
 import Gotcha from '@/components/Gotcha.astro';
+import MoreGotchas from '@/components/MoreGotchas.astro';
 import ProviderSwitcherLab from '@/components/ProviderSwitcherLab.astro';
 import { gradleDependencies } from '@/data/snippets';
 import ProjectTree from '@/components/ProjectTree.astro';
@@ -189,13 +190,6 @@ auto-configured `ChatClient.Builder` then fails at startup with a `NoUniqueBeanD
 `spring.ai.model.chat` (Pattern A), or stop injecting the builder and wire clients explicitly with `@Primary` (Pattern B).
 </Gotcha>
 
-<Gotcha kind="reliability" title="Portable code, but behavior differs by provider">
-The Java code is portable. Model behavior is not. Default `max-tokens`, whether `temperature` is supported (OpenAI's GPT-5 family rejects it),
-JSON-schema strictness, multimodal support and tool-calling quality all differ between providers. Run the same evaluation suite against each
-provider you switch to (Module 6) rather than assuming parity. Reasoning models also return their thinking, which the
-<a href={lessonHref('01-foundations/message-parts-and-reasoning')}>Message Parts & Reasoning</a> lesson reads.
-</Gotcha>
-
 <Gotcha kind="migration" title="Provider changes in 2.1">
 Spring AI 2.1 moves Anthropic to `anthropic-java` 3.x, which calls API version 2026-10-21. That version rejects sampling options,
 so `AnthropicChatModel` no longer sends `temperature`, `topP` or `topK`: it logs a warning and drops them, and the option
@@ -209,6 +203,15 @@ over plain HTTP sends prompts and customer data unencrypted. Use TLS and network
 Ollama's port to the internet. It has no authentication.
 </Gotcha>
 
+<MoreGotchas>
+
+<Gotcha kind="reliability" title="Portable code, but behavior differs by provider">
+The Java code is portable. Model behavior is not. Default `max-tokens`, whether `temperature` is supported (OpenAI's GPT-5 family rejects it),
+JSON-schema strictness, multimodal support and tool-calling quality all differ between providers. Run the same evaluation suite against each
+provider you switch to (Module 6) rather than assuming parity. Reasoning models also return their thinking, which the
+<a href={lessonHref('01-foundations/message-parts-and-reasoning')}>Message Parts & Reasoning</a> lesson reads.
+</Gotcha>
+
 <Gotcha kind="cost" title="pull-model-strategy: always in production">
 `always` re-pulls multi-gigabyte model layers on every startup, which slows rollouts and autoscaling. Use `when_missing` in development, and
 bake models into the image or a volume for production.
@@ -218,6 +221,8 @@ bake models into the image or a volume for production.
 `spring-ai-azure-openai` and `spring-ai-openai-sdk` were removed and merged into `spring-ai-openai`, which now supports Microsoft Foundry
 deployments. The dedicated MiniMax and OCI GenAI modules are gone as well. Drop the `Azure` or `Sdk` prefixes from class names when you migrate.
 </Gotcha>
+
+</MoreGotchas>
 
 ## Recap
 
